@@ -27,3 +27,11 @@ class DocumentGrouper:
             filename = filename[:-4]
 
         return filename
+
+    def _extract_part_number(self, filename: str) -> int:
+        """Extract part number from filename (0 if no part number)."""
+        for pattern in self.MULTIPART_PATTERNS:
+            match = re.search(pattern, filename, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
+        return 0
