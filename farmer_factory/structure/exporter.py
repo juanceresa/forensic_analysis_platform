@@ -2,11 +2,23 @@
 
 import re
 import json
+import logging
 from datetime import datetime
 from typing import Dict, Any, List
 from pathlib import Path
 from collections import Counter
 from farmer_factory.structure.graph import KnowledgeGraph
+
+logger = logging.getLogger(__name__)
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder for datetime objects."""
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 class GraphExporter:
@@ -229,3 +241,33 @@ class GraphExporter:
             "earliest_event": min(valid_dates),
             "latest_event": max(valid_dates)
         }
+
+    def save(self, output_path: Path, factory_version: str) -> None:
+        """
+        Save graph to JSON file with atomic write.
+
+        Uses temp file + rename for atomic write to prevent corruption.
+
+        Args:
+            output_path: Path to save JSON file
+            factory_version: Version string for Farmer Factory
+        """
+        # Export to JSON
+        data = self.to_json(factory_version)
+
+        # Atomic write: write to temp file, then rename
+        temp_path = output_path.with_suffix('.tmp')
+
+        try:
+            with open(temp_path, 'w') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
+
+            # Atomic rename
+            temp_path.rename(output_path)
+
+            logger.info(f"Saved graph to {output_path} ({len(data['nodes'])} nodes, {len(data['links'])} links)")
+        except Exception as e:
+            # Clean up temp file if write failed
+            if temp_path.exists():
+                temp_path.unlink()
+            raise

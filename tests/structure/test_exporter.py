@@ -1,6 +1,9 @@
 """Unit tests for Graph Exporter."""
 
 import pytest
+import tempfile
+import json
+from pathlib import Path
 from farmer_factory.structure.exporter import GraphExporter
 from farmer_factory.structure import KnowledgeGraph
 from farmer_factory.structure.schema import (
@@ -208,3 +211,48 @@ def test_to_json_with_conflicting_dates():
     assert person_node["birth_date"] == ["1920 (doc_001)", "1922 (doc_002)"]
     assert person_node["birth_date_earliest"] == "1920"  # Earliest for sorting
     assert person_node["birth_date_sortable"] == "1920-01-01"
+
+
+def test_save_to_file():
+    """Test saving graph to JSON file."""
+    graph = KnowledgeGraph(case_id="test_case")
+
+    # Add a simple entity
+    person = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez",
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+    graph.add_entity(person)
+
+    exporter = GraphExporter(knowledge_graph=graph)
+
+    # Save to temp file
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        temp_path = Path(f.name)
+
+    try:
+        exporter.save(temp_path, factory_version="1.0.0")
+
+        # Verify file exists and is valid JSON
+        assert temp_path.exists()
+
+        with open(temp_path, 'r') as f:
+            data = json.load(f)
+
+        assert data["metadata"]["case_id"] == "test_case"
+        assert len(data["nodes"]) == 1
+    finally:
+        # Cleanup
+        if temp_path.exists():
+            temp_path.unlink()
