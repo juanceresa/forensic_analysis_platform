@@ -43,3 +43,32 @@ def detect_skew_angle(image: np.ndarray) -> float:
 
     # Return median angle (robust to outliers)
     return np.median(angles)
+
+
+def rotate_image(image: np.ndarray, angle: float) -> np.ndarray:
+    """
+    Rotate image to correct skew.
+
+    Args:
+        image: Grayscale image (H x W)
+        angle: Rotation angle in degrees (positive = clockwise)
+
+    Returns:
+        Rotated image with same dimensions
+    """
+    h, w = image.shape[:2]
+    center = (w / 2, h / 2)
+
+    # Get rotation matrix
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+    # Rotate with white background
+    rotated = cv2.warpAffine(
+        image,
+        rotation_matrix,
+        (w, h),
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=255
+    )
+
+    return rotated

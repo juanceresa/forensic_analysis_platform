@@ -37,3 +37,20 @@ def test_detect_skew_angle_rotated():
 
     # Should detect rotation close to 5 degrees
     assert 4.0 < angle < 6.0
+
+
+def test_rotate_image():
+    """Test image rotation correction."""
+    # Create test image
+    image = np.ones((200, 200), dtype=np.uint8) * 255
+    # Add diagonal marker to verify rotation
+    cv2.line(image, (50, 50), (150, 50), 0, 2)
+
+    from farmer_factory.prepare.deskew import rotate_image
+    rotated = rotate_image(image, 10.0)
+
+    # Check dimensions preserved
+    assert rotated.shape == image.shape
+
+    # Check background is white (255)
+    assert rotated[0, 0] == 255
