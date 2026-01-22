@@ -5,7 +5,13 @@ import cv2
 from pathlib import Path
 from typing import Dict, Any
 
-from farmer_factory.prepare import PreprocessingPipeline
+try:
+    from farmer_factory.prepare import PreprocessingPipeline
+except (ModuleNotFoundError, ImportError):
+    import sys
+    import os
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from farmer_factory.prepare import PreprocessingPipeline
 from farmer_factory.extract import (
     ExtractionPipeline,
     OCRService,

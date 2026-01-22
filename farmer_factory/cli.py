@@ -77,7 +77,10 @@ def process(case_id: str, verbose: bool):
     logger.info(f"Processing case: {case_id}")
 
     # Import here to avoid circular imports
-    from farmer_factory.processing import process_case, ProcessingError
+    try:
+        from farmer_factory.processing import process_case, ProcessingError
+    except ModuleNotFoundError:
+        from processing import process_case, ProcessingError
 
     try:
         # Run processing pipeline
