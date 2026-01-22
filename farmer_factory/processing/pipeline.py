@@ -1,0 +1,164 @@
+"""Main processing pipeline orchestration."""
+
+import logging
+import cv2
+from pathlib import Path
+from typing import Dict, Any
+
+from farmer_factory.prepare import PreprocessingPipeline
+from farmer_factory.extract import (
+    ExtractionPipeline,
+    OCRService,
+    VisionExtractionService,
+    LLMExtractionService,
+    SchemaValidator
+)
+from farmer_factory.structure import (
+    KnowledgeGraph,
+    EntityResolver,
+    GraphBuilder,
+    GraphExporter
+)
+from .helpers import load_pdf_pages, save_extraction_json, setup_logging
+from .exceptions import ProcessingError
+
+logger = logging.getLogger(__name__)
+
+
+def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
+    """
+    Process all PDFs in case through complete pipeline.
+
+    Pipeline stages:
+    1. PDF Loading - Convert PDFs to images using pdf2image
+    2. Preprocessing - Deskew, denoise, triage (prepare module)
+    3. Extraction - OCR + Vision + LLM entity/relation extraction
+    4. Graph Building - Entity deduplication, graph construction
+    5. Export - Save graph_data.json in force-graph format
+
+    Args:
+        case_id: Case identifier (e.g., "CASE-CERESA")
+        base_dir: Base directory for cases (defaults to "cases")
+
+    Returns:
+        Dictionary with processing statistics
+
+    Raises:
+        ProcessingError: If any stage fails
+    """
+    if base_dir is None:
+        base_dir = Path('cases')
+
+    # 1. Setup paths and logging
+    case_dir = base_dir / case_id
+    if not case_dir.exists():
+        raise ProcessingError(f"Case directory not found: {case_dir}")
+
+    intake_dir = case_dir / 'intake'
+    preprocessed_dir = case_dir / 'preprocessed'
+    extractions_dir = case_dir / 'extractions'
+    output_dir = case_dir / 'output'
+
+    # Ensure output directories exist
+    preprocessed_dir.mkdir(parents=True, exist_ok=True)
+    extractions_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    setup_logging(case_dir / 'processing.log')
+    logger.info(f"Starting processing for case: {case_id}")
+
+    # 2. Initialize pipelines once (reuse across all documents)
+    logger.info("Initializing pipelines...")
+    try:
+        prep_pipeline = PreprocessingPipeline()
+        extract_pipeline = ExtractionPipeline(
+            ocr_service=OCRService(),
+            vision_service=VisionExtractionService(),
+            llm_service=LLMExtractionService(),
+            validator=SchemaValidator()
+        )
+    except Exception as e:
+        raise ProcessingError(f"Failed to initialize pipelines: {e}")
+
+    # 3. Initialize graph builder
+    logger.info("Initializing graph builder...")
+    try:
+        graph = KnowledgeGraph(case_id=case_id)
+        resolver = EntityResolver(similarity_threshold=0.85)
+        builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
+    except Exception as e:
+        raise ProcessingError(f"Failed to initialize graph builder: {e}")
+
+    # 4. Process each PDF
+    pdfs = sorted(intake_dir.glob('*.pdf'))
+    logger.info(f"Found {len(pdfs)} PDFs to process")
+
+    for pdf_idx, pdf_path in enumerate(pdfs, 1):
+        logger.info(f"[{pdf_idx}/{len(pdfs)}] Processing {pdf_path.name}...")
+
+        # Convert PDF to images
+        try:
+            page_images = load_pdf_pages(pdf_path, preprocessed_dir)
+            logger.info(f"  Loaded {len(page_images)} pages")
+        except Exception as e:
+            raise ProcessingError(f"Failed to load PDF {pdf_path.name}: {e}")
+
+        # Process each page
+        for page_idx, page_path in enumerate(page_images, 1):
+            logger.info(f"  Page {page_idx}/{len(page_images)}...")
+
+            # Preprocess
+            try:
+                raw_image = cv2.imread(str(page_path), cv2.IMREAD_GRAYSCALE)
+                if raw_image is None:
+                    raise ValueError(f"Failed to load image: {page_path}")
+                preprocessed = prep_pipeline.process_page(raw_image)
+            except Exception as e:
+                raise ProcessingError(f"Failed preprocessing {page_path.name}: {e}")
+
+            # Save preprocessed image
+            try:
+                preprocessed_path = preprocessed_dir / f"{page_path.stem}_processed.png"
+                cv2.imwrite(str(preprocessed_path), preprocessed.image)
+            except Exception as e:
+                logger.warning(f"Failed to save preprocessed image: {e}")
+
+            # Extract entities
+            try:
+                document_id = page_path.stem
+                extraction = extract_pipeline.extract_page(preprocessed, document_id=document_id)
+            except Exception as e:
+                raise ProcessingError(f"Failed extraction {page_path.stem}: {e}")
+
+            # Save extraction JSON
+            try:
+                extraction_path = extractions_dir / f"{document_id}.json"
+                save_extraction_json(extraction, extraction_path)
+            except Exception as e:
+                logger.warning(f"Failed to save extraction JSON: {e}")
+
+            # Add to graph (with auto-deduplication)
+            try:
+                builder.add_extraction(extraction)
+            except Exception as e:
+                raise ProcessingError(f"Failed adding to graph {document_id}: {e}")
+
+            logger.info(f"  Page {page_idx}/{len(page_images)} ✓")
+
+    # 5. Export graph
+    logger.info("Exporting graph...")
+    try:
+        exporter = GraphExporter(knowledge_graph=graph)
+        exporter.save(output_dir / 'graph_data.json', factory_version="1.0.0")
+    except Exception as e:
+        raise ProcessingError(f"Failed to export graph: {e}")
+
+    # 6. Get summary statistics
+    stats = builder.processing_stats
+    logger.info("Processing complete!")
+    logger.info(f"Documents processed: {stats['documents_processed']}")
+    logger.info(f"Entities extracted:  {stats['entities_extracted']}")
+    logger.info(f"Entities merged:     {stats['entities_merged']}")
+    logger.info(f"Relations added:     {stats['relations_added']}")
+
+    return stats

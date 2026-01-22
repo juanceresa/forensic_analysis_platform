@@ -1,10 +1,12 @@
 """Graph builder for constructing knowledge graph from extraction results."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, TYPE_CHECKING
 import logging
-from farmer_factory.extract import ExtractionResult
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.structure.resolver import EntityResolver
+
+if TYPE_CHECKING:
+    from farmer_factory.extract import ExtractionResult
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +31,7 @@ class GraphBuilder:
             "relations_added": 0
         }
 
-    def add_extraction(self, extraction: ExtractionResult) -> None:
+    def add_extraction(self, extraction: "ExtractionResult") -> None:
         """
         Add entities and relations from extraction result.
 
@@ -78,7 +80,7 @@ class GraphBuilder:
 
     def build_from_document_batch(
         self,
-        extractions: List[ExtractionResult]
+        extractions: List["ExtractionResult"]
     ) -> None:
         """
         Process multiple document extractions.

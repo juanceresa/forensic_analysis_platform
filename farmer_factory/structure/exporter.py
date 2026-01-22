@@ -224,8 +224,8 @@ class GraphExporter:
             if "date_sortable" in link:
                 all_dates.append(link["date_sortable"])
 
-        # Filter out non-date strings
-        valid_dates = [d for d in all_dates if re.match(r'^\d{4}-\d{2}-\d{2}$', d)]
+        # Filter out non-date strings and None values
+        valid_dates = [d for d in all_dates if d and re.match(r'^\d{4}-\d{2}-\d{2}$', d)]
 
         if not valid_dates:
             return {
