@@ -407,3 +407,60 @@ def test_relation_with_context():
     assert relation.currency == "pesos"
     assert relation.property_id == "property_789"
     assert relation.document_id == "doc_001"
+
+
+from farmer_factory.structure.schema import GraphMetadata, GraphExport
+
+
+def test_graph_metadata():
+    """Test GraphMetadata model."""
+    metadata = GraphMetadata(
+        case_id="case_001",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        factory_version="1.0.0",
+        entity_count=45,
+        relation_count=78,
+        document_count=12,
+        processing_stats={"ocr_confidence": 0.85}
+    )
+    assert metadata.case_id == "case_001"
+    assert metadata.entity_count == 45
+    assert metadata.processing_stats["ocr_confidence"] == 0.85
+
+
+def test_graph_export():
+    """Test GraphExport model."""
+    metadata = GraphMetadata(
+        case_id="case_001",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        factory_version="1.0.0",
+        entity_count=2,
+        relation_count=1,
+        document_count=1
+    )
+
+    export = GraphExport(
+        metadata=metadata,
+        nodes=[
+            {
+                "id": "person_123",
+                "entity_type": "PERSON",
+                "name": "Test Person"
+            }
+        ],
+        edges=[
+            {
+                "source": "person_123",
+                "target": "property_456",
+                "relation_type": "OWNS"
+            }
+        ],
+        verification_summary={"TIER_3_AI": 3},
+        entity_type_summary={"PERSON": 1, "PROPERTY": 1}
+    )
+
+    assert len(export.nodes) == 1
+    assert len(export.edges) == 1
+    assert export.verification_summary["TIER_3_AI"] == 3

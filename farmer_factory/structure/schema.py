@@ -182,3 +182,25 @@ class Relation(BaseModel):
     property_id: Optional[str] = None
     document_id: Optional[str] = None
     notes: Optional[str] = None
+
+
+class GraphMetadata(BaseModel):
+    """Metadata for knowledge graph export."""
+    case_id: str
+    created_at: datetime
+    updated_at: datetime
+    factory_version: str
+    entity_count: int
+    relation_count: int
+    document_count: int
+    processing_stats: Dict[str, Any] = Field(default_factory=dict)
+
+
+class GraphExport(BaseModel):
+    """Export format for graph_data.json."""
+    metadata: GraphMetadata
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, Any]]
+    verification_summary: Dict[str, int]
+    entity_type_summary: Dict[str, int]
+    date_range: Optional[tuple[str, str]] = None
