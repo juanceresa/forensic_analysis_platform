@@ -1,7 +1,11 @@
 """
-Preprocessing pipeline module.
-Implements image enhancement, deskewing, noise reduction, and OCR preparation.
-See PREPROCESSING.md for pipeline specifications.
+Document preprocessing module.
+Handles image preprocessing for OCR readiness.
 """
 
-__all__ = []
+from .triage import DocumentPath, TriageResult
+
+__all__ = [
+    "DocumentPath",
+    "TriageResult",
+]
