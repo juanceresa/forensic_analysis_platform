@@ -45,6 +45,7 @@ logs/
 
 # Output
 output/
+!output/.gitkeep
 cases/
 *.pdf
 *.png
@@ -69,3 +70,7 @@ dist/
 tmp/
 temp/
 *.tmp
+
+# Claude
+.claude
+docs/
