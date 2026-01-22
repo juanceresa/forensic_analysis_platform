@@ -46,3 +46,23 @@ class BaseEntity(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     notes: Optional[str] = None
+
+
+class Person(BaseEntity):
+    """Person entity (owners, heirs, witnesses, notaries)."""
+    entity_type: Literal[EntityType.PERSON] = EntityType.PERSON
+
+    # Core identity
+    name: str
+    alternate_names: List[str] = Field(default_factory=list)
+
+    # Demographics
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    nationality: Optional[str] = None
+    residence: Optional[str] = None
+    profession: Optional[str] = None
+    marital_status: Optional[str] = None
+
+    # Roles
+    roles: List[str] = Field(default_factory=list)

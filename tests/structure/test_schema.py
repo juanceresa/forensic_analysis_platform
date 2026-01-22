@@ -120,3 +120,67 @@ def test_base_entity_with_notes():
         notes="Test note"
     )
     assert entity.notes == "Test note"
+
+
+from farmer_factory.structure.schema import Person
+
+
+def test_person_minimal():
+    """Test Person with only required fields."""
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa Rodriguez",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.92
+        ),
+        extracted_from="doc_001"
+    )
+    assert person.name == "Mario Ceresa Rodriguez"
+    assert person.alternate_names == []
+    assert person.roles == []
+    assert person.birth_date is None
+    assert person.nationality is None
+
+
+def test_person_full():
+    """Test Person with all fields."""
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa Rodriguez",
+        alternate_names=["Mario Ceresa", "M. Ceresa Rodriguez"],
+        verification=Verification(
+            tier=VerificationTier.TIER_2_ANALYST,
+            confidence=0.95
+        ),
+        extracted_from="doc_001",
+        birth_date="1920-05-15",
+        death_date="1995-12-20",
+        nationality="Cuban",
+        residence="Holguín, Oriente, Cuba",
+        profession="Agricultor",
+        marital_status="Married",
+        roles=["owner", "debtor"]
+    )
+    assert person.name == "Mario Ceresa Rodriguez"
+    assert len(person.alternate_names) == 2
+    assert person.birth_date == "1920-05-15"
+    assert person.nationality == "Cuban"
+    assert "owner" in person.roles
+
+
+def test_person_entity_type_literal():
+    """Test Person entity_type must be PERSON."""
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Test Person",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_001"
+    )
+    assert person.entity_type == EntityType.PERSON
