@@ -234,6 +234,12 @@ class GraphExporter:
         """
         Export graph to force-graph JSON format.
 
+        Includes date normalization for sorting:
+        - Converts flexible dates to ISO 8601 where possible
+        - Adds computed fields (*_earliest, *_sortable)
+        - Generates date_range metadata
+        - Calculates verification distribution
+
         Args:
             factory_version: Version string for Farmer Factory
 
@@ -245,9 +251,27 @@ class GraphExporter:
         """
         Save graph_data.json to file.
 
+        Uses atomic write (temp file + rename) to prevent corruption.
+
         Args:
             output_path: Path to write JSON file
             factory_version: Version string for metadata
+        """
+
+    def _normalize_date(self, date_str: str) -> str:
+        """
+        Normalize flexible date format to sortable ISO 8601.
+
+        Examples:
+        - "1958-03-15" → "1958-03-15"
+        - "1920" → "1920-01-01"
+        - "March 1958" → "1958-03-01"
+
+        Args:
+            date_str: Flexible date string
+
+        Returns:
+            ISO 8601 date string for sorting
         """
 ```
 
@@ -261,6 +285,8 @@ class GraphExporter:
       "name": "Juan Pérez García",
       "alternate_names": ["Don Juan Pérez"],
       "birth_date": ["1920 (doc_001)", "1922 (doc_005)"],
+      "birth_date_earliest": "1920",
+      "death_date": null,
       "nationality": "Cuban",
       "roles": ["owner", "seller"],
       "verification": {
@@ -271,8 +297,23 @@ class GraphExporter:
         "notes": null
       },
       "extracted_from": ["doc_001", "doc_005"],
-      "created_at": "2026-01-22T15:30:00",
-      "updated_at": "2026-01-22T15:35:00"
+      "created_at": "2026-01-22T15:30:00Z",
+      "updated_at": "2026-01-22T15:35:00Z"
+    },
+    {
+      "id": "doc_001",
+      "type": "DOCUMENT",
+      "title": "Escritura de Compraventa",
+      "document_type": "deed",
+      "date": "1958-03-15",
+      "date_sortable": "1958-03-15",
+      "issuer": "Notaría Pública",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.95
+      },
+      "extracted_from": "doc_001",
+      "created_at": "2026-01-22T15:30:00Z"
     }
   ],
   "links": [
@@ -286,6 +327,7 @@ class GraphExporter:
         "confidence": 0.90
       },
       "date": "1958-03-15",
+      "date_sortable": "1958-03-15",
       "document_id": "doc_001"
     }
   ],
@@ -294,14 +336,26 @@ class GraphExporter:
     "entity_count": 42,
     "relation_count": 67,
     "document_count": 5,
-    "created_at": "2026-01-22T15:30:00",
-    "updated_at": "2026-01-22T15:35:00",
+    "created_at": "2026-01-22T15:30:00Z",
+    "updated_at": "2026-01-22T15:35:00Z",
     "factory_version": "1.0.0",
     "processing_stats": {
       "documents_processed": 5,
       "entities_extracted": 67,
       "entities_merged": 25,
       "relations_added": 67
+    },
+    "date_range": {
+      "earliest_document": "1916-01-01",
+      "latest_document": "1961-12-31",
+      "earliest_event": "1916-01-01",
+      "latest_event": "1961-12-31"
+    },
+    "verification_distribution": {
+      "TIER_3_AI": 42,
+      "TIER_2_ANALYST": 0,
+      "TIER_2_INSTITUTIONAL": 0,
+      "TIER_1_CERTIFIED": 0
     }
   }
 }
@@ -312,6 +366,129 @@ class GraphExporter:
 - **Conflicting values**: Stored as arrays with provenance strings
 - **Verification metadata**: All verification info preserved
 - **Force-graph compatibility**: Standard `{nodes, links}` structure for react-force-graph-2d
+- **Sortable fields**: Computed fields for easy frontend sorting
+
+---
+
+## Sorting and Filtering Support
+
+The export format includes computed fields and metadata to support frontend sorting and filtering:
+
+### Sortable Fields on Nodes
+
+**All Entities:**
+- `created_at` (ISO 8601): When entity was added to graph
+- `updated_at` (ISO 8601): Last modification timestamp
+- `verification.confidence` (float): Extraction confidence score
+- `verification.tier` (enum): Verification tier for filtering
+
+**Person Entities:**
+- `birth_date_earliest` (string): Earliest birth date from conflicting values (for sorting)
+- `death_date` (string): Death date if available
+- `name` (string): Alphabetical sorting
+
+**Property Entities:**
+- `address` (string): Alphabetical sorting by location
+- `area` (float): Sort by property size
+- `registry_number` (string): Legal registry sorting
+
+**Document Entities:**
+- `date` (string): Original document date
+- `date_sortable` (ISO 8601 or year): Normalized for sorting
+- `document_type` (string): Filter by type (deed, will, certificate)
+
+**Organization Entities:**
+- `name` (string): Alphabetical sorting
+- `location_id` (string): Geographic filtering
+
+**Location Entities:**
+- `name` (string): Alphabetical sorting
+- `location_type` (string): Filter by type (city, province, neighborhood)
+
+### Sortable Fields on Links
+
+**All Relations:**
+- `verification.confidence` (float): Relation confidence
+- `verification.tier` (enum): Verification tier filtering
+- `type` (enum): Filter by relation type (OWNS, INHERITED, etc.)
+
+**Contextual Relations:**
+- `date` (string): Transaction/event date
+- `date_sortable` (ISO 8601): Normalized date for timeline sorting
+- `amount` (float): Financial transaction sorting
+- `document_id` (string): Group by source document
+
+### Metadata for Global Filtering
+
+**Date Range:**
+```json
+"date_range": {
+  "earliest_document": "1916-01-01",
+  "latest_document": "1961-12-31",
+  "earliest_event": "1916-01-01",
+  "latest_event": "1961-12-31"
+}
+```
+
+**Verification Distribution:**
+```json
+"verification_distribution": {
+  "TIER_3_AI": 42,
+  "TIER_2_ANALYST": 0,
+  "TIER_2_INSTITUTIONAL": 0,
+  "TIER_1_CERTIFIED": 0
+}
+```
+
+### Date Normalization Strategy
+
+Historical documents have flexible date formats ("1920", "March 1958", "1958-03-15"). The exporter normalizes dates for sorting:
+
+**Normalization Rules:**
+- Full ISO date "1958-03-15" → "1958-03-15" (sortable)
+- Year only "1920" → "1920-01-01" (sortable, assume January 1)
+- Month/Year "March 1958" → "1958-03-01" (sortable, use first of month)
+- Conflicting dates → Use earliest for `*_earliest` field
+
+**Conflicting Dates Example:**
+```json
+{
+  "birth_date": ["1920 (doc_001)", "1922 (doc_005)"],
+  "birth_date_earliest": "1920",
+  "birth_date_sortable": "1920-01-01"
+}
+```
+
+This allows frontend to:
+- **Sort chronologically**: Use `*_sortable` fields
+- **Display all values**: Show `birth_date` array with provenance
+- **Filter by date range**: Use `date_range` metadata for UI controls
+
+### Frontend Sorting Examples
+
+**Timeline View (Chronological):**
+- Sort relations by `date_sortable`
+- Group by year/decade
+- Show earliest to latest events
+
+**Verification Priority:**
+- Filter: `verification.tier != "TIER_3_AI"` (show only verified)
+- Sort: `verification.confidence DESC` (highest confidence first)
+
+**Document-Centric View:**
+- Group entities by `extracted_from`
+- Sort documents by `date_sortable`
+- Show all entities from each document
+
+**Entity Type Filtering:**
+- Filter: `type == "PERSON"` (show only people)
+- Sort: `name ASC` (alphabetical)
+- Sub-filter: `birth_date_earliest >= "1900"` (20th century)
+
+**Property Analysis:**
+- Filter: `type == "PROPERTY"`
+- Sort: `area DESC` (largest properties first)
+- Group by: `location_id` (geographic clustering)
 
 ---
 
