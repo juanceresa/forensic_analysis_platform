@@ -75,3 +75,4 @@ temp/
 .claude
 docs/*
 !docs/plans/
+!docs/CLI_USAGE.md
