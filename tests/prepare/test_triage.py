@@ -48,3 +48,30 @@ def test_estimate_text_density_text_image():
     density = estimate_text_density(image)
 
     assert 0.30 < density < 0.35  # Approximately 32%
+
+
+def test_estimate_line_spacing_variance_regular():
+    """Test line spacing variance on evenly spaced lines."""
+    # Create image with evenly spaced horizontal lines (spacing = 20px)
+    image = np.ones((200, 200), dtype=np.uint8) * 255
+    for y in range(10, 200, 20):
+        image[y:y+2, :] = 0  # 2px thick lines
+
+    from farmer_factory.prepare.triage import estimate_line_spacing_variance
+    variance = estimate_line_spacing_variance(image)
+
+    assert variance < 0.15  # Low variance for regular spacing
+
+
+def test_estimate_line_spacing_variance_irregular():
+    """Test line spacing variance on irregularly spaced lines."""
+    # Create image with irregular spacing (handwriting-like)
+    image = np.ones((200, 200), dtype=np.uint8) * 255
+    y_positions = [10, 25, 50, 60, 90, 115, 125, 160, 180]
+    for y in y_positions:
+        image[y:y+2, :] = 0
+
+    from farmer_factory.prepare.triage import estimate_line_spacing_variance
+    variance = estimate_line_spacing_variance(image)
+
+    assert variance > 0.25  # High variance for irregular spacing
