@@ -70,3 +70,61 @@ def test_vision_service_initialization():
     # With API key
     service_with_key = VisionExtractionService(api_key="test_key")
     assert service_with_key is not None
+
+
+def test_extract_from_handwritten_image():
+    """Test vision extraction from handwritten image (mocked)."""
+    from farmer_factory.structure.schema import EntityType
+
+    service = VisionExtractionService()
+
+    # Create synthetic handwritten image (grayscale)
+    image = np.ones((400, 600), dtype=np.uint8) * 220
+    # Simulate irregular handwritten text
+    for y in [50, 90, 135, 180, 230]:
+        thickness = np.random.randint(2, 5)
+        image[y:y+thickness, 60:550] = 70
+
+    # Extract entities (mocked)
+    result = service.extract_from_image(image, document_id="doc_123")
+
+    # Verify result structure
+    assert isinstance(result, VisionExtractionResult)
+    assert isinstance(result.entities, list)
+    assert len(result.entities) > 0  # Should extract at least one entity
+    assert isinstance(result.relations, list)
+    assert 0.0 <= result.confidence <= 1.0
+    assert isinstance(result.reasoning, str)
+    assert len(result.reasoning) > 0
+    assert isinstance(result.metadata, dict)
+
+
+def test_extract_entities_are_valid_pydantic_models():
+    """Test that extracted entities are valid Pydantic models."""
+    from farmer_factory.structure.schema import EntityType, VerificationTier
+
+    service = VisionExtractionService()
+
+    image = np.ones((400, 600), dtype=np.uint8) * 220
+    result = service.extract_from_image(image, document_id="doc_123")
+
+    # All entities should be BaseEntity instances
+    for entity in result.entities:
+        assert hasattr(entity, 'id')
+        assert hasattr(entity, 'entity_type')
+        assert hasattr(entity, 'verification')
+        assert entity.verification.tier == VerificationTier.TIER_3_AI
+        assert entity.extracted_from == "doc_123"
+
+
+def test_extract_includes_reasoning():
+    """Test that vision extraction includes reasoning."""
+    service = VisionExtractionService()
+
+    image = np.ones((400, 600), dtype=np.uint8) * 220
+    result = service.extract_from_image(image, document_id="doc_123")
+
+    # Reasoning should be present and non-empty
+    assert result.reasoning is not None
+    assert len(result.reasoning) > 20  # Should be a substantial explanation
+    assert "handwritten" in result.reasoning.lower() or "document" in result.reasoning.lower()
