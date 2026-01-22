@@ -79,3 +79,58 @@ def estimate_line_spacing_variance(image: np.ndarray) -> float:
     std_gap = np.std(significant_gaps)
 
     return std_gap / mean_gap if mean_gap > 0 else 0.0
+
+
+def estimate_contrast(image: np.ndarray) -> float:
+    """
+    Calculate contrast score based on dynamic range.
+
+    Args:
+        image: Grayscale image (H x W)
+
+    Returns:
+        Contrast score (0.0-1.0, where 1.0 = full range)
+    """
+    min_val = np.min(image)
+    max_val = np.max(image)
+
+    dynamic_range = max_val - min_val
+
+    return dynamic_range / 255.0
+
+
+def estimate_degradation(image: np.ndarray) -> float:
+    """
+    Estimate degradation level (fading, stains, damage).
+
+    Args:
+        image: Grayscale image (H x W)
+
+    Returns:
+        Degradation score (0.0-1.0, where 0.0 = clean, 1.0 = severely degraded)
+    """
+    # Calculate histogram
+    hist = cv2.calcHist([image], [0], None, [256], [0, 256]).flatten()
+
+    # Normalize histogram
+    hist = hist / hist.sum()
+
+    # Calculate mean intensity
+    mean_intensity = np.mean(image)
+
+    # Degradation indicators:
+    # 1. Low mean intensity (faded)
+    fading_score = 1.0 - (mean_intensity / 255.0)
+
+    # 2. Histogram spread (noise/artifacts)
+    # Use entropy as a measure of randomness
+    # Clean documents have concentrated histograms
+    hist_nonzero = hist[hist > 0]
+    entropy = -np.sum(hist_nonzero * np.log2(hist_nonzero))
+    # Normalize entropy (max is 8.0 for uniform distribution over 256 bins)
+    noise_score = entropy / 8.0
+
+    # Combine scores (weighted average)
+    degradation = 0.7 * fading_score + 0.3 * noise_score
+
+    return np.clip(degradation, 0.0, 1.0)

@@ -75,3 +75,52 @@ def test_estimate_line_spacing_variance_irregular():
     variance = estimate_line_spacing_variance(image)
 
     assert variance > 0.25  # High variance for irregular spacing
+
+
+def test_estimate_contrast_high():
+    """Test contrast score on high-contrast image."""
+    # Create image with full dynamic range (0-255)
+    image = np.zeros((100, 100), dtype=np.uint8)
+    image[:50, :] = 255  # Half white, half black
+
+    from farmer_factory.prepare.triage import estimate_contrast
+    contrast = estimate_contrast(image)
+
+    assert contrast > 0.9  # Near 1.0 for full range
+
+
+def test_estimate_contrast_low():
+    """Test contrast score on low-contrast image."""
+    # Create image with narrow range (120-135)
+    image = np.ones((100, 100), dtype=np.uint8) * 120
+    image[:50, :] = 135
+
+    from farmer_factory.prepare.triage import estimate_contrast
+    contrast = estimate_contrast(image)
+
+    assert contrast < 0.1  # Low contrast
+
+
+def test_estimate_degradation_clean():
+    """Test degradation score on clean image."""
+    # Uniform white image (clean document)
+    image = np.ones((100, 100), dtype=np.uint8) * 240
+
+    from farmer_factory.prepare.triage import estimate_degradation
+    degradation = estimate_degradation(image)
+
+    assert degradation < 0.2  # Low degradation
+
+
+def test_estimate_degradation_faded():
+    """Test degradation score on faded image."""
+    # Low-intensity image with artifacts (faded document)
+    image = np.ones((100, 100), dtype=np.uint8) * 150
+    # Add noise to simulate degradation
+    noise = np.random.randint(-30, 30, (100, 100), dtype=np.int16)
+    image = np.clip(image.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+
+    from farmer_factory.prepare.triage import estimate_degradation
+    degradation = estimate_degradation(image)
+
+    assert degradation > 0.4  # High degradation
