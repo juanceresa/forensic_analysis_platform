@@ -13,6 +13,7 @@ numpy>=1.26.0
 scipy>=1.11.0
 Pillow>=10.1.0
 PyMuPDF>=1.23.0  # PDF handling
+pdf2image>=1.16.0  # PDF to image conversion
 
 # Cloud Services
 google-cloud-vision>=3.4.0
