@@ -68,29 +68,48 @@ def create_case(case_id: str, name: str, family: str):
 
 @cli.command()
 @click.argument('case_id')
-@click.option('--stage', type=click.Choice(['preprocessing', 'ocr', 'extraction', 'graph', 'all']),
-              default='all', help='Processing stage to run')
-@click.option('--document', help='Process single document ID')
 @click.option('--verbose', is_flag=True, help='Verbose output')
-def process(case_id: str, stage: str, document: str, verbose: bool):
+def process(case_id: str, verbose: bool):
     """Process case documents through the pipeline."""
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    logger.info(f"Processing case: {case_id} (stage: {stage})")
+    logger.info(f"Processing case: {case_id}")
 
-    case_dir = Path('cases') / case_id
-    if not case_dir.exists():
-        raise click.ClickException(f"Case {case_id} not found")
+    # Import here to avoid circular imports
+    from farmer_factory.processing import process_case, ProcessingError
 
-    # TODO: Implement processing pipeline
-    click.echo(f"Processing {case_id}...")
-    click.echo(f"Stage: {stage}")
-    if document:
-        click.echo(f"Document: {document}")
+    try:
+        # Run processing pipeline
+        stats = process_case(case_id)
 
-    click.echo("\n⚠️  Processing pipeline not yet implemented")
-    click.echo("Coming in Phase 2-6 of ROADMAP.md")
+        # Print summary
+        click.echo("\n" + "="*60)
+        click.echo("Processing Complete!")
+        click.echo("="*60)
+        click.echo(f"Documents processed: {stats['documents_processed']}")
+        click.echo(f"Entities extracted:  {stats['entities_extracted']}")
+        click.echo(f"Entities merged:     {stats['entities_merged']}")
+        click.echo(f"Relations added:     {stats['relations_added']}")
+
+        output_path = Path('cases') / case_id / 'output' / 'graph_data.json'
+        click.echo(f"\nGraph saved to: {output_path}")
+
+    except ProcessingError as e:
+        logger.error(f"Processing failed: {e}")
+        click.echo(f"\n❌ Processing failed: {e}", err=True)
+        case_dir = Path('cases') / case_id
+        if case_dir.exists():
+            click.echo(f"Check detailed logs: {case_dir}/processing.log")
+        raise click.ClickException(str(e))
+
+    except Exception as e:
+        logger.exception(f"Unexpected error: {e}")
+        click.echo(f"\n❌ Unexpected error: {e}", err=True)
+        case_dir = Path('cases') / case_id
+        if case_dir.exists():
+            click.echo(f"Check detailed logs: {case_dir}/processing.log")
+        raise click.ClickException(str(e))
 
 
 @cli.command()
