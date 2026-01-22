@@ -1,0 +1,64 @@
+"""
+Configuration settings for Farmer Factory.
+Loads from environment variables.
+"""
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+from typing import Optional
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        env_file_encoding='utf-8',
+        case_sensitive=False
+    )
+
+    # Google Cloud Vision
+    google_application_credentials: Optional[Path] = None
+    google_cloud_project: Optional[str] = None
+
+    # Anthropic Claude API
+    anthropic_api_key: str
+
+    # Supabase
+    supabase_url: str
+    supabase_key: str  # Anon key for client
+    supabase_service_role_key: str  # Service role key for admin operations
+
+    # Processing Configuration
+    log_level: str = "INFO"
+    max_workers: int = 4
+    ocr_confidence_threshold: float = 0.60
+    entity_confidence_threshold: float = 0.70
+
+    # Paths
+    cases_dir: Path = Path("./cases")
+    output_dir: Path = Path("./output")
+
+    # Model Configuration
+    claude_model: str = "claude-3-haiku-20240307"  # Default to Haiku (cheap)
+    claude_model_retry: str = "claude-3-5-sonnet-20241022"  # Upgrade on retry
+
+    # API Limits
+    max_retries: int = 3
+    retry_delay: float = 1.0  # seconds
+    api_timeout: int = 120  # seconds
+
+    # Processing Limits
+    max_pages_per_document: int = 50
+    max_entities_per_document: int = 500
+    max_graph_nodes: int = 2000
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Ensure directories exist
+        self.cases_dir.mkdir(exist_ok=True)
+        self.output_dir.mkdir(exist_ok=True)
+
+
+# Global settings instance
+settings = Settings()
