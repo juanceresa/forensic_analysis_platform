@@ -73,4 +73,5 @@ temp/
 
 # Claude
 .claude
-docs/
+docs/*
+!docs/plans/
