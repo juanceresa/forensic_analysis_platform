@@ -1,6 +1,7 @@
 """Provenance tracking for document chain of custody."""
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -66,3 +67,10 @@ class ProvenanceTracker:
             "status": status,
             "missing_parts": missing_parts or []
         }
+
+    def save_provenance(self, provenance: Dict[str, Any], output_path: Path):
+        """Write provenance JSON to disk."""
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(provenance, f, indent=2, ensure_ascii=False)

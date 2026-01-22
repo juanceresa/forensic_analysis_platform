@@ -1,6 +1,7 @@
 """Tests for ProvenanceTracker."""
 
 import pytest
+import json
 from pathlib import Path
 from farmer_factory.intake.provenance import ProvenanceTracker
 
@@ -78,3 +79,25 @@ def test_create_provenance_multipart(tmp_path):
     assert len(provenance["source_files"]) == 2
     assert provenance["source_files"][0]["filename"] == "doc.pdf"
     assert provenance["source_files"][1]["filename"] == "doc.1pdf.pdf"
+
+
+def test_save_provenance(tmp_path):
+    """Test saving provenance to JSON file."""
+    provenance = {
+        "document_id": "DOC-001",
+        "original_filename": "test",
+        "status": "success"
+    }
+
+    tracker = ProvenanceTracker()
+    output_path = tmp_path / "provenance.json"
+
+    tracker.save_provenance(provenance, output_path)
+
+    assert output_path.exists()
+
+    with open(output_path) as f:
+        loaded = json.load(f)
+
+    assert loaded["document_id"] == "DOC-001"
+    assert loaded["original_filename"] == "test"
