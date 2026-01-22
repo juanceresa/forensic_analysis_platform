@@ -220,3 +220,112 @@ def test_find_similar_entity_below_threshold():
 
     result = resolver.find_similar_entity(new_person, graph)
     assert result is None  # Should not match
+
+
+def test_merge_entities_no_conflict():
+    """Test merging entities with no conflicting data."""
+    resolver = EntityResolver()
+
+    existing = {
+        "id": "p1",
+        "entity_type": "PERSON",
+        "name": "Juan Pérez",
+        "birth_date": "1920",
+        "extracted_from": "doc_001"
+    }
+
+    new_person = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez",
+        birth_date="1920",  # Same birth date
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    merged = resolver.merge_entities(existing, new_person)
+
+    assert merged["name"] == "Juan Pérez"
+    assert merged["birth_date"] == "1920"  # No conflict
+    assert set(merged["extracted_from"]) == {"doc_001", "doc_002"}  # Combined sources
+
+
+def test_merge_entities_with_conflict():
+    """Test merging entities with conflicting birth dates."""
+    resolver = EntityResolver()
+
+    existing = {
+        "id": "p1",
+        "entity_type": "PERSON",
+        "name": "Juan Pérez",
+        "birth_date": "1920",
+        "extracted_from": "doc_001"
+    }
+
+    new_person = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez",
+        birth_date="1922",  # Different birth date
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    merged = resolver.merge_entities(existing, new_person)
+
+    assert merged["name"] == "Juan Pérez"
+    # Conflicting dates should be stored as list with provenance
+    assert isinstance(merged["birth_date"], list)
+    assert "1920 (doc_001)" in merged["birth_date"]
+    assert "1922 (doc_002)" in merged["birth_date"]
+    assert set(merged["extracted_from"]) == {"doc_001", "doc_002"}
+
+
+def test_merge_entities_list_fields():
+    """Test merging list fields (union of values)."""
+    resolver = EntityResolver()
+
+    existing = {
+        "id": "p1",
+        "entity_type": "PERSON",
+        "name": "Juan Pérez",
+        "roles": ["owner"],
+        "extracted_from": "doc_001"
+    }
+
+    new_person = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez",
+        alternate_names=[],
+        roles=["seller", "owner"],  # Overlapping roles
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    merged = resolver.merge_entities(existing, new_person)
+
+    # Roles should be union
+    assert set(merged["roles"]) == {"owner", "seller"}

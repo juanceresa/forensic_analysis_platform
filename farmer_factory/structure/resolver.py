@@ -121,3 +121,76 @@ class EntityResolver:
             return best_match_id
 
         return None
+
+    def merge_entities(
+        self,
+        existing: Dict[str, Any],
+        new: BaseEntity
+    ) -> Dict[str, Any]:
+        """
+        Merge new entity data into existing entity.
+
+        For conflicting fields, creates lists with document provenance:
+        Example: birth_date = ["1920 (doc_001)", "1922 (doc_005)"]
+
+        Args:
+            existing: Existing entity data from graph
+            new: New entity to merge in
+
+        Returns:
+            Merged entity data dictionary
+        """
+        merged = existing.copy()
+        new_data = new.model_dump()
+
+        # Handle extracted_from (always combine)
+        existing_sources = existing.get("extracted_from", "")
+        new_source = new_data.get("extracted_from", "")
+
+        # Convert to list if needed
+        if isinstance(existing_sources, str):
+            existing_sources = [existing_sources] if existing_sources else []
+        if isinstance(new_source, str):
+            new_source = [new_source] if new_source else []
+
+        merged["extracted_from"] = list(set(existing_sources + new_source))
+
+        # Merge other fields
+        for field, new_value in new_data.items():
+            if field in ("id", "entity_type", "extracted_from", "created_at", "updated_at"):
+                continue  # Skip metadata fields
+
+            existing_value = existing.get(field)
+
+            # Handle None values
+            if new_value is None:
+                continue  # Keep existing value
+            if existing_value is None:
+                merged[field] = new_value
+                continue
+
+            # Handle list fields (union)
+            if isinstance(new_value, list):
+                if isinstance(existing_value, list):
+                    merged[field] = list(set(existing_value + new_value))
+                else:
+                    merged[field] = new_value
+                continue
+
+            # Handle conflicts (different values)
+            if existing_value != new_value:
+                # Create provenance list
+                existing_source = existing.get("extracted_from", ["unknown"])[0] if isinstance(existing.get("extracted_from"), list) else existing.get("extracted_from", "unknown")
+                new_source_str = new_source[0] if new_source else "unknown"
+
+                if isinstance(existing_value, list):
+                    # Already a conflict list, append new value
+                    merged[field] = existing_value + [f"{new_value} ({new_source_str})"]
+                else:
+                    # Create new conflict list
+                    merged[field] = [
+                        f"{existing_value} ({existing_source})",
+                        f"{new_value} ({new_source_str})"
+                    ]
+
+        return merged
