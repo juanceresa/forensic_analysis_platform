@@ -45,3 +45,61 @@ def test_ocr_service_initialization():
     # With API key
     service_with_key = OCRService(api_key="test_key")
     assert service_with_key is not None
+
+
+def test_extract_text_from_binary_image():
+    """Test OCR extraction from binary image (mocked)."""
+    service = OCRService()
+
+    # Create synthetic binary image (400x600 pixels, black text on white)
+    image = np.ones((400, 600), dtype=np.uint8) * 255
+    image[50:70, 100:500] = 0  # Simulate text line
+
+    # Extract text (mocked)
+    result = service.extract_text(image)
+
+    # Verify result structure
+    assert isinstance(result, OCRResult)
+    assert isinstance(result.text, str)
+    assert len(result.text) > 0  # Should have extracted something
+    assert 0.0 <= result.confidence <= 1.0
+    assert 0.0 <= result.page_confidence <= 1.0
+    assert isinstance(result.blocks, list)
+    assert isinstance(result.metadata, dict)
+
+
+def test_extract_text_high_confidence():
+    """Test OCR with high-quality image returns high confidence."""
+    service = OCRService()
+
+    # High-quality synthetic image
+    image = np.ones((400, 600), dtype=np.uint8) * 255
+    for y in range(50, 350, 30):
+        image[y:y+15, 50:550] = 0
+
+    result = service.extract_text(image)
+
+    # Mocked service should return high confidence for clean images
+    assert result.confidence >= 0.85
+    assert result.page_confidence >= 0.80
+
+
+def test_extract_text_preserves_blocks():
+    """Test that OCR preserves text block structure."""
+    service = OCRService()
+
+    image = np.ones((400, 600), dtype=np.uint8) * 255
+    image[50:70, 100:500] = 0
+
+    result = service.extract_text(image)
+
+    # Should have at least one text block
+    assert len(result.blocks) > 0
+
+    # Verify block structure
+    for block in result.blocks:
+        assert isinstance(block, TextBlock)
+        assert isinstance(block.text, str)
+        assert 0.0 <= block.confidence <= 1.0
+        assert len(block.bounding_box) == 4
+        assert block.block_type in ["paragraph", "line", "word"]
