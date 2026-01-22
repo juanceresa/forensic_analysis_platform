@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import List, Dict
 
 
+class PDFLoadError(Exception):
+    """Exception raised when PDF loading fails."""
+    pass
+
+
 class DocumentGrouper:
     """Group multi-part PDF files into logical documents."""
 
@@ -62,3 +67,11 @@ class DocumentGrouper:
             base_name: [path for _, path in sorted(parts)]
             for base_name, parts in groups.items()
         }
+
+
+class PDFLoader:
+    """Extract page images from PDF documents."""
+
+    def __init__(self, dpi: int = 300):
+        """Initialize with target DPI for extraction."""
+        self.dpi = dpi
