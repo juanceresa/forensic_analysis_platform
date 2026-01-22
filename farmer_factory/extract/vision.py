@@ -3,8 +3,11 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
 import numpy as np
+import logging
 
 from farmer_factory.structure.schema import BaseEntity, Relation
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -55,6 +58,10 @@ class VisionExtractionService:
 
         # MOCKED: Simulate vision-based entity extraction
         # In production, this would send image to Claude Vision API with structured prompt
+        logger.warning(
+            f"⚠️  MOCK EXTRACTION - Using simulated data for {document_id}. "
+            "Configure ANTHROPIC_API_KEY to use real Claude Vision API."
+        )
 
         # Calculate base confidence based on image quality
         # Simple heuristic: check contrast and text-like patterns
@@ -86,7 +93,7 @@ class VisionExtractionService:
             roles=["owner"],
             verification=verification,
             extracted_from=document_id,
-            notes="Extracted from handwritten document via Claude Vision"
+            notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
         )
 
         # Mock Property entity
@@ -100,7 +107,7 @@ class VisionExtractionService:
             registry_number="REG-1958-0042",
             verification=verification,
             extracted_from=document_id,
-            notes="Extracted from handwritten document via Claude Vision"
+            notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
         )
 
         entities = [person, property_entity]
@@ -115,7 +122,7 @@ class VisionExtractionService:
             target_id=property_entity.id,
             verification=verification,
             document_id=document_id,
-            notes="Ownership extracted from handwritten deed"
+            notes="⚠️ MOCK DATA - Simulated relation for testing (no API configured)"
         )
 
         relations = [relation]

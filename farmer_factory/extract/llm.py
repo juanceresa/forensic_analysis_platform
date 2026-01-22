@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
+import logging
 
 from farmer_factory.structure.schema import BaseEntity, Relation
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,6 +61,10 @@ class LLMExtractionService:
 
         # MOCKED: Simulate LLM entity extraction from text
         # In production, this would send text to Claude API with JSON schema prompt
+        logger.warning(
+            f"⚠️  MOCK EXTRACTION - Using simulated data for {document_id}. "
+            "Configure ANTHROPIC_API_KEY to use real Claude API."
+        )
 
         # Calculate extraction confidence
         # Base LLM confidence (simulated quality of extraction)
@@ -93,7 +100,7 @@ class LLMExtractionService:
                 roles=["seller", "owner"],
                 verification=verification,
                 extracted_from=document_id,
-                notes="Extracted from OCR text via Claude LLM"
+                notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
             )
             entities.append(person1)
 
@@ -110,7 +117,7 @@ class LLMExtractionService:
                 roles=["buyer"],
                 verification=verification,
                 extracted_from=document_id,
-                notes="Extracted from OCR text via Claude LLM"
+                notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
             )
             entities.append(person2)
 
@@ -126,7 +133,7 @@ class LLMExtractionService:
                 registry_number="REG-1958-0042",
                 verification=verification,
                 extracted_from=document_id,
-                notes="Extracted from OCR text via Claude LLM"
+                notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
             )
             entities.append(property_entity)
 
@@ -139,7 +146,7 @@ class LLMExtractionService:
                 location_type="city",
                 verification=verification,
                 extracted_from=document_id,
-                notes="Extracted from OCR text via Claude LLM"
+                notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
             )
             entities.append(location)
 

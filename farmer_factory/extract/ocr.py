@@ -3,6 +3,9 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,6 +56,10 @@ class OCRService:
         """
         # MOCKED: Simulate OCR extraction
         # In production, this would call Google Cloud Vision API
+        logger.warning(
+            "⚠️  MOCK OCR - Using simulated text extraction. "
+            "Configure GOOGLE_APPLICATION_CREDENTIALS to use real Google Cloud Vision API."
+        )
 
         # Analyze image to determine quality (for confidence calculation)
         # Simple heuristic: more black pixels = more text = higher confidence
