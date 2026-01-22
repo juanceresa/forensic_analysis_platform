@@ -134,3 +134,59 @@ def estimate_degradation(image: np.ndarray) -> float:
     degradation = 0.7 * fading_score + 0.3 * noise_score
 
     return np.clip(degradation, 0.0, 1.0)
+
+
+def triage_document(image: np.ndarray) -> TriageResult:
+    """
+    Triage document to appropriate processing path.
+
+    Args:
+        image: Grayscale image (H x W)
+
+    Returns:
+        TriageResult with path, confidence, reason, and metrics
+    """
+    # Calculate all metrics
+    text_density = estimate_text_density(image)
+    line_variance = estimate_line_spacing_variance(image)
+    contrast = estimate_contrast(image)
+    degradation = estimate_degradation(image)
+
+    metrics = {
+        "text_density": text_density,
+        "line_variance": line_variance,
+        "contrast": contrast,
+        "degradation": degradation,
+    }
+
+    # Routing logic
+    # TYPED: High text density, low line variance (regular spacing)
+    # HANDWRITTEN: Lower density OR high line variance (irregular)
+
+    # Decision tree:
+    # 1. High line variance (> 0.3) → HANDWRITTEN
+    # 2. Low text density (< 0.15) → HANDWRITTEN (sparse writing)
+    # 3. Otherwise → TYPED
+
+    if line_variance > 0.3:
+        # High variance = handwritten
+        confidence = min(line_variance, 0.95)
+        reason = f"High line spacing variance ({line_variance:.2f}) indicates handwriting"
+        path = DocumentPath.HANDWRITTEN
+    elif text_density < 0.15:
+        # Low density = likely handwritten (sparse)
+        confidence = 0.7
+        reason = f"Low text density ({text_density:.2f}) suggests handwriting"
+        path = DocumentPath.HANDWRITTEN
+    else:
+        # Regular spacing, sufficient density = typed
+        confidence = min(text_density, 0.95)
+        reason = f"Regular spacing and text density ({text_density:.2f}) indicate typed text"
+        path = DocumentPath.TYPED
+
+    return TriageResult(
+        path=path,
+        confidence=confidence,
+        reason=reason,
+        metrics=metrics,
+    )

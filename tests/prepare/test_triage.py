@@ -124,3 +124,41 @@ def test_estimate_degradation_faded():
     degradation = estimate_degradation(image)
 
     assert degradation > 0.4  # High degradation
+
+
+def test_triage_document_typed():
+    """Test triage routing for typed document."""
+    # Create clean typed document: high text density, low line variance
+    image = np.ones((200, 200), dtype=np.uint8) * 240
+    # Add regular horizontal text blocks (typed text with higher coverage)
+    for y in range(20, 180, 15):
+        image[y:y+8, 10:190] = 50  # Thicker lines for higher density
+
+    from farmer_factory.prepare.triage import triage_document
+    result = triage_document(image)
+
+    assert result.path == DocumentPath.TYPED
+    assert result.confidence > 0.3  # Confidence based on text density
+    assert "text_density" in result.metrics
+    assert "line_variance" in result.metrics
+
+
+def test_triage_document_handwritten():
+    """Test triage routing for handwritten document."""
+    # Create handwritten-like document: moderate density, high line variance
+    image = np.ones((200, 200), dtype=np.uint8) * 230
+    # Add irregular lines (handwriting)
+    y_positions = [15, 35, 50, 75, 95, 120, 140, 165]
+    for y in y_positions:
+        # Vary line thickness and position
+        thickness = np.random.randint(1, 3)
+        start_x = np.random.randint(5, 15)
+        end_x = np.random.randint(180, 195)
+        image[y:y+thickness, start_x:end_x] = np.random.randint(30, 80)
+
+    from farmer_factory.prepare.triage import triage_document
+    result = triage_document(image)
+
+    assert result.path == DocumentPath.HANDWRITTEN
+    assert result.confidence > 0.5
+    assert "line_variance" in result.metrics
