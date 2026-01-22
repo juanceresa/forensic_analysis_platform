@@ -4,4 +4,20 @@ Handles OCR (Google Cloud Vision) and LLM-based entity/relation extraction (Anth
 All extracted data starts at TIER_3_AI verification level.
 """
 
-__all__ = []
+from .ocr import OCRService, OCRResult
+from .vision import VisionExtractionService, VisionExtractionResult
+from .llm import LLMExtractionService, LLMExtractionResult
+from .pipeline import ExtractionPipeline, ExtractionResult
+from .validator import SchemaValidator
+
+__all__ = [
+    "OCRService",
+    "OCRResult",
+    "VisionExtractionService",
+    "VisionExtractionResult",
+    "LLMExtractionService",
+    "LLMExtractionResult",
+    "ExtractionPipeline",
+    "ExtractionResult",
+    "SchemaValidator",
+]
