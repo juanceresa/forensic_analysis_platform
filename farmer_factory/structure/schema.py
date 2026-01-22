@@ -66,3 +66,46 @@ class Person(BaseEntity):
 
     # Roles
     roles: List[str] = Field(default_factory=list)
+
+
+class Property(BaseEntity):
+    """Property entity (fincas, haciendas, urban properties)."""
+    entity_type: Literal[EntityType.PROPERTY] = EntityType.PROPERTY
+
+    # Identity
+    name: Optional[str] = None
+    property_type: Optional[str] = None
+
+    # Location & Description
+    location_id: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None
+
+    # Measurements
+    area: Optional[float] = None
+    area_unit: Optional[str] = None
+
+    # Registry info
+    registry_number: Optional[str] = None
+    cadastral_info: Optional[str] = None
+    folio_number: Optional[str] = None
+
+
+class Organization(BaseEntity):
+    """Organization entity (banks, courts, government agencies)."""
+    entity_type: Literal[EntityType.ORGANIZATION] = EntityType.ORGANIZATION
+
+    name: str
+    org_type: Optional[str] = None
+    location_id: Optional[str] = None
+    address: Optional[str] = None
+
+
+class Location(BaseEntity):
+    """Location entity (cities, provinces, neighborhoods)."""
+    entity_type: Literal[EntityType.LOCATION] = EntityType.LOCATION
+
+    name: str
+    location_type: Optional[str] = None
+    parent_location_id: Optional[str] = None
+    country: str = "Cuba"

@@ -184,3 +184,120 @@ def test_person_entity_type_literal():
         extracted_from="doc_001"
     )
     assert person.entity_type == EntityType.PERSON
+
+
+from farmer_factory.structure.schema import Property, Organization, Location
+
+
+def test_property_minimal():
+    """Test Property with minimal fields."""
+    prop = Property(
+        id="property_123",
+        entity_type=EntityType.PROPERTY,
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88
+        ),
+        extracted_from="doc_001"
+    )
+    assert prop.entity_type == EntityType.PROPERTY
+    assert prop.name is None
+    assert prop.property_type is None
+
+
+def test_property_full():
+    """Test Property with all fields."""
+    prop = Property(
+        id="property_123",
+        entity_type=EntityType.PROPERTY,
+        name="Finca Aguaras",
+        property_type="finca",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88
+        ),
+        extracted_from="doc_001",
+        location_id="loc_456",
+        address="Holguín, Oriente, Cuba",
+        description="Rustic property with boundaries",
+        area=20.5,
+        area_unit="hectares",
+        registry_number="REG-1234",
+        cadastral_info="CAD-5678",
+        folio_number="FOLIO-90"
+    )
+    assert prop.name == "Finca Aguaras"
+    assert prop.area == 20.5
+    assert prop.area_unit == "hectares"
+
+
+def test_organization_minimal():
+    """Test Organization with minimal fields."""
+    org = Organization(
+        id="org_123",
+        entity_type=EntityType.ORGANIZATION,
+        name="Banco de Fomento Agricola",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90
+        ),
+        extracted_from="doc_001"
+    )
+    assert org.name == "Banco de Fomento Agricola"
+    assert org.org_type is None
+
+
+def test_organization_full():
+    """Test Organization with all fields."""
+    org = Organization(
+        id="org_123",
+        entity_type=EntityType.ORGANIZATION,
+        name="Banco de Fomento Agricola",
+        org_type="bank",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90
+        ),
+        extracted_from="doc_001",
+        location_id="loc_456",
+        address="Havana, Cuba"
+    )
+    assert org.org_type == "bank"
+    assert org.address == "Havana, Cuba"
+
+
+def test_location_minimal():
+    """Test Location with minimal fields."""
+    loc = Location(
+        id="loc_123",
+        entity_type=EntityType.LOCATION,
+        name="Holguín",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.95
+        ),
+        extracted_from="doc_001"
+    )
+    assert loc.name == "Holguín"
+    assert loc.country == "Cuba"
+    assert loc.location_type is None
+
+
+def test_location_full():
+    """Test Location with hierarchy."""
+    loc = Location(
+        id="loc_123",
+        entity_type=EntityType.LOCATION,
+        name="Puerto Padre",
+        location_type="city",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.95
+        ),
+        extracted_from="doc_001",
+        parent_location_id="loc_456",
+        country="Cuba"
+    )
+    assert loc.name == "Puerto Padre"
+    assert loc.location_type == "city"
+    assert loc.parent_location_id == "loc_456"
