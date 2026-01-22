@@ -35,3 +35,30 @@ class DocumentGrouper:
             if match:
                 return int(match.group(1))
         return 0
+
+    def group_documents(self, pdf_files: List[Path]) -> Dict[str, List[Path]]:
+        """
+        Group PDFs by base filename.
+
+        Args:
+            pdf_files: List of PDF file paths
+
+        Returns:
+            Dict mapping logical document name to list of PDF parts (sorted)
+        """
+        groups: Dict[str, List[tuple[int, Path]]] = {}
+
+        for pdf_file in pdf_files:
+            base_name = self._extract_base_name(pdf_file.name)
+            part_number = self._extract_part_number(pdf_file.name)
+
+            if base_name not in groups:
+                groups[base_name] = []
+
+            groups[base_name].append((part_number, pdf_file))
+
+        # Sort by part number and return just the paths
+        return {
+            base_name: [path for _, path in sorted(parts)]
+            for base_name, parts in groups.items()
+        }
