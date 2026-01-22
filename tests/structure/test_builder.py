@@ -225,6 +225,142 @@ def test_add_extraction_with_merge():
     assert set(entity_data["roles"]) == {"owner", "seller"}  # Merged roles
 
 
+def test_add_extraction_with_merge_and_relations():
+    """Test that relations are remapped correctly when entities are merged."""
+    graph = KnowledgeGraph(case_id="test_case")
+    resolver = EntityResolver(similarity_threshold=0.85)
+    builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
+
+    # First extraction: person + property + relation
+    person1 = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        alternate_names=[],
+        roles=["owner"],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.92,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+
+    property1 = Property(
+        id="prop1",
+        entity_type=EntityType.PROPERTY,
+        name="Finca Aguaras",
+        property_type="Farm",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+
+    relation1 = Relation(
+        id="rel1",
+        type=RelationType.OWNS,
+        source_id="p1",
+        target_id="prop1",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90
+        )
+    )
+
+    extraction1 = ExtractionResult(
+        entities=[person1, property1],
+        relations=[relation1],
+        ocr_result=None,
+        confidence_scores={"vision_confidence": 0.90},
+        path=DocumentPath.TYPED,
+        processing_metadata={}
+    )
+
+    builder.add_extraction(extraction1)
+
+    # Verify first extraction
+    assert graph.graph.number_of_nodes() == 2
+    assert graph.graph.number_of_edges() == 1
+
+    # Second extraction: similar person + new property + relation
+    # This person should merge with p1
+    person2 = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="Mario F. Ceresa",  # Similar name, will merge
+        alternate_names=[],
+        roles=["heir"],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    property2 = Property(
+        id="prop2",
+        entity_type=EntityType.PROPERTY,
+        name="Casa Habana",
+        property_type="House",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    # Relation references p2, which will be merged into p1
+    relation2 = Relation(
+        id="rel2",
+        type=RelationType.OWNS,
+        source_id="p2",  # This ID will be remapped to p1
+        target_id="prop2",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88
+        )
+    )
+
+    extraction2 = ExtractionResult(
+        entities=[person2, property2],
+        relations=[relation2],
+        ocr_result=None,
+        confidence_scores={"vision_confidence": 0.88},
+        path=DocumentPath.TYPED,
+        processing_metadata={}
+    )
+
+    builder.add_extraction(extraction2)
+
+    # Verify merge happened: should have 3 nodes (1 person merged, 2 properties)
+    assert graph.graph.number_of_nodes() == 3
+
+    # CRITICAL: Should have 2 relations, not 1 (the second relation should be added successfully)
+    assert graph.graph.number_of_edges() == 2
+
+    # Verify stats
+    assert builder.processing_stats["entities_extracted"] == 4
+    assert builder.processing_stats["entities_merged"] == 1
+    assert builder.processing_stats["relations_added"] == 2  # Both relations should be added
+
+    # Verify the merged person has both roles
+    entity_data = graph.get_entity("p1")
+    assert set(entity_data["roles"]) == {"owner", "heir"}
+
+
 def test_build_from_document_batch():
     """Test processing multiple extractions in batch."""
     graph = KnowledgeGraph(case_id="test_case")

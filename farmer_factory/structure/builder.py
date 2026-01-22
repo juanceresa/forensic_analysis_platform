@@ -46,6 +46,9 @@ class GraphBuilder:
         # Track document processing
         self.processing_stats["documents_processed"] += 1
 
+        # Track ID remappings when entities are merged
+        id_remapping: Dict[str, str] = {}
+
         # Process entities
         for entity in extraction.entities:
             self.processing_stats["entities_extracted"] += 1
@@ -61,6 +64,9 @@ class GraphBuilder:
                 # Update graph node
                 self.graph.graph.nodes[similar_id].update(merged_data)
 
+                # Track that this entity's ID was remapped
+                id_remapping[entity.id] = similar_id
+
                 self.processing_stats["entities_merged"] += 1
                 logger.info(f"Merged entity {entity.id} into {similar_id}")
             else:
@@ -68,8 +74,27 @@ class GraphBuilder:
                 self.graph.add_entity(entity)
                 logger.info(f"Added new entity {entity.id}")
 
-        # Process relations
+        # Process relations, remapping IDs if needed
         for relation in extraction.relations:
+            # Remap source and target IDs if they were merged
+            remapped_source = id_remapping.get(relation.source_id, relation.source_id)
+            remapped_target = id_remapping.get(relation.target_id, relation.target_id)
+
+            # Create a new relation dict with remapped IDs if needed
+            if remapped_source != relation.source_id or remapped_target != relation.target_id:
+                from pydantic import ValidationError
+                try:
+                    # Create new relation with remapped IDs
+                    relation_dict = relation.model_dump()
+                    relation_dict["source_id"] = remapped_source
+                    relation_dict["target_id"] = remapped_target
+                    # Recreate relation object with remapped IDs
+                    relation = relation.__class__(**relation_dict)
+                    logger.debug(f"Remapped relation {relation.id}: {relation.source_id} -> {relation.target_id}")
+                except (ValidationError, Exception) as e:
+                    logger.warning(f"Failed to remap relation {relation.id}: {e}")
+                    continue
+
             try:
                 self.graph.add_relation(relation)
                 self.processing_stats["relations_added"] += 1
