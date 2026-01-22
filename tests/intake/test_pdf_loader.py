@@ -61,3 +61,38 @@ def test_load_document_group_multipage(tmp_path):
     assert page_paths[0].name == "page_001.png"
     assert page_paths[1].name == "page_002.png"
     assert page_paths[2].name == "page_003.png"
+
+
+def test_load_document_group_multipart(tmp_path):
+    """Test loading multi-part PDF (multiple files)."""
+    # Create two test PDFs
+    pdf1 = tmp_path / "doc.pdf"
+    doc = fitz.open()
+    for i in range(2):
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((50, 50), f"Part 1, Page {i+1}")
+    doc.save(pdf1)
+    doc.close()
+
+    pdf2 = tmp_path / "doc.1pdf.pdf"
+    doc = fitz.open()
+    for i in range(3):
+        page = doc.new_page(width=595, height=842)
+        page.insert_text((50, 50), f"Part 2, Page {i+1}")
+    doc.save(pdf2)
+    doc.close()
+
+    # Test extraction
+    loader = PDFLoader(dpi=150)
+    output_dir = tmp_path / "output"
+
+    page_paths = loader.load_document_group([pdf1, pdf2], output_dir)
+
+    # Should have 2 + 3 = 5 pages sequentially numbered
+    assert len(page_paths) == 5
+    assert all(p.exists() for p in page_paths)
+    assert page_paths[0].name == "page_001.png"
+    assert page_paths[1].name == "page_002.png"
+    assert page_paths[2].name == "page_003.png"
+    assert page_paths[3].name == "page_004.png"
+    assert page_paths[4].name == "page_005.png"
