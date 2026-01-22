@@ -28,37 +28,148 @@ class OCRResult:
 
 
 class OCRService:
-    """Wrapper for Google Cloud Vision API OCR (mocked for testing)."""
+    """Wrapper for Google Cloud Vision API OCR."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, use_real_api: bool = False, credentials_path: Optional[str] = None):
         """
         Initialize OCR service.
 
         Args:
-            api_key: Optional Google Cloud Vision API key.
-                    If None, loads from environment variable.
+            use_real_api: If True, use real Google Cloud Vision API.
+                         If False, use mock data for testing.
+            credentials_path: Optional path to service account JSON.
+                            If None, uses Application Default Credentials (gcloud auth).
         """
-        self.api_key = api_key
+        self.use_real_api = use_real_api
+        self.credentials_path = credentials_path
+        self.client = None
+
+        if use_real_api:
+            try:
+                from google.cloud import vision
+                import os
+
+                # Use explicit credentials if provided
+                if credentials_path and os.path.exists(credentials_path):
+                    self.client = vision.ImageAnnotatorClient.from_service_account_json(credentials_path)
+                    logger.info(f"Using Google Cloud Vision with service account: {credentials_path}")
+                else:
+                    # Use Application Default Credentials (gcloud auth)
+                    self.client = vision.ImageAnnotatorClient()
+                    logger.info("Using Google Cloud Vision with Application Default Credentials")
+            except Exception as e:
+                logger.error(f"Failed to initialize Google Cloud Vision: {e}")
+                logger.warning("Falling back to mock OCR")
+                self.use_real_api = False
 
     def extract_text(self, image: np.ndarray) -> OCRResult:
         """
-        Extract text from binary image using mocked Google Cloud Vision API.
+        Extract text from binary image using Google Cloud Vision API.
 
         Args:
             image: Binary image as numpy array (uint8, 0-255)
 
         Returns:
             OCRResult with extracted text, confidence, and blocks
-
-        Note:
-            This is a MOCKED implementation for testing.
-            Real implementation would call Google Cloud Vision API.
         """
-        # MOCKED: Simulate OCR extraction
-        # In production, this would call Google Cloud Vision API
+        if self.use_real_api and self.client:
+            return self._extract_text_real(image)
+        else:
+            return self._extract_text_mock(image)
+
+    def _extract_text_real(self, image: np.ndarray) -> OCRResult:
+        """Extract text using real Google Cloud Vision API."""
+        from google.cloud import vision
+        import io
+
+        # Convert numpy array to bytes
+        from PIL import Image
+        pil_image = Image.fromarray(image)
+        img_byte_arr = io.BytesIO()
+        pil_image.save(img_byte_arr, format='PNG')
+        content = img_byte_arr.getvalue()
+
+        # Create Vision API image
+        vision_image = vision.Image(content=content)
+
+        # Perform text detection
+        response = self.client.document_text_detection(image=vision_image)
+
+        if response.error.message:
+            raise Exception(f"Google Cloud Vision API error: {response.error.message}")
+
+        # Extract full text
+        full_text = response.full_text_annotation.text if response.full_text_annotation else ""
+
+        # Extract text blocks with confidence
+        blocks = []
+        total_confidence = 0.0
+        block_count = 0
+
+        for page in response.full_text_annotation.pages:
+            for block in page.blocks:
+                # Get block text
+                block_text = ""
+                block_confidence = 0.0
+                word_count = 0
+
+                for paragraph in block.paragraphs:
+                    for word in paragraph.words:
+                        word_text = "".join([symbol.text for symbol in word.symbols])
+                        block_text += word_text + " "
+                        block_confidence += word.confidence
+                        word_count += 1
+
+                if word_count > 0:
+                    avg_confidence = block_confidence / word_count
+                    total_confidence += avg_confidence
+                    block_count += 1
+
+                    # Get bounding box
+                    vertices = block.bounding_box.vertices
+                    x = vertices[0].x
+                    y = vertices[0].y
+                    width = vertices[2].x - vertices[0].x
+                    height = vertices[2].y - vertices[0].y
+
+                    blocks.append(TextBlock(
+                        text=block_text.strip(),
+                        confidence=avg_confidence,
+                        bounding_box=(x, y, width, height),
+                        block_type="paragraph"
+                    ))
+
+        # Calculate overall confidence
+        overall_confidence = total_confidence / block_count if block_count > 0 else 0.0
+
+        # Metadata
+        metadata = {
+            "language": response.full_text_annotation.pages[0].property.detected_languages[0].language_code
+                       if response.full_text_annotation.pages and
+                          response.full_text_annotation.pages[0].property.detected_languages
+                       else "unknown",
+            "api_version": "google_cloud_vision_v1",
+            "image_dimensions": {
+                "height": image.shape[0],
+                "width": image.shape[1]
+            }
+        }
+
+        logger.info(f"OCR extracted {len(blocks)} blocks, confidence: {overall_confidence:.2f}")
+
+        return OCRResult(
+            text=full_text,
+            confidence=overall_confidence,
+            page_confidence=overall_confidence,
+            blocks=blocks,
+            metadata=metadata
+        )
+
+    def _extract_text_mock(self, image: np.ndarray) -> OCRResult:
+        """Extract text using mock data for testing."""
         logger.warning(
             "⚠️  MOCK OCR - Using simulated text extraction. "
-            "Configure GOOGLE_APPLICATION_CREDENTIALS to use real Google Cloud Vision API."
+            "Run 'gcloud auth application-default login' to use real Google Cloud Vision API."
         )
 
         # Analyze image to determine quality (for confidence calculation)

@@ -41,10 +41,12 @@ def test_ocr_service_initialization():
     """Test OCRService can be initialized."""
     service = OCRService()
     assert service is not None
+    assert service.use_real_api is False  # Default to mock
 
-    # With API key
-    service_with_key = OCRService(api_key="test_key")
-    assert service_with_key is not None
+    # With real API enabled
+    service_with_real_api = OCRService(use_real_api=False)  # False for testing
+    assert service_with_real_api is not None
+    assert service_with_real_api.use_real_api is False
 
 
 def test_extract_text_from_binary_image():

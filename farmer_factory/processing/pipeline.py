@@ -76,9 +76,20 @@ def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
     # 2. Initialize pipelines once (reuse across all documents)
     logger.info("Initializing pipelines...")
     try:
+        # Check if real APIs should be used (based on environment variables)
+        import os
+        use_google_ocr = bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or
+                             os.getenv('GOOGLE_CLOUD_PROJECT'))
+        use_anthropic = bool(os.getenv('ANTHROPIC_API_KEY'))
+
+        if use_google_ocr:
+            logger.info("✓ Google Cloud credentials detected - using real OCR")
+        if use_anthropic:
+            logger.info("✓ Anthropic API key detected - using real extraction")
+
         prep_pipeline = PreprocessingPipeline()
         extract_pipeline = ExtractionPipeline(
-            ocr_service=OCRService(),
+            ocr_service=OCRService(use_real_api=use_google_ocr),
             vision_service=VisionExtractionService(),
             llm_service=LLMExtractionService(),
             validator=SchemaValidator()
