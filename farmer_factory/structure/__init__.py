@@ -20,6 +20,9 @@ from .schema import (
     GraphExport,
 )
 from .graph import KnowledgeGraph
+from .resolver import EntityResolver
+from .builder import GraphBuilder
+from .exporter import GraphExporter
 
 __all__ = [
     "VerificationTier",
@@ -36,4 +39,7 @@ __all__ = [
     "GraphMetadata",
     "GraphExport",
     "KnowledgeGraph",
+    "EntityResolver",
+    "GraphBuilder",
+    "GraphExporter",
 ]
