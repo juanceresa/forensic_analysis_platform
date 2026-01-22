@@ -78,7 +78,8 @@ class LLMExtractionService:
         # Mock entity extraction (simulating Claude understanding the text)
         entities = []
 
-        # Extract Person entities
+        # Extract entities based on text content
+        # Check for specific Spanish names first (for realistic test cases)
         if "Juan Pérez" in text or "Juan Perez" in text:
             person1 = Person(
                 id=f"{document_id}_person_1",
@@ -141,6 +142,22 @@ class LLMExtractionService:
                 notes="Extracted from OCR text via Claude LLM"
             )
             entities.append(location)
+
+        # Generic extraction fallback: if no specific entities found but text is substantial,
+        # create generic mock entities (simulates LLM finding something in any text)
+        if len(entities) == 0 and len(text) > 50:
+            # Generic person entity
+            person = Person(
+                id=f"{document_id}_person_generic",
+                entity_type=EntityType.PERSON,
+                name="Generic Person",
+                alternate_names=[],
+                roles=["owner"],
+                verification=verification,
+                extracted_from=document_id,
+                notes="Generic entity extracted from OCR text for testing"
+            )
+            entities.append(person)
 
         # Mock relations
         relations = []
