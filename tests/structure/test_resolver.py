@@ -62,3 +62,161 @@ def test_calculate_name_similarity_case_insensitive():
 
     similarity = resolver._calculate_name_similarity("JUAN PÉREZ", "juan pérez")
     assert similarity > 0.95  # Should be nearly identical
+
+
+def test_find_similar_entity_no_match():
+    """Test find_similar_entity when no match exists."""
+    resolver = EntityResolver()
+    graph = KnowledgeGraph(case_id="test_case")
+
+    # Create a person entity
+    person = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez",
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+
+    result = resolver.find_similar_entity(person, graph)
+    assert result is None  # No entities in graph yet
+
+
+def test_find_similar_entity_exact_match():
+    """Test find_similar_entity with exact name match."""
+    resolver = EntityResolver(similarity_threshold=0.85)
+    graph = KnowledgeGraph(case_id="test_case")
+
+    # Add existing person
+    existing = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez García",
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+    graph.add_entity(existing)
+
+    # Try to find similar (same name)
+    new_person = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez García",
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    result = resolver.find_similar_entity(new_person, graph)
+    assert result == "p1"  # Should find existing entity
+
+
+def test_find_similar_entity_fuzzy_match():
+    """Test find_similar_entity with fuzzy name match."""
+    resolver = EntityResolver(similarity_threshold=0.85)
+    graph = KnowledgeGraph(case_id="test_case")
+
+    # Add existing person
+    existing = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez García",
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+    graph.add_entity(existing)
+
+    # Try to find similar (slight name variation)
+    new_person = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="Juan Perez Garcia",  # No accents
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    result = resolver.find_similar_entity(new_person, graph)
+    assert result == "p1"  # Should find existing despite accent difference
+
+
+def test_find_similar_entity_below_threshold():
+    """Test find_similar_entity when similarity below threshold."""
+    resolver = EntityResolver(similarity_threshold=0.85)
+    graph = KnowledgeGraph(case_id="test_case")
+
+    # Add existing person
+    existing = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Juan Pérez",
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_001"
+    )
+    graph.add_entity(existing)
+
+    # Try to find similar (different person)
+    new_person = Person(
+        id="p2",
+        entity_type=EntityType.PERSON,
+        name="María López",  # Completely different
+        alternate_names=[],
+        roles=[],
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.88,
+            verified_by=None,
+            verified_at=None,
+            notes=None
+        ),
+        extracted_from="doc_002"
+    )
+
+    result = resolver.find_similar_entity(new_person, graph)
+    assert result is None  # Should not match
