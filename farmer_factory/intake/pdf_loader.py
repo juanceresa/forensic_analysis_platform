@@ -1,6 +1,7 @@
 """PDF loading and document grouping."""
 
 import re
+import fitz  # PyMuPDF
 from pathlib import Path
 from typing import List, Dict
 
@@ -75,3 +76,55 @@ class PDFLoader:
     def __init__(self, dpi: int = 300):
         """Initialize with target DPI for extraction."""
         self.dpi = dpi
+
+    def load_document_group(
+        self,
+        pdf_parts: List[Path],
+        output_dir: Path
+    ) -> List[Path]:
+        """
+        Extract pages from multiple PDF parts into sequential images.
+
+        Args:
+            pdf_parts: List of PDF files (sorted) that form one document
+            output_dir: Directory for output images
+
+        Returns:
+            List of all page image paths in order
+
+        Raises:
+            PDFLoadError: If any PDF cannot be read or is corrupted
+        """
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        page_paths = []
+        page_number = 1
+
+        for pdf_path in pdf_parts:
+            try:
+                doc = fitz.open(pdf_path)
+
+                for page in doc:
+                    output_path = output_dir / f"page_{page_number:03d}.png"
+                    self._extract_page(page, output_path)
+                    page_paths.append(output_path)
+                    page_number += 1
+
+                doc.close()
+
+            except Exception as e:
+                raise PDFLoadError(f"Failed to load PDF {pdf_path}: {e}")
+
+        return page_paths
+
+    def _extract_page(self, page: fitz.Page, output_path: Path) -> None:
+        """Extract single page to PNG at target DPI."""
+        # Calculate zoom factor for target DPI
+        zoom = self.dpi / 72  # PDF default is 72 DPI
+        mat = fitz.Matrix(zoom, zoom)
+
+        # Render page to pixmap
+        pix = page.get_pixmap(matrix=mat)
+
+        # Save as PNG
+        pix.save(output_path)
