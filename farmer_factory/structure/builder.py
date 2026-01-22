@@ -75,3 +75,24 @@ class GraphBuilder:
             except ValueError as e:
                 logger.warning(f"Failed to add relation {relation.id}: {e}")
                 # Skip invalid relations, continue processing
+
+    def build_from_document_batch(
+        self,
+        extractions: List[ExtractionResult]
+    ) -> None:
+        """
+        Process multiple document extractions.
+
+        Args:
+            extractions: List of ExtractionResult objects
+        """
+        logger.info(f"Processing batch of {len(extractions)} documents")
+
+        for extraction in extractions:
+            self.add_extraction(extraction)
+
+        logger.info(
+            f"Batch complete: {self.processing_stats['entities_extracted']} entities extracted, "
+            f"{self.processing_stats['entities_merged']} merged, "
+            f"{self.processing_stats['relations_added']} relations added"
+        )

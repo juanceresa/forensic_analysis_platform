@@ -25,7 +25,7 @@ class EntityResolver:
         self.threshold = similarity_threshold
         self.entity_index: Dict[str, List[str]] = {}  # {entity_type: [entity_ids]}
 
-    def _calculate_name_similarity(self, name1: str, name2: str) -> float:
+    def _calculate_name_similarity(self, name1: str, name2: Any) -> float:
         """
         Calculate fuzzy similarity between two names.
 
@@ -33,13 +33,17 @@ class EntityResolver:
 
         Args:
             name1: First name to compare
-            name2: Second name to compare
+            name2: Second name to compare (can be list from conflict merges)
 
         Returns:
             Similarity score between 0.0 and 1.0
         """
         if not name1 or not name2:
             return 0.0
+
+        # Handle list (from conflict merges) - take first value
+        if isinstance(name2, list):
+            name2 = name2[0].split(" (")[0]  # Extract name before provenance
 
         # Use token_sort_ratio for order-insensitive matching
         # This handles "Juan Pérez García" vs "García, Juan Pérez"

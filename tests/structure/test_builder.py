@@ -223,3 +223,49 @@ def test_add_extraction_with_merge():
     entity_data = graph.get_entity("p1")
     assert isinstance(entity_data["birth_date"], list)  # Conflicting dates
     assert set(entity_data["roles"]) == {"owner", "seller"}  # Merged roles
+
+
+def test_build_from_document_batch():
+    """Test processing multiple extractions in batch."""
+    graph = KnowledgeGraph(case_id="test_case")
+    resolver = EntityResolver()
+    builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
+
+    # Create multiple extractions
+    extractions = []
+    names = ["Juan Pérez", "María López", "Carlos García"]
+
+    for i, name in enumerate(names):
+        person = Person(
+            id=f"p{i}",
+            entity_type=EntityType.PERSON,
+            name=name,
+            alternate_names=[],
+            roles=[],
+            verification=Verification(
+                tier=VerificationTier.TIER_3_AI,
+                confidence=0.88,
+                verified_by=None,
+                verified_at=None,
+                notes=None
+            ),
+            extracted_from=f"doc_00{i}"
+        )
+
+        extraction = ExtractionResult(
+            entities=[person],
+            relations=[],
+            ocr_result=None,
+            confidence_scores={"vision_confidence": 0.88},
+            path=DocumentPath.HANDWRITTEN,
+            processing_metadata={}
+        )
+
+        extractions.append(extraction)
+
+    builder.build_from_document_batch(extractions)
+
+    # Verify all entities added
+    assert graph.graph.number_of_nodes() == 3
+    assert builder.processing_stats["documents_processed"] == 3
+    assert builder.processing_stats["entities_extracted"] == 3
