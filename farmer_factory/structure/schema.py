@@ -109,3 +109,24 @@ class Location(BaseEntity):
     location_type: Optional[str] = None
     parent_location_id: Optional[str] = None
     country: str = "Cuba"
+
+
+class Document(BaseEntity):
+    """Document entity (source documents for provenance)."""
+    entity_type: Literal[EntityType.DOCUMENT] = EntityType.DOCUMENT
+
+    # Document identity
+    title: Optional[str] = None
+    document_type: str
+    document_number: Optional[str] = None
+    date: Optional[str] = None
+
+    # Provenance
+    issuer: Optional[str] = None
+    location_id: Optional[str] = None
+
+    # Processing
+    file_path: str
+    page_count: int
+    ocr_text: Optional[str] = None
+    language: str = "es"

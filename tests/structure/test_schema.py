@@ -301,3 +301,54 @@ def test_location_full():
     assert loc.name == "Puerto Padre"
     assert loc.location_type == "city"
     assert loc.parent_location_id == "loc_456"
+
+
+from farmer_factory.structure.schema import Document
+
+
+def test_document_minimal():
+    """Test Document with required fields."""
+    doc = Document(
+        id="doc_123",
+        entity_type=EntityType.DOCUMENT,
+        document_type="will",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_123",
+        file_path="/path/to/document.pdf",
+        page_count=5
+    )
+    assert doc.document_type == "will"
+    assert doc.file_path == "/path/to/document.pdf"
+    assert doc.page_count == 5
+    assert doc.language == "es"
+
+
+def test_document_full():
+    """Test Document with all fields."""
+    doc = Document(
+        id="doc_123",
+        entity_type=EntityType.DOCUMENT,
+        title="Last Will and Testament of Rosalia Queral Cartaya",
+        document_type="will",
+        document_number="357",
+        date="1958-08-27",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_123",
+        issuer="notary_456",
+        location_id="loc_789",
+        file_path="/path/to/document.pdf",
+        page_count=5,
+        ocr_text="Full OCR text here...",
+        language="es"
+    )
+    assert doc.title == "Last Will and Testament of Rosalia Queral Cartaya"
+    assert doc.document_number == "357"
+    assert doc.date == "1958-08-27"
+    assert doc.issuer == "notary_456"
+    assert doc.ocr_text == "Full OCR text here..."
