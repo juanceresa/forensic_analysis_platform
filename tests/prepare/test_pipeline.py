@@ -24,3 +24,13 @@ def test_processed_page_creation():
     assert page.path == DocumentPath.TYPED
     assert page.metadata["skew_angle"] == 2.5
     assert page.image.shape == (100, 100)
+
+
+def test_preprocessing_pipeline_creation():
+    """Test PreprocessingPipeline instantiation."""
+    from farmer_factory.prepare.pipeline import PreprocessingPipeline
+
+    pipeline = PreprocessingPipeline()
+
+    # Just check it creates successfully
+    assert pipeline is not None
