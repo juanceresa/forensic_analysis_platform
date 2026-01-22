@@ -35,3 +35,14 @@ class EntityType(str, Enum):
     ORGANIZATION = "ORGANIZATION"
     LOCATION = "LOCATION"
     DOCUMENT = "DOCUMENT"
+
+
+class BaseEntity(BaseModel):
+    """Base class for all entity types."""
+    id: str
+    entity_type: EntityType
+    verification: Verification
+    extracted_from: str
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+    notes: Optional[str] = None

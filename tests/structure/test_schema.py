@@ -69,3 +69,54 @@ def test_entity_type_enum():
     assert EntityType.ORGANIZATION == "ORGANIZATION"
     assert EntityType.LOCATION == "LOCATION"
     assert EntityType.DOCUMENT == "DOCUMENT"
+
+
+from farmer_factory.structure.schema import BaseEntity
+
+
+def test_base_entity_creation():
+    """Test BaseEntity creation with required fields."""
+    entity = BaseEntity(
+        id="test_123",
+        entity_type=EntityType.PERSON,
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_001"
+    )
+    assert entity.id == "test_123"
+    assert entity.entity_type == EntityType.PERSON
+    assert entity.verification.tier == VerificationTier.TIER_3_AI
+    assert entity.extracted_from == "doc_001"
+    assert entity.notes is None
+
+
+def test_base_entity_timestamps():
+    """Test BaseEntity has timestamps."""
+    entity = BaseEntity(
+        id="test_123",
+        entity_type=EntityType.PERSON,
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_001"
+    )
+    assert isinstance(entity.created_at, datetime)
+    assert isinstance(entity.updated_at, datetime)
+
+
+def test_base_entity_with_notes():
+    """Test BaseEntity with notes field."""
+    entity = BaseEntity(
+        id="test_123",
+        entity_type=EntityType.PERSON,
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_001",
+        notes="Test note"
+    )
+    assert entity.notes == "Test note"
