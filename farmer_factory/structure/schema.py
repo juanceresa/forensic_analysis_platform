@@ -130,3 +130,55 @@ class Document(BaseEntity):
     page_count: int
     ocr_text: Optional[str] = None
     language: str = "es"
+
+
+class RelationType(str, Enum):
+    """Relation types in the knowledge graph."""
+    # Property Ownership
+    OWNS = "OWNS"
+    OWNED = "OWNED"
+    INHERITED = "INHERITED"
+    SOLD_TO = "SOLD_TO"
+    PURCHASED_FROM = "PURCHASED_FROM"
+
+    # Family Relations
+    SPOUSE_OF = "SPOUSE_OF"
+    CHILD_OF = "CHILD_OF"
+    HEIR_OF = "HEIR_OF"
+
+    # Property Boundaries
+    BORDERS_NORTH = "BORDERS_NORTH"
+    BORDERS_SOUTH = "BORDERS_SOUTH"
+    BORDERS_EAST = "BORDERS_EAST"
+    BORDERS_WEST = "BORDERS_WEST"
+
+    # Document Relations
+    MENTIONED_IN = "MENTIONED_IN"
+    WITNESSED_BY = "WITNESSED_BY"
+    NOTARIZED_BY = "NOTARIZED_BY"
+    ISSUED_BY = "ISSUED_BY"
+
+    # Professional/Organizational
+    REPRESENTED_BY = "REPRESENTED_BY"
+    EMPLOYED_BY = "EMPLOYED_BY"
+
+    # Financial
+    CREDITOR_OF = "CREDITOR_OF"
+    DEBTOR_OF = "DEBTOR_OF"
+
+
+class Relation(BaseModel):
+    """Relation between entities in the knowledge graph."""
+    id: str
+    type: RelationType
+    source_id: str
+    target_id: str
+    verification: Verification
+
+    # Context fields
+    date: Optional[str] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    property_id: Optional[str] = None
+    document_id: Optional[str] = None
+    notes: Optional[str] = None

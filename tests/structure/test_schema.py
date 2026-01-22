@@ -352,3 +352,58 @@ def test_document_full():
     assert doc.date == "1958-08-27"
     assert doc.issuer == "notary_456"
     assert doc.ocr_text == "Full OCR text here..."
+
+
+from farmer_factory.structure.schema import RelationType, Relation
+
+
+def test_relation_type_enum():
+    """Test RelationType enum values."""
+    assert RelationType.OWNS == "OWNS"
+    assert RelationType.SPOUSE_OF == "SPOUSE_OF"
+    assert RelationType.BORDERS_NORTH == "BORDERS_NORTH"
+    assert RelationType.MENTIONED_IN == "MENTIONED_IN"
+
+
+def test_relation_minimal():
+    """Test Relation with minimal fields."""
+    relation = Relation(
+        id="rel_123",
+        type=RelationType.OWNS,
+        source_id="person_123",
+        target_id="property_456",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        )
+    )
+    assert relation.type == RelationType.OWNS
+    assert relation.source_id == "person_123"
+    assert relation.target_id == "property_456"
+    assert relation.date is None
+    assert relation.amount is None
+
+
+def test_relation_with_context():
+    """Test Relation with context fields."""
+    relation = Relation(
+        id="rel_123",
+        type=RelationType.SOLD_TO,
+        source_id="person_123",
+        target_id="person_456",
+        verification=Verification(
+            tier=VerificationTier.TIER_2_ANALYST,
+            confidence=0.95
+        ),
+        date="1960-03-26",
+        amount=2850.50,
+        currency="pesos",
+        property_id="property_789",
+        document_id="doc_001",
+        notes="Sale documented in notarial deed"
+    )
+    assert relation.date == "1960-03-26"
+    assert relation.amount == 2850.50
+    assert relation.currency == "pesos"
+    assert relation.property_id == "property_789"
+    assert relation.document_id == "doc_001"
