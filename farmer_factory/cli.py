@@ -69,12 +69,16 @@ def create_case(case_id: str, name: str, family: str):
 @cli.command()
 @click.argument('case_id')
 @click.option('--verbose', is_flag=True, help='Verbose output')
-def process(case_id: str, verbose: bool):
+@click.option('--file', 'single_file', help='Process only this PDF file from intake/ directory')
+def process(case_id: str, verbose: bool, single_file: str):
     """Process case documents through the pipeline."""
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    logger.info(f"Processing case: {case_id}")
+    if single_file:
+        logger.info(f"Processing case: {case_id}, file: {single_file}")
+    else:
+        logger.info(f"Processing case: {case_id}")
 
     # Import here to avoid circular imports
     try:
@@ -84,7 +88,7 @@ def process(case_id: str, verbose: bool):
 
     try:
         # Run processing pipeline
-        stats = process_case(case_id)
+        stats = process_case(case_id, single_file=single_file)
 
         # Print summary
         click.echo("\n" + "="*60)

@@ -31,7 +31,7 @@ from .exceptions import ProcessingError
 logger = logging.getLogger(__name__)
 
 
-def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
+def process_case(case_id: str, base_dir: Path = None, single_file: str = None) -> Dict[str, Any]:
     """
     Process all PDFs in case through complete pipeline.
 
@@ -45,6 +45,7 @@ def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
     Args:
         case_id: Case identifier (e.g., "CASE-CERESA")
         base_dir: Base directory for cases (defaults to "cases")
+        single_file: Optional filename to process only one PDF (for testing)
 
     Returns:
         Dictionary with processing statistics
@@ -116,7 +117,15 @@ def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
 
     # 4. Process each PDF
     pdfs = sorted(intake_dir.glob('*.pdf'))
-    logger.info(f"Found {len(pdfs)} PDFs to process")
+
+    # Filter to single file if requested
+    if single_file:
+        pdfs = [p for p in pdfs if p.name == single_file]
+        if not pdfs:
+            raise ProcessingError(f"File not found in intake/: {single_file}")
+        logger.info(f"Processing single file: {single_file}")
+    else:
+        logger.info(f"Found {len(pdfs)} PDFs to process")
 
     for pdf_idx, pdf_path in enumerate(pdfs, 1):
         logger.info(f"[{pdf_idx}/{len(pdfs)}] Processing {pdf_path.name}...")
