@@ -1,7 +1,7 @@
 """LLM extraction service for entity extraction from OCR text using Claude API."""
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Literal
 from enum import Enum
 import logging
 import json
@@ -47,6 +47,55 @@ class EntityExtractionResult(BaseModel):
     document_date: Optional[str] = None
     document_date_confidence: Optional[float] = None
     extraction_notes: Optional[str] = None
+
+
+class TemporalInfo(BaseModel):
+    """Temporal information for a relation."""
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    ongoing: bool = False
+    date_precision: Literal["exact", "month", "year", "decade", "unknown"] = "unknown"
+
+
+class ExtractedRelation(BaseModel):
+    """Single relation extracted from document (intermediate format)."""
+    relation_type: str  # Will be validated against RelationType enum
+    source_entity: str  # Entity name as string (not ID yet)
+    target_entity: str  # Entity name as string (not ID yet)
+    confidence: float = Field(ge=0.0, le=1.0)
+    temporal: Optional[TemporalInfo] = None
+    evidence: str  # Quote from document
+    notes: Optional[str] = None
+
+
+class RelationExtractionResult(BaseModel):
+    """Result from Claude relation extraction (intermediate format)."""
+    relations: List[ExtractedRelation]
+    extraction_notes: Optional[str] = None
+
+
+# ============================================================================
+# Relation Type Constants
+# ============================================================================
+
+# Temporal relations (events - need dates)
+TEMPORAL_RELATIONS = {
+    "SOLD",
+    "BOUGHT",
+    "INHERITED",
+    "CONFISCATED",
+    "WITNESSED",
+    "NOTARIZED"
+}
+
+# State relations (conditions - dates optional)
+STATE_RELATIONS = {
+    "OWNS",
+    "LOCATED_IN",
+    "EMPLOYED_BY",
+    "RELATED_TO",
+    "REGISTERED_IN"
+}
 
 
 @dataclass
