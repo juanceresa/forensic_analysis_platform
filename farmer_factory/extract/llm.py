@@ -278,7 +278,14 @@ EXTRACTED ENTITIES:
 OCR TEXT:
 {text}
 
-Respond with a JSON object:
+REQUIRED OUTPUT FORMAT:
+You MUST respond with a valid JSON object in the format shown below.
+- If you find relations, include them in the "relations" array
+- If you find NO relations, return an empty array: "relations": []
+- ALWAYS return valid JSON - never return prose explanations
+- Use "extraction_notes" to explain why no relations were found
+
+Example response with relations:
 {{
   "relations": [
     {{
@@ -297,6 +304,12 @@ Respond with a JSON object:
     }}
   ],
   "extraction_notes": "Document is a notarial certification of ownership."
+}}
+
+Example response with NO relations:
+{{
+  "relations": [],
+  "extraction_notes": "Document is a loan fee notification with no property ownership or transaction relationships."
 }}"""
         return prompt
 
