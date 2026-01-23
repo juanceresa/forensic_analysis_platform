@@ -76,10 +76,19 @@ def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
     # 2. Initialize pipelines once (reuse across all documents)
     logger.info("Initializing pipelines...")
     try:
-        # Check if real APIs should be used (based on environment variables)
+        # Check if real APIs should be used
         import os
-        use_google_ocr = bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS') or
-                             os.getenv('GOOGLE_CLOUD_PROJECT'))
+        from pathlib import Path
+
+        # Check for Google Cloud credentials
+        # gcloud auth saves to default location, doesn't set env var
+        default_creds = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+        use_google_ocr = (
+            bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS')) or
+            bool(os.getenv('GOOGLE_CLOUD_PROJECT')) or
+            default_creds.exists()
+        )
+
         use_anthropic = bool(os.getenv('ANTHROPIC_API_KEY'))
 
         if use_google_ocr:
