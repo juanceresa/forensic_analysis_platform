@@ -4,10 +4,19 @@ Civic Table - Factory CLI
 Command-line interface for document processing pipeline.
 """
 
+import os
 import click
 from pathlib import Path
 import logging
 from datetime import datetime
+
+# Load .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not installed, env vars must be set manually
+    pass
 
 # Configure logging
 logging.basicConfig(
