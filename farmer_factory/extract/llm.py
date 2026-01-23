@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Literal
 from enum import Enum
+from difflib import SequenceMatcher
 import logging
 import json
 import time
@@ -298,6 +299,59 @@ Respond with a JSON object:
   "extraction_notes": "Document is a notarial certification of ownership."
 }}"""
         return prompt
+
+    def _match_entity(
+        self,
+        entity_name: str,
+        entities: List[BaseEntity]
+    ) -> Optional[str]:
+        """
+        Match extracted entity name to entity ID using hybrid strategy.
+
+        Strategy:
+        1. Exact match on entity.name
+        2. Exact match on entity.alternate_names[]
+        3. Fuzzy match with threshold ≥0.85
+        4. Return None if no match
+
+        Args:
+            entity_name: Entity name from Claude (e.g., "Don Mario Ceresa")
+            entities: List of extracted entities to search
+
+        Returns:
+            Entity ID if match found, None otherwise
+        """
+        # Step 1: Exact match on name
+        for entity in entities:
+            if hasattr(entity, 'name') and entity.name == entity_name:
+                return entity.id
+
+        # Step 2: Exact match on alternate names
+        for entity in entities:
+            if hasattr(entity, 'alternate_names'):
+                if entity_name in entity.alternate_names:
+                    return entity.id
+
+        # Step 3: Fuzzy matching with SequenceMatcher
+        best_match_id = None
+        best_similarity = 0.0
+
+        for entity in entities:
+            if hasattr(entity, 'name'):
+                # Calculate similarity
+                similarity = SequenceMatcher(None, entity_name.lower(), entity.name.lower()).ratio()
+
+                if similarity >= 0.85 and similarity > best_similarity:
+                    best_match_id = entity.id
+                    best_similarity = similarity
+
+        if best_match_id:
+            logger.info(f"Fuzzy matched '{entity_name}' to entity (similarity: {best_similarity:.2f})")
+            return best_match_id
+
+        # Step 4: No match found
+        logger.warning(f"Could not match entity '{entity_name}' - relation will be skipped")
+        return None
 
     def _get_client(self):
         """Get or initialize Anthropic client (lazy initialization)."""
