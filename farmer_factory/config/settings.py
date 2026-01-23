@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file='.env',
         env_file_encoding='utf-8',
-        case_sensitive=False
+        case_sensitive=False,
+        extra='ignore'  # Ignore unknown environment variables
     )
 
     # Google Cloud Vision
@@ -22,12 +23,12 @@ class Settings(BaseSettings):
     google_cloud_project: Optional[str] = None
 
     # Anthropic Claude API
-    anthropic_api_key: str
+    anthropic_api_key: Optional[str] = None
 
     # Supabase
-    supabase_url: str
-    supabase_key: str  # Anon key for client
-    supabase_service_role_key: str  # Service role key for admin operations
+    supabase_url: Optional[str] = None
+    supabase_key: Optional[str] = None  # Anon key for client
+    supabase_service_role_key: Optional[str] = None  # Service role key for admin operations
 
     # Processing Configuration
     log_level: str = "INFO"

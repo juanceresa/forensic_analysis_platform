@@ -80,6 +80,7 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
     try:
         # Check if real APIs should be used
         import os
+        from farmer_factory.config.settings import settings
 
         # Check for Google Cloud credentials
         # gcloud auth saves to default location, doesn't set env var
@@ -99,9 +100,12 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
 
         prep_pipeline = PreprocessingPipeline()
         extract_pipeline = ExtractionPipeline(
-            ocr_service=OCRService(use_real_api=use_google_ocr),
+            ocr_service=OCRService(
+                use_real_api=use_google_ocr,
+                credentials_path=None  # Use Application Default Credentials (gcloud auth)
+            ),
             vision_service=VisionExtractionService(),
-            llm_service=LLMExtractionService(),
+            llm_service=LLMExtractionService(api_key=settings.anthropic_api_key),
             validator=SchemaValidator()
         )
     except Exception as e:

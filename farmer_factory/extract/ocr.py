@@ -49,10 +49,15 @@ class OCRService:
                 from google.cloud import vision
                 import os
 
-                # Use explicit credentials if provided
-                if credentials_path and os.path.exists(credentials_path):
-                    self.client = vision.ImageAnnotatorClient.from_service_account_json(credentials_path)
+                # Use explicit credentials if provided AND file exists
+                if credentials_path and os.path.exists(str(credentials_path)):
+                    self.client = vision.ImageAnnotatorClient.from_service_account_json(str(credentials_path))
                     logger.info(f"Using Google Cloud Vision with service account: {credentials_path}")
+                elif credentials_path:
+                    # Credentials path provided but file doesn't exist - warn and use ADC
+                    logger.warning(f"Service account file not found: {credentials_path}")
+                    logger.info("Falling back to Application Default Credentials")
+                    self.client = vision.ImageAnnotatorClient()
                 else:
                     # Use Application Default Credentials (gcloud auth)
                     self.client = vision.ImageAnnotatorClient()
