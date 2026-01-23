@@ -181,6 +181,7 @@ class Relation(BaseModel):
     currency: Optional[str] = None
     property_id: Optional[str] = None
     document_id: Optional[str] = None
+    evidence: Optional[str] = None
     notes: Optional[str] = None
 
 
