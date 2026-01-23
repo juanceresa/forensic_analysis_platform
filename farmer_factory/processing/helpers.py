@@ -44,6 +44,43 @@ def load_pdf_pages(pdf_path: Path, output_dir: Path) -> List[Path]:
     return page_paths
 
 
+def _serialize_text_block(block) -> dict:
+    """
+    Convert TextBlock dataclass to JSON-serializable dict.
+
+    Args:
+        block: TextBlock with text, confidence, bounding_box, block_type
+
+    Returns:
+        Dictionary with all TextBlock fields, bounding_box as list
+    """
+    return {
+        "text": block.text,
+        "confidence": block.confidence,
+        "bounding_box": list(block.bounding_box),  # tuple → list for JSON
+        "block_type": block.block_type
+    }
+
+
+def _serialize_ocr_result(ocr) -> dict:
+    """
+    Convert OCRResult dataclass to JSON-serializable dict.
+
+    Args:
+        ocr: OCRResult with text, confidence, blocks, metadata
+
+    Returns:
+        Dictionary with complete OCR data including serialized blocks
+    """
+    return {
+        "text": ocr.text,
+        "confidence": ocr.confidence,
+        "page_confidence": ocr.page_confidence,
+        "blocks": [_serialize_text_block(block) for block in ocr.blocks],
+        "metadata": ocr.metadata
+    }
+
+
 def save_extraction_json(extraction, output_path: Path) -> None:
     """
     Save extraction result to JSON with proper serialization.
@@ -64,6 +101,7 @@ def save_extraction_json(extraction, output_path: Path) -> None:
     data = {
         'entities': [e.model_dump() for e in extraction.entities],
         'relations': [r.model_dump() for r in extraction.relations],
+        'ocr_result': _serialize_ocr_result(extraction.ocr_result) if extraction.ocr_result else None,
         'confidence_scores': extraction.confidence_scores,
         'path': extraction.path.value,
         'processing_metadata': extraction.processing_metadata
