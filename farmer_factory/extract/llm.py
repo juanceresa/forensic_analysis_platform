@@ -492,6 +492,55 @@ Respond with a JSON object:
 
         return final_relations
 
+    def _parse_relation_response(self, response_text: str) -> RelationExtractionResult:
+        """
+        Parse Claude response into RelationExtractionResult.
+
+        Handles markdown code blocks and validates JSON schema.
+
+        Args:
+            response_text: Raw response from Claude
+
+        Returns:
+            Validated RelationExtractionResult
+
+        Raises:
+            ValueError: If JSON parsing or validation fails
+        """
+        try:
+            # Extract JSON from markdown code blocks if present
+            cleaned_text = response_text.strip()
+
+            # Check for markdown JSON code blocks
+            if "```json" in cleaned_text:
+                start = cleaned_text.find("```json") + 7
+                end = cleaned_text.find("```", start)
+                if end > start:
+                    cleaned_text = cleaned_text[start:end].strip()
+            elif "```" in cleaned_text:
+                # Generic code block
+                start = cleaned_text.find("```") + 3
+                end = cleaned_text.find("```", start)
+                if end > start:
+                    cleaned_text = cleaned_text[start:end].strip()
+
+            # Parse JSON
+            data = json.loads(cleaned_text)
+
+            # Validate with Pydantic model
+            result = RelationExtractionResult(**data)
+            return result
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from Claude relation response: {str(e)}")
+            logger.debug(f"Response text: {response_text[:500]}...")
+            raise ValueError(f"Invalid JSON in Claude response: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Failed to validate relation extraction result: {str(e)}")
+            logger.debug(f"Parsed data: {data if 'data' in locals() else 'N/A'}")
+            raise ValueError(f"Invalid relation extraction result schema: {str(e)}")
+
     def _get_client(self):
         """Get or initialize Anthropic client (lazy initialization)."""
         if self._client is None:
