@@ -407,6 +407,91 @@ Respond with a JSON object:
         # Unknown relation type - return as-is
         return temporal
 
+    def _transform_to_final_relations(
+        self,
+        extraction: RelationExtractionResult,
+        entities: List[BaseEntity],
+        document_id: str,
+        document_date: Optional[str]
+    ) -> List[Relation]:
+        """
+        Transform intermediate relations to final schema.
+
+        Args:
+            extraction: Intermediate extraction result from Claude
+            entities: Previously extracted entities
+            document_id: Document identifier
+            document_date: Document date for temporal fallback
+
+        Returns:
+            List of final Relation objects
+        """
+        from farmer_factory.structure.schema import Verification, VerificationTier
+
+        final_relations = []
+
+        for rel in extraction.relations:
+            # Match source and target entities
+            source_id = self._match_entity(rel.source_entity, entities)
+            target_id = self._match_entity(rel.target_entity, entities)
+
+            if not source_id or not target_id:
+                logger.warning(
+                    f"Skipping relation {rel.relation_type} - "
+                    f"unmatched entities: {rel.source_entity} -> {rel.target_entity}"
+                )
+                continue
+
+            # Apply temporal logic
+            temporal_info = self._apply_temporal_logic(rel, document_date)
+
+            # Create verification
+            verification = Verification(
+                tier=VerificationTier.TIER_3_AI,
+                confidence=rel.confidence,
+                verified_by=None,
+                verified_at=None,
+                notes=rel.notes
+            )
+
+            # Determine if needs review (low confidence or missing temporal data)
+            needs_review = (
+                rel.confidence < 0.70 or
+                (rel.relation_type in TEMPORAL_RELATIONS and temporal_info.date_precision == "unknown")
+            )
+
+            # Build notes with review flag if needed
+            final_notes = rel.notes or ""
+            if needs_review:
+                if rel.confidence < 0.70:
+                    final_notes += f" Low confidence ({rel.confidence:.2f}) - requires analyst review."
+                if rel.relation_type in TEMPORAL_RELATIONS and temporal_info.date_precision == "unknown":
+                    final_notes += " Missing temporal data for event relation."
+
+            # Create final relation
+            relation = Relation(
+                id=f"{document_id}_rel_{uuid.uuid4().hex[:8]}",
+                type=rel.relation_type,
+                source_id=source_id,
+                target_id=target_id,
+                verification=verification,
+                document_id=document_id,
+                evidence=rel.evidence,
+                notes=final_notes.strip(),
+                # Temporal fields (if supported by Relation model)
+                date=temporal_info.start_date,
+            )
+
+            final_relations.append(relation)
+
+        logger.info(
+            f"Transformed {len(extraction.relations)} intermediate relations → "
+            f"{len(final_relations)} final relations "
+            f"({len(extraction.relations) - len(final_relations)} skipped due to entity matching failures)"
+        )
+
+        return final_relations
+
     def _get_client(self):
         """Get or initialize Anthropic client (lazy initialization)."""
         if self._client is None:
