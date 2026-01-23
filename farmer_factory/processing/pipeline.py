@@ -31,7 +31,7 @@ from .exceptions import ProcessingError
 logger = logging.getLogger(__name__)
 
 
-def process_case(case_id: str, base_dir: Path = None, single_file: str = None) -> Dict[str, Any]:
+def process_case(case_id: str, base_dir: Path = None, single_file: str = None, force_typed: bool = False) -> Dict[str, Any]:
     """
     Process all PDFs in case through complete pipeline.
 
@@ -46,6 +46,7 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None) -
         case_id: Case identifier (e.g., "CASE-CERESA")
         base_dir: Base directory for cases (defaults to "cases")
         single_file: Optional filename to process only one PDF (for testing)
+        force_typed: Force all documents to use TYPED path (skip triage, for testing OCR)
 
     Returns:
         Dictionary with processing statistics
@@ -160,6 +161,13 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None) -
             # Extract entities
             try:
                 document_id = page_path.stem
+
+                # Force TYPED path if requested (for testing OCR)
+                if force_typed:
+                    from farmer_factory.prepare import DocumentPath
+                    preprocessed.path = DocumentPath.TYPED
+                    logger.debug(f"Forcing TYPED path for {document_id}")
+
                 extraction = extract_pipeline.extract_page(preprocessed, document_id=document_id)
             except Exception as e:
                 raise ProcessingError(f"Failed extraction {page_path.stem}: {e}")

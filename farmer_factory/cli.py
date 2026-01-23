@@ -70,7 +70,8 @@ def create_case(case_id: str, name: str, family: str):
 @click.argument('case_id')
 @click.option('--verbose', is_flag=True, help='Verbose output')
 @click.option('--file', 'single_file', help='Process only this PDF file from intake/ directory')
-def process(case_id: str, verbose: bool, single_file: str):
+@click.option('--force-typed', is_flag=True, help='Force all documents to use OCR path (ignore triage)')
+def process(case_id: str, verbose: bool, single_file: str, force_typed: bool):
     """Process case documents through the pipeline."""
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -80,6 +81,9 @@ def process(case_id: str, verbose: bool, single_file: str):
     else:
         logger.info(f"Processing case: {case_id}")
 
+    if force_typed:
+        logger.info("Forcing TYPED path (skipping triage)")
+
     # Import here to avoid circular imports
     try:
         from farmer_factory.processing import process_case, ProcessingError
@@ -88,7 +92,7 @@ def process(case_id: str, verbose: bool, single_file: str):
 
     try:
         # Run processing pipeline
-        stats = process_case(case_id, single_file=single_file)
+        stats = process_case(case_id, single_file=single_file, force_typed=force_typed)
 
         # Print summary
         click.echo("\n" + "="*60)
