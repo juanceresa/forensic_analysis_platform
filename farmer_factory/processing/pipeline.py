@@ -25,7 +25,7 @@ from farmer_factory.structure import (
     GraphBuilder,
     GraphExporter
 )
-from .helpers import load_pdf_pages, save_extraction_json, setup_logging
+from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, setup_logging
 from .exceptions import ProcessingError
 
 logger = logging.getLogger(__name__)
@@ -182,6 +182,13 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
                 save_extraction_json(extraction, extraction_path)
             except Exception as e:
                 logger.warning(f"Failed to save extraction JSON: {e}")
+
+            # Save OCR text as standalone .txt file
+            try:
+                ocr_text_path = case_dir / 'ocr' / f"{document_id}.txt"
+                save_ocr_text(extraction.ocr_result, ocr_text_path)
+            except Exception as e:
+                logger.warning(f"Failed to save OCR text: {e}")
 
             # Add to graph (with auto-deduplication)
             try:

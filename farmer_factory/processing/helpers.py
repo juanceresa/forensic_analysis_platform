@@ -114,6 +114,25 @@ def save_extraction_json(extraction, output_path: Path) -> None:
     logger.debug(f"Saved extraction to {output_path}")
 
 
+def save_ocr_text(ocr_result, output_path: Path) -> None:
+    """
+    Save plain OCR text to standalone .txt file for convenient viewing.
+
+    Args:
+        ocr_result: OCRResult object with extracted text
+        output_path: Path to save .txt file
+    """
+    if not ocr_result or not ocr_result.text:
+        logger.debug(f"No OCR text to save for {output_path}")
+        return
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(ocr_result.text)
+
+    logger.debug(f"Saved OCR text to {output_path}")
+
+
 def setup_logging(log_file: Path) -> None:
     """
     Configure dual logging: file (DEBUG) + console (INFO).
