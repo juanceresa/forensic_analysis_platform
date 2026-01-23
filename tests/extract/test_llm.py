@@ -156,3 +156,360 @@ def test_extract_includes_reasoning():
     # Reasoning should be present and non-empty
     assert result.reasoning is not None
     assert len(result.reasoning) > 20  # Should be a substantial explanation
+
+
+# --- Relation Extraction Tests ---
+
+
+def test_build_relation_prompt():
+    """Test relation prompt includes entities and relation types."""
+    from farmer_factory.structure.schema import (
+        Person, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="test_person_1",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    prompt = service._build_relation_prompt(
+        text="Mario Ceresa es propietario del Central Santa Maria",
+        entities=[person],
+        document_id="test_doc"
+    )
+
+    # Verify prompt contains key elements
+    assert "Mario Ceresa" in prompt
+    assert "OWNS" in prompt
+    assert "PERSON" in prompt
+    assert "REQUIRED OUTPUT FORMAT" in prompt
+    assert "relations" in prompt.lower()
+
+
+def test_match_entity_exact():
+    """Test entity matching with exact name match."""
+    from farmer_factory.structure.schema import (
+        Person, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa Rodriguez",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    entities = [person]
+
+    # Exact match
+    matched_id = service._match_entity("Mario Ceresa Rodriguez", entities)
+    assert matched_id == "person_123"
+
+
+def test_match_entity_alternate_name():
+    """Test entity matching with alternate name."""
+    from farmer_factory.structure.schema import (
+        Person, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa Rodriguez",
+        alternate_names=["M. Ceresa", "Mario C. Rodriguez"],
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    entities = [person]
+
+    # Match alternate name
+    matched_id = service._match_entity("M. Ceresa", entities)
+    assert matched_id == "person_123"
+
+
+def test_match_entity_fuzzy():
+    """Test entity matching with fuzzy matching."""
+    from farmer_factory.structure.schema import (
+        Person, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa Rodriguez",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    entities = [person]
+
+    # Fuzzy match with typo
+    matched_id = service._match_entity("Mario Cereza Rodriguez", entities)
+    assert matched_id == "person_123"
+
+
+def test_match_entity_no_match():
+    """Test entity matching returns None when no match found."""
+    from farmer_factory.structure.schema import (
+        Person, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    entities = [person]
+
+    # No match
+    matched_id = service._match_entity("Completely Different Person", entities)
+    assert matched_id is None
+
+
+def test_apply_temporal_logic_owns():
+    """Test temporal logic for OWNS relation (state relation)."""
+    from farmer_factory.extract.llm import ExtractedRelation
+
+    service = LLMExtractionService()
+
+    # OWNS is a state relation (if no dates, assume ongoing)
+    relation = ExtractedRelation(
+        relation_type="OWNS",
+        source_entity="Mario Ceresa",
+        target_entity="Central Santa Maria",
+        confidence=0.88,
+        temporal=None,  # No temporal info
+        evidence="Some evidence"
+    )
+
+    result = service._apply_temporal_logic(relation, document_date=None)
+
+    # Should set ongoing=True for state relation with no dates
+    assert result.ongoing is True
+
+
+def test_apply_temporal_logic_sold():
+    """Test temporal logic for SOLD relation (event relation)."""
+    from farmer_factory.extract.llm import ExtractedRelation
+
+    service = LLMExtractionService()
+
+    # SOLD is an event relation (if no dates, don't assume ongoing)
+    relation = ExtractedRelation(
+        relation_type="SOLD",
+        source_entity="Mario Ceresa",
+        target_entity="Central Santa Maria",
+        confidence=0.88,
+        temporal=None,  # No temporal info
+        evidence="Some evidence"
+    )
+
+    # Without document_date, temporal relations should return basic temporal info
+    result = service._apply_temporal_logic(relation, document_date=None)
+
+    # Should NOT set ongoing=True for event relation without dates
+    assert result.ongoing is None or result.ongoing is False
+
+
+def test_parse_relation_response_valid_json():
+    """Test parsing valid JSON relation response."""
+    service = LLMExtractionService()
+
+    response_text = '''
+    {
+      "relations": [
+        {
+          "relation_type": "OWNS",
+          "source_entity": "Mario Ceresa",
+          "target_entity": "Central Santa Maria",
+          "confidence": 0.88,
+          "temporal": {
+            "start_date": "1945-01-01",
+            "end_date": null,
+            "ongoing": true,
+            "date_precision": "year"
+          },
+          "evidence": "Mario Ceresa, propietario del Central Santa Maria",
+          "notes": "Ownership stated"
+        }
+      ],
+      "extraction_notes": "Document is a notarial certification."
+    }
+    '''
+
+    result = service._parse_relation_response(response_text)
+
+    assert result is not None
+    assert len(result.relations) == 1
+    assert result.relations[0].relation_type == "OWNS"
+    assert result.relations[0].source_entity == "Mario Ceresa"
+    assert result.relations[0].confidence == 0.88
+
+
+def test_parse_relation_response_markdown_json():
+    """Test parsing JSON wrapped in markdown code block."""
+    service = LLMExtractionService()
+
+    response_text = '''
+    ```json
+    {
+      "relations": [],
+      "extraction_notes": "No relations found"
+    }
+    ```
+    '''
+
+    result = service._parse_relation_response(response_text)
+
+    assert result is not None
+    assert len(result.relations) == 0
+    assert result.extraction_notes == "No relations found"
+
+
+def test_parse_relation_response_empty_relations():
+    """Test parsing response with no relations."""
+    service = LLMExtractionService()
+
+    response_text = '''
+    {
+      "relations": [],
+      "extraction_notes": "Document contains no property relations"
+    }
+    '''
+
+    result = service._parse_relation_response(response_text)
+
+    assert result is not None
+    assert len(result.relations) == 0
+    assert "no property relations" in result.extraction_notes.lower()
+
+
+def test_transform_to_final_relations():
+    """Test transformation of intermediate relations to final Relation objects."""
+    from farmer_factory.structure.schema import (
+        Person, Property, EntityType, Verification, VerificationTier,
+        RelationType
+    )
+    from farmer_factory.extract.llm import (
+        ExtractedRelation, TemporalInfo, RelationExtractionResult
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    property_entity = Property(
+        id="property_456",
+        entity_type=EntityType.PROPERTY,
+        name="Central Santa Maria",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.90),
+        extracted_from="test_doc"
+    )
+
+    entities = [person, property_entity]
+
+    extracted = ExtractedRelation(
+        relation_type="OWNS",
+        source_entity="Mario Ceresa",
+        target_entity="Central Santa Maria",
+        confidence=0.88,
+        temporal=TemporalInfo(
+            start_date="1945-01-01",
+            end_date=None,
+            ongoing=True,
+            date_precision="year"
+        ),
+        evidence="Mario Ceresa es propietario del Central Santa Maria",
+        notes="Ownership stated in document"
+    )
+
+    extraction_result = RelationExtractionResult(
+        relations=[extracted],
+        extraction_notes="Test extraction"
+    )
+
+    result = service._transform_to_final_relations(
+        extraction_result,
+        entities,
+        "test_doc",
+        "1945-01-01"
+    )
+
+    assert len(result) == 1
+    relation = result[0]
+    assert relation.type == RelationType.OWNS
+    assert relation.source_id == "person_123"
+    assert relation.target_id == "property_456"
+    assert relation.verification.tier == VerificationTier.TIER_3_AI
+    assert 0.0 <= relation.verification.confidence <= 1.0
+    assert relation.date == "1945-01-01"
+    assert relation.evidence == "Mario Ceresa es propietario del Central Santa Maria"
+
+
+def test_transform_skips_unmatched_entities():
+    """Test that transformation skips relations with unmatched entities."""
+    from farmer_factory.structure.schema import (
+        Person, EntityType, Verification, VerificationTier
+    )
+    from farmer_factory.extract.llm import ExtractedRelation, RelationExtractionResult
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    entities = [person]
+
+    extracted = ExtractedRelation(
+        relation_type="OWNS",
+        source_entity="Mario Ceresa",
+        target_entity="Unknown Property",  # This won't match any entity
+        confidence=0.88,
+        temporal=None,
+        evidence="Some evidence",
+        notes=""
+    )
+
+    extraction_result = RelationExtractionResult(
+        relations=[extracted],
+        extraction_notes="Test extraction"
+    )
+
+    result = service._transform_to_final_relations(
+        extraction_result,
+        entities,
+        "test_doc",
+        None
+    )
+
+    # Should skip relation with unmatched entity
+    assert len(result) == 0
