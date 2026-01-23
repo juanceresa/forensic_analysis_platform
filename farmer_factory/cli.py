@@ -182,6 +182,37 @@ def retry(case_id: str):
 
 
 @cli.command()
+@click.argument('case_id')
+@click.option('--verbose', is_flag=True, help='Verbose output')
+def retry_relations(case_id: str, verbose: bool):
+    """Retry relation extraction for documents that failed.
+
+    Finds documents with RELATION_EXTRACTION_FAILED flag and
+    re-runs only relation extraction (preserves entities).
+    """
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    logger.info(f"Retrying relation extraction for case: {case_id}")
+
+    click.echo("⚠️  retry-relations command not yet implemented")
+    click.echo("    This will be implemented in a future update")
+    click.echo(f"\nFor now, re-run the full process command:")
+    click.echo(f"  python cli.py process {case_id}")
+
+    # TODO: Implement retry logic
+    # 1. Load graph data
+    # 2. Find documents with RELATION_EXTRACTION_FAILED flag
+    # 3. For each failed doc:
+    #    - Load entities from graph
+    #    - Load OCR text from extractions/
+    #    - Re-run relation extraction
+    #    - Update graph with new relations
+    # 4. Save updated graph
+    # 5. Report results
+
+
+@cli.command()
 def list_cases():
     """List all cases."""
     cases_dir = Path('cases')
