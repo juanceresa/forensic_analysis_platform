@@ -78,7 +78,6 @@ def process_case(case_id: str, base_dir: Path = None) -> Dict[str, Any]:
     try:
         # Check if real APIs should be used
         import os
-        from pathlib import Path
 
         # Check for Google Cloud credentials
         # gcloud auth saves to default location, doesn't set env var
