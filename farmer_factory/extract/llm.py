@@ -903,6 +903,50 @@ Respond with a JSON object:
 
         return final_entities
 
+    def _extract_entities(
+        self,
+        text: str,
+        ocr_confidence: float,
+        document_id: str
+    ) -> tuple[List[BaseEntity], Optional[str]]:
+        """
+        Extract entities from OCR text (first pass).
+
+        Returns:
+            Tuple of (entities list, document_date)
+        """
+        from farmer_factory.config.settings import settings
+
+        start_time = time.time()
+
+        # Build prompt
+        prompt = self._build_entity_prompt(
+            text=text,
+            document_id=document_id,
+            ocr_quality=ocr_confidence
+        )
+
+        # Call Claude API
+        logger.info(f"Calling Claude API for entity extraction from {document_id}...")
+        response_text = self._call_claude_api_with_retry(
+            prompt=prompt,
+            max_retries=settings.max_retries,
+            retry_delay=settings.retry_delay,
+            api_timeout=settings.api_timeout
+        )
+
+        # Parse response
+        extraction = self._parse_extraction_response(response_text)
+
+        # Transform to final entities
+        entities = self._transform_to_final_entities(
+            extraction=extraction,
+            document_id=document_id,
+            ocr_confidence=ocr_confidence
+        )
+
+        return entities, extraction.document_date
+
     def extract_from_text(
         self,
         text: str,
@@ -910,7 +954,7 @@ Respond with a JSON object:
         document_id: str
     ) -> LLMExtractionResult:
         """
-        Extract entities from OCR text using Claude API.
+        Extract entities and relations from OCR text using Claude API.
 
         Falls back to mock extraction if:
         - API key not configured
@@ -937,74 +981,72 @@ Respond with a JSON object:
 
         # Try real Claude API extraction
         try:
-            start_time = time.time()
+            # STEP 1: Extract entities (first pass)
+            entities, document_date = self._extract_entities(text, ocr_confidence, document_id)
 
-            # Build prompt
-            prompt = self._build_entity_prompt(
-                text=text,
-                document_id=document_id,
-                ocr_quality=ocr_confidence
-            )
-
-            # Call Claude API with retry logic
-            logger.info(f"Calling Claude API for entity extraction from {document_id}...")
-            response_text = self._call_claude_api_with_retry(
-                prompt=prompt,
-                max_retries=settings.max_retries,
-                retry_delay=settings.retry_delay,
-                api_timeout=settings.api_timeout
-            )
-
-            # Parse response
-            extraction = self._parse_extraction_response(response_text)
-
-            # Transform to final entities
-            entities = self._transform_to_final_entities(
-                extraction=extraction,
-                document_id=document_id,
-                ocr_confidence=ocr_confidence
-            )
-
-            processing_time = time.time() - start_time
+            # STEP 2: Extract relations (second pass - only if we have 2+ entities)
+            relations = []
+            if len(entities) >= 2:
+                logger.info(
+                    f"Extracting relations from {document_id} ({len(entities)} entities found)..."
+                )
+                relations = self._extract_relations(
+                    text=text,
+                    entities=entities,
+                    document_id=document_id,
+                    ocr_confidence=ocr_confidence
+                )
+            else:
+                logger.info(
+                    f"Skipping relation extraction for {document_id} (only {len(entities)} entities)"
+                )
 
             # Calculate overall confidence
             if entities:
-                avg_confidence = sum(e.verification.confidence for e in entities) / len(entities)
+                avg_entity_confidence = sum(e.verification.confidence for e in entities) / len(entities)
             else:
-                avg_confidence = ocr_confidence
+                avg_entity_confidence = ocr_confidence
 
-            # Build reasoning from extraction notes
+            if relations:
+                avg_relation_confidence = sum(r.verification.confidence for r in relations) / len(relations)
+                avg_confidence = (avg_entity_confidence + avg_relation_confidence) / 2
+            else:
+                avg_confidence = avg_entity_confidence
+
+            # Build reasoning
             reasoning = f"""
-Entity extraction completed using Claude API.
+Entity and relation extraction completed using Claude API.
 
-Extracted {len(entities)} entities from document.
+Extracted {len(entities)} entities and {len(relations)} relations from document.
 - {len([e for e in entities if e.entity_type.value == 'PERSON'])} Person(s)
 - {len([e for e in entities if e.entity_type.value == 'PROPERTY'])} Property/Properties
 - {len([e for e in entities if e.entity_type.value == 'ORGANIZATION'])} Organization(s)
 - {len([e for e in entities if e.entity_type.value == 'LOCATION'])} Location(s)
 
 OCR confidence: {ocr_confidence:.2f}
-Average entity confidence: {avg_confidence:.2f}
+Average entity confidence: {avg_entity_confidence:.2f}
+Average relation confidence: {avg_relation_confidence if relations else 'N/A'}
 
-Extraction notes: {extraction.extraction_notes or 'None'}
-All entities tagged as TIER_3_AI (unverified AI extraction).
+All entities and relations tagged as TIER_3_AI (unverified AI extraction).
             """.strip()
 
             # Build metadata
             metadata = {
                 "model": settings.claude_model,
                 "api_version": "anthropic_v1",
-                "processing_time_ms": int(processing_time * 1000),
                 "ocr_confidence": ocr_confidence,
-                "llm_confidence": avg_confidence,
-                "text_length": len(text),
-                "document_date": extraction.document_date,
-                "document_date_confidence": extraction.document_date_confidence
+                "entity_count": len(entities),
+                "relation_count": len(relations),
+                "relation_extraction_status": (
+                    "COMPLETE" if relations or len(entities) < 2 else "FAILED"
+                ),
+                "document_date": document_date,
+                "text_length": len(text)
             }
 
             return LLMExtractionResult(
                 entities=entities,
-                relations=[],  # Phase 2: relation extraction
+                relations=relations,
                 confidence=avg_confidence,
                 reasoning=reasoning,
                 metadata=metadata
