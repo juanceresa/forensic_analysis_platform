@@ -541,6 +541,75 @@ Respond with a JSON object:
             logger.debug(f"Parsed data: {data if 'data' in locals() else 'N/A'}")
             raise ValueError(f"Invalid relation extraction result schema: {str(e)}")
 
+    def _extract_relations(
+        self,
+        text: str,
+        entities: List[BaseEntity],
+        document_id: str,
+        ocr_confidence: float
+    ) -> List[Relation]:
+        """
+        Extract relations from OCR text using Claude API.
+
+        Args:
+            text: OCR-extracted text
+            entities: Previously extracted entities
+            document_id: Document identifier
+            ocr_confidence: OCR confidence for logging
+
+        Returns:
+            List of Relation objects (empty if extraction fails)
+        """
+        from farmer_factory.config.settings import settings
+
+        try:
+            start_time = time.time()
+
+            # Build prompt
+            prompt = self._build_relation_prompt(
+                text=text,
+                entities=entities,
+                document_id=document_id
+            )
+
+            # Call Claude API with retry logic
+            logger.info(f"Calling Claude API for relation extraction from {document_id}...")
+            response_text = self._call_claude_api_with_retry(
+                prompt=prompt,
+                max_retries=settings.max_retries,
+                retry_delay=settings.retry_delay,
+                api_timeout=settings.api_timeout
+            )
+
+            # Parse response
+            extraction = self._parse_relation_response(response_text)
+
+            # Get document date from metadata (if available)
+            # This would come from entity extraction phase
+            document_date = None  # TODO: pass this from entity extraction
+
+            # Transform to final relations
+            relations = self._transform_to_final_relations(
+                extraction=extraction,
+                entities=entities,
+                document_id=document_id,
+                document_date=document_date
+            )
+
+            processing_time = time.time() - start_time
+            logger.info(
+                f"Relation extraction completed in {processing_time:.2f}s - "
+                f"extracted {len(relations)} relations"
+            )
+
+            return relations
+
+        except Exception as e:
+            logger.error(f"Relation extraction failed for {document_id}: {str(e)}")
+            logger.debug(f"Error details: {type(e).__name__}: {str(e)}")
+            # Return empty list - document will be flagged as incomplete
+            return []
+
     def _get_client(self):
         """Get or initialize Anthropic client (lazy initialization)."""
         if self._client is None:
