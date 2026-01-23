@@ -204,6 +204,101 @@ Respond with a JSON object:
 }}"""
         return prompt
 
+    def _build_relation_prompt(
+        self,
+        text: str,
+        entities: List[BaseEntity],
+        document_id: str,
+        document_type: str = "unknown"
+    ) -> str:
+        """
+        Build relation extraction prompt using PROMPTS.md template.
+
+        Args:
+            text: OCR-extracted text
+            entities: Previously extracted entities
+            document_id: Document identifier
+            document_type: Type of document
+
+        Returns:
+            Formatted prompt string
+        """
+        # Build entities JSON for prompt
+        entities_list = []
+        for entity in entities:
+            entities_list.append({
+                "id": entity.id,
+                "type": entity.entity_type.value,
+                "name": getattr(entity, 'name', str(entity.id))
+            })
+
+        entities_json = json.dumps(entities_list, indent=2, ensure_ascii=False)
+
+        prompt = f"""You are a forensic document analyst extracting relationships from historical Cuban property documents. Extract factual relationships only — never make legal conclusions about claim validity.
+
+Analyze the OCR text and the previously extracted entities to identify relationships between them.
+
+For each relationship, provide:
+1. relation_type: One of the defined types below
+2. source_entity: The entity at the start of the relationship
+3. target_entity: The entity at the end of the relationship
+4. confidence: 0.0-1.0 based on textual evidence
+5. temporal: Date or date range if applicable
+6. evidence: Quote from document supporting this relationship
+7. notes: Observations, caveats, or ambiguities
+
+RELATION TYPES:
+- OWNS: Person/Organization owns Property (current or historical)
+- SOLD: Person sold Property to another Person (transaction)
+- BOUGHT: Person bought Property from another Person
+- INHERITED: Person inherited Property (from another Person)
+- CONFISCATED: Government/Organization confiscated Property
+- WITNESSED: Person witnessed a transaction or legal act
+- NOTARIZED: Notary certified a document
+- REGISTERED_IN: Property registered in a Registry
+- LOCATED_IN: Property/Person located in a Location
+- EMPLOYED_BY: Person employed by Organization
+- RELATED_TO: Family relationship between Persons
+
+TEMPORAL INFORMATION:
+- Extract start_date and end_date where applicable
+- For ongoing relationships, set ongoing: true
+- Use date_precision: "exact", "month", "year", "decade", or "unknown"
+
+CRITICAL: Only extract relationships explicitly stated or directly implied by the document. Do not infer relationships that require outside knowledge.
+
+DOCUMENT METADATA:
+Document ID: {document_id}
+Document Type: {document_type}
+
+EXTRACTED ENTITIES:
+{entities_json}
+
+OCR TEXT:
+{text}
+
+Respond with a JSON object:
+{{
+  "relations": [
+    {{
+      "relation_type": "OWNS",
+      "source_entity": "Mario Ceresa",
+      "target_entity": "Central Santa Maria",
+      "confidence": 0.88,
+      "temporal": {{
+        "start_date": "1945-01-01",
+        "end_date": null,
+        "ongoing": true,
+        "date_precision": "year"
+      }},
+      "evidence": "...Don Mario Ceresa, propietario del Central Santa Maria...",
+      "notes": "Ownership stated but acquisition date not specified in this document"
+    }}
+  ],
+  "extraction_notes": "Document is a notarial certification of ownership."
+}}"""
+        return prompt
+
     def _get_client(self):
         """Get or initialize Anthropic client (lazy initialization)."""
         if self._client is None:
