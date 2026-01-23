@@ -353,6 +353,60 @@ Respond with a JSON object:
         logger.warning(f"Could not match entity '{entity_name}' - relation will be skipped")
         return None
 
+    def _apply_temporal_logic(
+        self,
+        relation: ExtractedRelation,
+        document_date: Optional[str]
+    ) -> TemporalInfo:
+        """
+        Apply smart temporal handling based on relation type.
+
+        Args:
+            relation: Extracted relation with temporal info
+            document_date: Document date from entity extraction (fallback)
+
+        Returns:
+            Enriched TemporalInfo with fallbacks applied
+        """
+        temporal = relation.temporal or TemporalInfo()
+
+        # TEMPORAL RELATIONS (events - need dates)
+        if relation.relation_type in TEMPORAL_RELATIONS:
+            if temporal.start_date:
+                # Claude found a date - use it
+                return temporal
+
+            elif document_date:
+                # Fallback: infer from document date
+                logger.info(f"Using document date as fallback for {relation.relation_type} relation")
+                return TemporalInfo(
+                    start_date=document_date,
+                    date_precision="year",
+                    notes="Date inferred from document date"
+                )
+
+            else:
+                # Last resort: mark unknown and will be flagged for review
+                logger.warning(f"No temporal data for {relation.relation_type} relation")
+                return TemporalInfo(
+                    date_precision="unknown",
+                    notes="Missing temporal data for event relation"
+                )
+
+        # STATE RELATIONS (conditions - dates optional)
+        elif relation.relation_type in STATE_RELATIONS:
+            if temporal.start_date:
+                return temporal
+            else:
+                # Dates are nice-to-have, not required
+                return TemporalInfo(
+                    date_precision="unknown",
+                    ongoing=True
+                )
+
+        # Unknown relation type - return as-is
+        return temporal
+
     def _get_client(self):
         """Get or initialize Anthropic client (lazy initialization)."""
         if self._client is None:
