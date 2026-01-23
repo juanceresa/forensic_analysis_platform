@@ -1,6 +1,6 @@
 """Extraction pipeline orchestrating OCR, Vision, and LLM services."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 
 from farmer_factory.prepare import DocumentPath, ProcessedPage
@@ -20,6 +20,7 @@ class ExtractionResult:
     confidence_scores: Dict[str, float]     # Multi-level confidence tracking
     path: DocumentPath                      # Which path was used
     processing_metadata: Dict[str, Any]     # Processing metadata
+    extraction_flags: List[str] = field(default_factory=list)  # Flags for incomplete/failed extractions
 
 
 class ExtractionPipeline:
@@ -111,12 +112,26 @@ class ExtractionPipeline:
             "combined_confidence": combined_confidence
         }
 
+        # Check for relation extraction failure
+        relation_status = llm_result.metadata.get("relation_extraction_status", "UNKNOWN")
+        if relation_status == "FAILED":
+            extraction_flags = ["RELATION_EXTRACTION_FAILED"]
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"⚠️  {document_id} INCOMPLETE - has entities but relation extraction failed"
+            )
+        else:
+            extraction_flags = []
+
         # Processing metadata
         processing_metadata = {
             "path": "TYPED",
             "ocr_metadata": ocr_result.metadata,
             "llm_metadata": llm_result.metadata,
-            "preprocessing_metadata": processed_page.metadata
+            "preprocessing_metadata": processed_page.metadata,
+            "relation_count": len(validated_relations),
+            "relation_extraction_status": relation_status
         }
 
         return ExtractionResult(
@@ -125,7 +140,8 @@ class ExtractionPipeline:
             ocr_result=ocr_result,
             confidence_scores=confidence_scores,
             path=DocumentPath.TYPED,
-            processing_metadata=processing_metadata
+            processing_metadata=processing_metadata,
+            extraction_flags=extraction_flags
         )
 
     def _extract_handwritten_path(
