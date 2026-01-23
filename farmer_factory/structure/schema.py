@@ -138,13 +138,17 @@ class RelationType(str, Enum):
     OWNS = "OWNS"
     OWNED = "OWNED"
     INHERITED = "INHERITED"
+    SOLD = "SOLD"  # New: Person sold Property
     SOLD_TO = "SOLD_TO"
+    BOUGHT = "BOUGHT"  # New: Person bought Property
     PURCHASED_FROM = "PURCHASED_FROM"
+    CONFISCATED = "CONFISCATED"  # New: Property confiscated by Government
 
     # Family Relations
     SPOUSE_OF = "SPOUSE_OF"
     CHILD_OF = "CHILD_OF"
     HEIR_OF = "HEIR_OF"
+    RELATED_TO = "RELATED_TO"  # New: Generic family relation
 
     # Property Boundaries
     BORDERS_NORTH = "BORDERS_NORTH"
@@ -154,13 +158,19 @@ class RelationType(str, Enum):
 
     # Document Relations
     MENTIONED_IN = "MENTIONED_IN"
+    WITNESSED = "WITNESSED"  # New: Person witnessed transaction
     WITNESSED_BY = "WITNESSED_BY"
+    NOTARIZED = "NOTARIZED"  # New: Notary certified document
     NOTARIZED_BY = "NOTARIZED_BY"
     ISSUED_BY = "ISSUED_BY"
 
     # Professional/Organizational
     REPRESENTED_BY = "REPRESENTED_BY"
     EMPLOYED_BY = "EMPLOYED_BY"
+
+    # Geographic
+    LOCATED_IN = "LOCATED_IN"  # New: Property/Person located in Location
+    REGISTERED_IN = "REGISTERED_IN"  # New: Property registered in Registry
 
     # Financial
     CREDITOR_OF = "CREDITOR_OF"
