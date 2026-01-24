@@ -20,9 +20,12 @@ from .schema import (
     GraphExport,
 )
 from .graph import KnowledgeGraph
-from .resolver import EntityResolver
+from .resolver import DedupeEntityResolver
 from .builder import GraphBuilder
 from .exporter import GraphExporter
+
+# Backward compatibility alias (deprecated, use DedupeEntityResolver)
+EntityResolver = DedupeEntityResolver
 
 __all__ = [
     "VerificationTier",
@@ -39,7 +42,8 @@ __all__ = [
     "GraphMetadata",
     "GraphExport",
     "KnowledgeGraph",
-    "EntityResolver",
+    "DedupeEntityResolver",
+    "EntityResolver",  # Deprecated alias
     "GraphBuilder",
     "GraphExporter",
 ]

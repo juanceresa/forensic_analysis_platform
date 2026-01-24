@@ -213,6 +213,70 @@ def retry_relations(case_id: str, verbose: bool):
 
 
 @cli.command()
+@click.argument('case_id')
+@click.option('--entity-type',
+              type=click.Choice(['PERSON', 'LOCATION', 'PROPERTY', 'ORGANIZATION']),
+              help='Train specific entity type (default: all)')
+@click.option('--num-examples', default=30,
+              help='Number of labeled examples to collect per type')
+def train_deduplication(case_id: str, entity_type: str, num_examples: int):
+    """
+    Train entity deduplication models using labeled examples.
+
+    Interactive session where you label entity pairs as matches or not.
+    Models are saved to farmer_factory/structure/models/ for use in
+    future processing runs.
+
+    Example:
+        python cli.py train-deduplication TEST-CERESA --entity-type PERSON
+    """
+    from farmer_factory.structure.train_dedupe import train_dedupe_model
+
+    case_dir = Path('cases') / case_id
+    extractions_dir = case_dir / 'extractions'
+
+    if not extractions_dir.exists():
+        raise click.ClickException(
+            f"No extractions found for {case_id}. "
+            f"Run 'python cli.py process {case_id}' first."
+        )
+
+    click.echo(f"\n{'='*60}")
+    click.echo("Deduplication Model Training")
+    click.echo(f"{'='*60}\n")
+    click.echo(f"Case: {case_id}")
+    click.echo(f"Examples per type: {num_examples}\n")
+
+    entity_types = [entity_type] if entity_type else ['PERSON', 'LOCATION', 'PROPERTY', 'ORGANIZATION']
+
+    for etype in entity_types:
+        try:
+            click.echo(f"\n--- Training {etype} ---\n")
+            model = train_dedupe_model(
+                case_id=case_id,
+                entity_type=etype,
+                num_examples=num_examples
+            )
+            click.echo(f"✓ {etype} model trained and saved\n")
+        except ValueError as e:
+            click.echo(f"⚠️  Skipping {etype}: {e}\n")
+            continue
+        except Exception as e:
+            logger.exception(f"Failed to train {etype} model")
+            click.echo(f"❌ Failed to train {etype}: {e}\n")
+            continue
+
+    click.echo(f"\n{'='*60}")
+    click.echo("Training Complete!")
+    click.echo(f"{'='*60}")
+    click.echo("\nModels saved to: farmer_factory/structure/models/")
+    click.echo("\nNext steps:")
+    click.echo(f"  1. Test models: python cli.py process {case_id} --force-typed")
+    click.echo(f"  2. Review deduplication in: cases/{case_id}/output/graph_data.json")
+    click.echo(f"  3. If quality is good, process new cases with trained models")
+
+
+@cli.command()
 def list_cases():
     """List all cases."""
     cases_dir = Path('cases')

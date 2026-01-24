@@ -21,7 +21,7 @@ from farmer_factory.extract import (
 )
 from farmer_factory.structure import (
     KnowledgeGraph,
-    EntityResolver,
+    DedupeEntityResolver,
     GraphBuilder,
     GraphExporter
 )
@@ -115,7 +115,10 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
     logger.info("Initializing graph builder...")
     try:
         graph = KnowledgeGraph(case_id=case_id)
-        resolver = EntityResolver(similarity_threshold=0.85)
+
+        # Use dedupe-based resolver with trained models
+        resolver = DedupeEntityResolver(threshold=0.5)
+
         builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
     except Exception as e:
         raise ProcessingError(f"Failed to initialize graph builder: {e}")

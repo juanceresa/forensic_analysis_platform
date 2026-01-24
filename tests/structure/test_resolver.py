@@ -1,331 +1,350 @@
-"""Unit tests for Entity Resolver."""
+"""Tests for dedupe-based entity resolution."""
 
 import pytest
-from farmer_factory.structure.resolver import EntityResolver
-from farmer_factory.structure import KnowledgeGraph, Person, EntityType, Verification, VerificationTier
+from pathlib import Path
+from farmer_factory.structure.resolver import DedupeEntityResolver
+from farmer_factory.structure.schema import Person, Location, Property, Organization, Verification, EntityType
+from datetime import datetime
 
 
 def test_resolver_initialization():
-    """Test EntityResolver can be initialized."""
-    resolver = EntityResolver()
-    assert resolver is not None
-    assert resolver.threshold == 0.85  # Default threshold
-
-    # With custom threshold
-    resolver_custom = EntityResolver(similarity_threshold=0.90)
-    assert resolver_custom.threshold == 0.90
+    """Test resolver initializes without trained models."""
+    resolver = DedupeEntityResolver()
+    assert resolver.threshold == 0.5
+    assert resolver.dedupers == {}  # No models loaded yet
+    assert resolver.model_dir.exists()  # Directory should be created
 
 
-def test_resolver_similarity_threshold_validation():
-    """Test that similarity threshold must be between 0 and 1."""
-    # Valid thresholds
-    EntityResolver(similarity_threshold=0.0)
-    EntityResolver(similarity_threshold=1.0)
-    EntityResolver(similarity_threshold=0.85)
-
-    # Invalid thresholds should raise ValueError
-    with pytest.raises(ValueError):
-        EntityResolver(similarity_threshold=-0.1)
-
-    with pytest.raises(ValueError):
-        EntityResolver(similarity_threshold=1.5)
+def test_resolver_custom_threshold():
+    """Test resolver accepts custom threshold."""
+    resolver = DedupeEntityResolver(threshold=0.7)
+    assert resolver.threshold == 0.7
 
 
-def test_calculate_name_similarity_exact_match():
-    """Test name similarity calculation for exact matches."""
-    resolver = EntityResolver()
+def test_resolver_with_missing_models():
+    """Test resolver handles missing models gracefully."""
+    resolver = DedupeEntityResolver()
 
-    similarity = resolver._calculate_name_similarity("Juan Pérez", "Juan Pérez")
-    assert similarity == 1.0  # Exact match
-
-
-def test_calculate_name_similarity_fuzzy_match():
-    """Test name similarity for fuzzy matches."""
-    resolver = EntityResolver()
-
-    # Very similar names
-    similarity = resolver._calculate_name_similarity("Juan Pérez García", "Juan Perez Garcia")
-    assert similarity > 0.85  # Accent differences, still very similar
-
-    # Somewhat similar (one name is subset of another)
-    similarity = resolver._calculate_name_similarity("Juan Pérez", "Juan Perez Garcia")
-    assert 0.60 < similarity < 1.0
-
-    # Different names
-    similarity = resolver._calculate_name_similarity("Juan Pérez", "María López")
-    assert similarity < 0.50
-
-
-def test_calculate_name_similarity_case_insensitive():
-    """Test that name matching is case insensitive."""
-    resolver = EntityResolver()
-
-    similarity = resolver._calculate_name_similarity("JUAN PÉREZ", "juan pérez")
-    assert similarity > 0.95  # Should be nearly identical
-
-
-def test_find_similar_entity_no_match():
-    """Test find_similar_entity when no match exists."""
-    resolver = EntityResolver()
-    graph = KnowledgeGraph(case_id="test_case")
-
-    # Create a person entity
+    # Create test entity
     person = Person(
-        id="p1",
+        id="test_1",
         entity_type=EntityType.PERSON,
-        name="Juan Pérez",
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_001"
+        verification=Verification(tier="TIER_3_AI", confidence=0.8),
+        extracted_from="doc_1",
+        name="Test Person"
     )
 
-    result = resolver.find_similar_entity(person, graph)
-    assert result is None  # No entities in graph yet
+    # Should return None when no model exists
+    result = resolver.find_similar_entity(person, None)
+    assert result is None
 
 
-def test_find_similar_entity_exact_match():
-    """Test find_similar_entity with exact name match."""
-    resolver = EntityResolver(similarity_threshold=0.85)
-    graph = KnowledgeGraph(case_id="test_case")
+def test_entity_data_preparation_person():
+    """Test entity data preparation for Person."""
+    resolver = DedupeEntityResolver()
 
-    # Add existing person
-    existing = Person(
-        id="p1",
+    person = Person(
+        id="test_1",
         entity_type=EntityType.PERSON,
-        name="Juan Pérez García",
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.90,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_001"
-    )
-    graph.add_entity(existing)
-
-    # Try to find similar (same name)
-    new_person = Person(
-        id="p2",
-        entity_type=EntityType.PERSON,
-        name="Juan Pérez García",
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_002"
+        verification=Verification(tier="TIER_3_AI", confidence=0.8),
+        extracted_from="doc_1",
+        name="Mario Ceresa",
+        birth_date="1920",
+        residence="Holguin"
     )
 
-    result = resolver.find_similar_entity(new_person, graph)
-    assert result == "p1"  # Should find existing entity
+    data = resolver._prepare_entity_data(person)
+
+    assert data['name'] == "Mario Ceresa"
+    assert data['birth_date'] == "1920"
+    assert data['residence'] == "Holguin"
+    assert 'profession' in data  # Should have all fields even if None
+    assert data['profession'] == ''  # None becomes empty string
 
 
-def test_find_similar_entity_fuzzy_match():
-    """Test find_similar_entity with fuzzy name match."""
-    resolver = EntityResolver(similarity_threshold=0.85)
-    graph = KnowledgeGraph(case_id="test_case")
+def test_entity_data_preparation_location():
+    """Test entity data preparation for Location."""
+    resolver = DedupeEntityResolver()
 
-    # Add existing person
-    existing = Person(
-        id="p1",
-        entity_type=EntityType.PERSON,
-        name="Juan Pérez García",
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.90,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_001"
-    )
-    graph.add_entity(existing)
-
-    # Try to find similar (slight name variation)
-    new_person = Person(
-        id="p2",
-        entity_type=EntityType.PERSON,
-        name="Juan Perez Garcia",  # No accents
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_002"
+    location = Location(
+        id="test_1",
+        entity_type=EntityType.LOCATION,
+        verification=Verification(tier="TIER_3_AI", confidence=0.8),
+        extracted_from="doc_1",
+        name="Holguin",
+        location_type="city",
+        country="Cuba"
     )
 
-    result = resolver.find_similar_entity(new_person, graph)
-    assert result == "p1"  # Should find existing despite accent difference
+    data = resolver._prepare_entity_data(location)
+
+    assert data['name'] == "Holguin"
+    assert data['location_type'] == "city"
+    assert data['country'] == "Cuba"
 
 
-def test_find_similar_entity_below_threshold():
-    """Test find_similar_entity when similarity below threshold."""
-    resolver = EntityResolver(similarity_threshold=0.85)
-    graph = KnowledgeGraph(case_id="test_case")
+def test_entity_data_preparation_property():
+    """Test entity data preparation for Property."""
+    resolver = DedupeEntityResolver()
 
-    # Add existing person
-    existing = Person(
-        id="p1",
-        entity_type=EntityType.PERSON,
-        name="Juan Pérez",
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.90,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_001"
-    )
-    graph.add_entity(existing)
-
-    # Try to find similar (different person)
-    new_person = Person(
-        id="p2",
-        entity_type=EntityType.PERSON,
-        name="María López",  # Completely different
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_002"
+    property_entity = Property(
+        id="test_1",
+        entity_type=EntityType.PROPERTY,
+        verification=Verification(tier="TIER_3_AI", confidence=0.8),
+        extracted_from="doc_1",
+        name="Finca Aguaras",
+        property_type="finca",
+        area=50.5
     )
 
-    result = resolver.find_similar_entity(new_person, graph)
-    assert result is None  # Should not match
+    data = resolver._prepare_entity_data(property_entity)
+
+    assert data['name'] == "Finca Aguaras"
+    assert data['property_type'] == "finca"
+    assert data['area'] == "50.5"  # Converted to string
 
 
-def test_merge_entities_no_conflict():
-    """Test merging entities with no conflicting data."""
-    resolver = EntityResolver()
+def test_entity_data_preparation_organization():
+    """Test entity data preparation for Organization."""
+    resolver = DedupeEntityResolver()
+
+    org = Organization(
+        id="test_1",
+        entity_type=EntityType.ORGANIZATION,
+        verification=Verification(tier="TIER_3_AI", confidence=0.8),
+        extracted_from="doc_1",
+        name="Banco de Fomento",
+        org_type="bank"
+    )
+
+    data = resolver._prepare_entity_data(org)
+
+    assert data['name'] == "Banco de Fomento"
+    assert data['org_type'] == "bank"
+
+
+def test_entity_data_from_dict():
+    """Test entity data preparation from graph node data."""
+    resolver = DedupeEntityResolver()
+
+    node_data = {
+        'name': 'Mario Ceresa',
+        'birth_date': '1920',
+        'residence': 'Holguin',
+        'profession': None,
+        'entity_type': 'PERSON'
+    }
+
+    data = resolver._prepare_entity_data_from_dict(node_data, 'PERSON')
+
+    assert data['name'] == 'Mario Ceresa'
+    assert data['birth_date'] == '1920'
+    assert data['residence'] == 'Holguin'
+    assert data['profession'] == ''  # None becomes empty string
+
+
+def test_merge_entities_combines_sources():
+    """Test merge entities combines extracted_from sources."""
+    resolver = DedupeEntityResolver()
 
     existing = {
-        "id": "p1",
-        "entity_type": "PERSON",
-        "name": "Juan Pérez",
-        "birth_date": "1920",
-        "extracted_from": "doc_001"
+        'name': 'Mario Ceresa',
+        'birth_date': '1920',
+        'extracted_from': ['doc_1'],
+        'verification': {'confidence': 0.7}
     }
 
     new_person = Person(
-        id="p2",
+        id="test_2",
         entity_type=EntityType.PERSON,
-        name="Juan Pérez",
-        birth_date="1920",  # Same birth date
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_002"
+        verification=Verification(tier="TIER_3_AI", confidence=0.9),
+        extracted_from="doc_2",
+        name="Mario Ceresa",
+        birth_date="1920"
     )
 
-    merged = resolver.merge_entities(existing, new_person)
+    merged = resolver.merge_entities(existing, new_person, match_confidence=0.8)
 
-    assert merged["name"] == "Juan Pérez"
-    assert merged["birth_date"] == "1920"  # No conflict
-    assert set(merged["extracted_from"]) == {"doc_001", "doc_002"}  # Combined sources
+    # Should combine sources
+    assert 'doc_1' in merged['extracted_from']
+    assert 'doc_2' in merged['extracted_from']
+    assert len(merged['extracted_from']) == 2
 
 
-def test_merge_entities_with_conflict():
-    """Test merging entities with conflicting birth dates."""
-    resolver = EntityResolver()
+def test_merge_entities_high_confidence():
+    """Test merge logic with high confidence uses better value."""
+    resolver = DedupeEntityResolver()
 
     existing = {
-        "id": "p1",
-        "entity_type": "PERSON",
-        "name": "Juan Pérez",
-        "birth_date": "1920",
-        "extracted_from": "doc_001"
+        'name': 'Mario Ceresa',
+        'birth_date': '1920',
+        'extracted_from': ['doc_1'],
+        'verification': {'confidence': 0.7}
     }
 
     new_person = Person(
-        id="p2",
+        id="test_2",
         entity_type=EntityType.PERSON,
-        name="Juan Pérez",
-        birth_date="1922",  # Different birth date
-        alternate_names=[],
-        roles=[],
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_002"
+        verification=Verification(tier="TIER_3_AI", confidence=0.9),
+        extracted_from="doc_2",
+        name="Mario Cereza Rodriguez",  # Longer, more complete
+        birth_date="1922"  # Conflict
     )
 
-    merged = resolver.merge_entities(existing, new_person)
+    # High confidence match (0.8)
+    merged = resolver.merge_entities(existing, new_person, match_confidence=0.8)
 
-    assert merged["name"] == "Juan Pérez"
-    # Conflicting dates should be stored as list with provenance
-    assert isinstance(merged["birth_date"], list)
-    assert "1920 (doc_001)" in merged["birth_date"]
-    assert "1922 (doc_002)" in merged["birth_date"]
-    assert set(merged["extracted_from"]) == {"doc_001", "doc_002"}
+    # Should pick better value based on confidence or completeness
+    assert 'doc_1' in merged['extracted_from']
+    assert 'doc_2' in merged['extracted_from']
+    # Birth date should pick higher confidence value (new: 0.9 vs existing: 0.7)
+    assert merged['birth_date'] == '1922'
 
 
-def test_merge_entities_list_fields():
-    """Test merging list fields (union of values)."""
-    resolver = EntityResolver()
+def test_merge_entities_low_confidence():
+    """Test merge logic with low confidence creates conflict list."""
+    resolver = DedupeEntityResolver()
 
     existing = {
-        "id": "p1",
-        "entity_type": "PERSON",
-        "name": "Juan Pérez",
-        "roles": ["owner"],
-        "extracted_from": "doc_001"
+        'name': 'Mario Ceresa',
+        'birth_date': '1920',
+        'extracted_from': ['doc_1'],
+        'verification': {'confidence': 0.7}
     }
 
     new_person = Person(
-        id="p2",
+        id="test_2",
         entity_type=EntityType.PERSON,
-        name="Juan Pérez",
-        alternate_names=[],
-        roles=["seller", "owner"],  # Overlapping roles
-        verification=Verification(
-            tier=VerificationTier.TIER_3_AI,
-            confidence=0.88,
-            verified_by=None,
-            verified_at=None,
-            notes=None
-        ),
-        extracted_from="doc_002"
+        verification=Verification(tier="TIER_3_AI", confidence=0.9),
+        extracted_from="doc_2",
+        name="Mario Cereza",  # Slight variation
+        birth_date="1922"  # Conflict
     )
 
-    merged = resolver.merge_entities(existing, new_person)
+    # Low confidence match (0.6)
+    merged = resolver.merge_entities(existing, new_person, match_confidence=0.6)
 
-    # Roles should be union
-    assert set(merged["roles"]) == {"owner", "seller"}
+    # Should create conflict list
+    assert isinstance(merged['birth_date'], list)
+    assert len(merged['birth_date']) == 2
+    assert '1920' in merged['birth_date'][0]
+    assert '1922' in merged['birth_date'][1]
+    assert 'doc_1' in merged['birth_date'][0]
+    assert 'doc_2' in merged['birth_date'][1]
+
+
+def test_merge_entities_handles_none_values():
+    """Test merge entities handles None values correctly."""
+    resolver = DedupeEntityResolver()
+
+    existing = {
+        'name': 'Mario Ceresa',
+        'birth_date': None,
+        'extracted_from': ['doc_1'],
+        'verification': {'confidence': 0.7}
+    }
+
+    new_person = Person(
+        id="test_2",
+        entity_type=EntityType.PERSON,
+        verification=Verification(tier="TIER_3_AI", confidence=0.9),
+        extracted_from="doc_2",
+        name="Mario Ceresa",
+        birth_date="1920"
+    )
+
+    merged = resolver.merge_entities(existing, new_person, match_confidence=0.8)
+
+    # Should fill in the None value
+    assert merged['birth_date'] == '1920'
+
+
+def test_merge_entities_handles_list_fields():
+    """Test merge entities handles list fields with union."""
+    resolver = DedupeEntityResolver()
+
+    existing = {
+        'name': 'Mario Ceresa',
+        'alternate_names': ['Mario', 'M. Ceresa'],
+        'extracted_from': ['doc_1'],
+        'verification': {'confidence': 0.7}
+    }
+
+    new_person = Person(
+        id="test_2",
+        entity_type=EntityType.PERSON,
+        verification=Verification(tier="TIER_3_AI", confidence=0.9),
+        extracted_from="doc_2",
+        name="Mario Ceresa",
+        alternate_names=['Ceresa', 'M. Ceresa']  # Some overlap
+    )
+
+    merged = resolver.merge_entities(existing, new_person, match_confidence=0.8)
+
+    # Should union the lists (no duplicates)
+    assert 'Mario' in merged['alternate_names']
+    assert 'M. Ceresa' in merged['alternate_names']
+    assert 'Ceresa' in merged['alternate_names']
+    assert len(merged['alternate_names']) == 3  # No duplicate 'M. Ceresa'
+
+
+def test_choose_better_value_by_confidence():
+    """Test choosing better value based on confidence difference."""
+    resolver = DedupeEntityResolver()
+
+    # New value has significantly higher confidence
+    result = resolver._choose_better_value("1920", "1922", 0.6, 0.9)
+    assert result == "1922"
+
+    # Existing value has significantly higher confidence
+    result = resolver._choose_better_value("1920", "1922", 0.9, 0.6)
+    assert result == "1920"
+
+
+def test_choose_better_value_by_completeness():
+    """Test choosing better value based on completeness when confidence similar."""
+    resolver = DedupeEntityResolver()
+
+    # Similar confidence, new value is longer
+    result = resolver._choose_better_value(
+        "Mario",
+        "Mario Ceresa Rodriguez",
+        0.8,
+        0.8
+    )
+    assert result == "Mario Ceresa Rodriguez"
+
+    # Similar confidence, existing value is longer
+    result = resolver._choose_better_value(
+        "Mario Ceresa Rodriguez",
+        "Mario",
+        0.8,
+        0.8
+    )
+    assert result == "Mario Ceresa Rodriguez"
+
+
+def test_create_conflict_list_new():
+    """Test creating new conflict list."""
+    resolver = DedupeEntityResolver()
+
+    result = resolver._create_conflict_list("1920", "1922", ["doc_1", "doc_2"])
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert "1920 (doc_1)" == result[0]
+    assert "1922 (doc_2)" == result[1]
+
+
+def test_create_conflict_list_append():
+    """Test appending to existing conflict list."""
+    resolver = DedupeEntityResolver()
+
+    existing_conflict = ["1920 (doc_1)", "1921 (doc_2)"]
+    result = resolver._create_conflict_list(existing_conflict, "1922", ["doc_1", "doc_2", "doc_3"])
+
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert "1920 (doc_1)" in result
+    assert "1921 (doc_2)" in result
+    assert "1922 (doc_3)" in result

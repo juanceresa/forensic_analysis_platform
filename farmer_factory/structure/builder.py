@@ -3,7 +3,7 @@
 from typing import List, Dict, Any, TYPE_CHECKING
 import logging
 from farmer_factory.structure.graph import KnowledgeGraph
-from farmer_factory.structure.resolver import EntityResolver
+from farmer_factory.structure.resolver import DedupeEntityResolver
 
 if TYPE_CHECKING:
     from farmer_factory.extract import ExtractionResult
@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 class GraphBuilder:
     """Orchestrates graph construction from extraction results."""
 
-    def __init__(self, knowledge_graph: KnowledgeGraph, resolver: EntityResolver):
+    def __init__(self, knowledge_graph: KnowledgeGraph, resolver: DedupeEntityResolver):
         """
         Initialize graph builder.
 
         Args:
             knowledge_graph: KnowledgeGraph instance to build into
-            resolver: EntityResolver for deduplication
+            resolver: DedupeEntityResolver for ML-based deduplication
         """
         self.graph = knowledge_graph
         self.resolver = resolver

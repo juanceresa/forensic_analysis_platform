@@ -1,56 +1,50 @@
-"""Entity resolution for deduplication and conflict handling."""
+"""Entity resolution using machine learning-based deduplication."""
 
-from typing import Optional, Dict, Any, List, Tuple
-from rapidfuzz import fuzz
-from farmer_factory.structure.schema import BaseEntity, EntityType
-from farmer_factory.structure.graph import KnowledgeGraph
+import logging
+import dedupe
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Tuple
+from .dedupe_config import FIELD_CONFIG
+from .schema import BaseEntity, EntityType
+from .graph import KnowledgeGraph
+
+logger = logging.getLogger(__name__)
 
 
-class EntityResolver:
-    """Handles entity deduplication using fuzzy matching."""
+class DedupeEntityResolver:
+    """Machine learning-based entity resolution using dedupe library."""
 
-    def __init__(self, similarity_threshold: float = 0.85):
+    def __init__(self, model_dir: Path = None, threshold: float = 0.5):
         """
-        Initialize entity resolver.
+        Initialize resolver with trained models.
 
         Args:
-            similarity_threshold: Minimum similarity score for merge (0.0-1.0)
-
-        Raises:
-            ValueError: If threshold not in range [0.0, 1.0]
+            model_dir: Directory containing trained dedupe models
+            threshold: Match probability threshold (0.0-1.0), default 0.5
         """
-        if not 0.0 <= similarity_threshold <= 1.0:
-            raise ValueError(f"Similarity threshold must be between 0.0 and 1.0, got {similarity_threshold}")
+        self.model_dir = model_dir or Path(__file__).parent / "models"
+        self.model_dir.mkdir(exist_ok=True)
+        self.threshold = threshold
 
-        self.threshold = similarity_threshold
-        self.entity_index: Dict[str, List[str]] = {}  # {entity_type: [entity_ids]}
+        # Separate deduper for each entity type
+        self.dedupers: Dict[str, dedupe.StaticDedupe] = {}
+        self._load_models()
 
-    def _calculate_name_similarity(self, name1: str, name2: Any) -> float:
-        """
-        Calculate fuzzy similarity between two names.
+    def _load_models(self):
+        """Load pre-trained models from disk."""
+        for entity_type in ["PERSON", "LOCATION", "PROPERTY", "ORGANIZATION"]:
+            settings_path = self.model_dir / f"{entity_type.lower()}_settings"
 
-        Uses token_sort_ratio for order-insensitive matching.
-
-        Args:
-            name1: First name to compare
-            name2: Second name to compare (can be list from conflict merges)
-
-        Returns:
-            Similarity score between 0.0 and 1.0
-        """
-        if not name1 or not name2:
-            return 0.0
-
-        # Handle list (from conflict merges) - take first value
-        if isinstance(name2, list):
-            name2 = name2[0].split(" (")[0]  # Extract name before provenance
-
-        # Use token_sort_ratio for order-insensitive matching
-        # This handles "Juan Pérez García" vs "García, Juan Pérez"
-        score = fuzz.token_sort_ratio(name1.lower(), name2.lower())
-
-        # Convert 0-100 scale to 0.0-1.0
-        return score / 100.0
+            if settings_path.exists():
+                logger.info(f"Loading {entity_type} deduplication model...")
+                try:
+                    with open(settings_path, 'rb') as f:
+                        deduper = dedupe.StaticDedupe(f)
+                    self.dedupers[entity_type] = deduper
+                except Exception as e:
+                    logger.warning(f"Failed to load {entity_type} model: {e}")
+            else:
+                logger.debug(f"No trained model for {entity_type}, will skip deduplication")
 
     def find_similar_entity(
         self,
@@ -58,88 +52,156 @@ class EntityResolver:
         graph: KnowledgeGraph
     ) -> Optional[str]:
         """
-        Find existing entity that matches this one.
-
-        Uses fuzzy string matching on name and attribute comparison.
+        Find matching entity using dedupe.
 
         Args:
             entity: New entity to match
             graph: KnowledgeGraph to search
 
         Returns:
-            Entity ID if match found (similarity > threshold), None otherwise
+            Entity ID if match found, None otherwise
         """
         entity_type_str = entity.entity_type.value
 
-        # Get all entities of the same type from graph
+        # Check if we have a trained model for this type
+        if entity_type_str not in self.dedupers:
+            return None
+
+        # Get all entities of same type from graph
         candidates = []
         for node_id, node_data in graph.graph.nodes(data=True):
             if node_data.get("entity_type") == entity_type_str:
                 candidates.append((node_id, node_data))
 
-        # No candidates to match against
         if not candidates:
             return None
 
-        # For Person entities, match by name
-        if entity.entity_type == EntityType.PERSON:
-            return self._find_similar_person(entity, candidates)
+        # Prepare data for dedupe
+        data_dict = {}
 
-        # For other entity types, implement type-specific matching
-        # For now, return None (no match)
+        # Add new entity
+        new_entity_data = self._prepare_entity_data(entity)
+        data_dict[entity.id] = new_entity_data
+
+        # Add candidates
+        for candidate_id, candidate_data in candidates:
+            candidate_entity_data = self._prepare_entity_data_from_dict(
+                candidate_data,
+                entity_type_str
+            )
+            data_dict[candidate_id] = candidate_entity_data
+
+        # Get deduper for this entity type
+        deduper = self.dedupers[entity_type_str]
+
+        # Find clusters
+        try:
+            clustered_dupes = deduper.partition(data_dict, threshold=self.threshold)
+        except Exception as e:
+            logger.warning(f"Dedupe partition failed for {entity_type_str}: {e}")
+            return None
+
+        # Find cluster containing new entity
+        for cluster_id, (record_ids, scores) in enumerate(clustered_dupes):
+            if entity.id in record_ids:
+                # Found a match - return first existing entity in cluster
+                for record_id in record_ids:
+                    if record_id != entity.id:
+                        logger.debug(f"Matched {entity.id} with {record_id}")
+                        return record_id
+
         return None
 
-    def _find_similar_person(
+    def _prepare_entity_data(self, entity: BaseEntity) -> Dict[str, Any]:
+        """Extract fields for dedupe based on entity type."""
+        entity_type = entity.entity_type.value
+
+        if entity_type == "PERSON":
+            return {
+                'name': entity.name or '',
+                'birth_date': entity.birth_date or '',
+                'death_date': entity.death_date or '',
+                'residence': entity.residence or '',
+                'profession': entity.profession or '',
+                'nationality': entity.nationality or '',
+            }
+        elif entity_type == "LOCATION":
+            return {
+                'name': entity.name or '',
+                'location_type': entity.location_type or '',
+                'country': entity.country or '',
+                'parent_location_id': entity.parent_location_id or '',
+            }
+        elif entity_type == "PROPERTY":
+            return {
+                'name': entity.name or '',
+                'property_type': entity.property_type or '',
+                'location_id': entity.location_id or '',
+                'area': str(entity.area or ''),
+            }
+        elif entity_type == "ORGANIZATION":
+            return {
+                'name': entity.name or '',
+                'org_type': entity.org_type or '',
+                'location_id': entity.location_id or '',
+            }
+        else:
+            return {}
+
+    def _prepare_entity_data_from_dict(
         self,
-        person: BaseEntity,
-        candidates: List[Tuple[str, Dict[str, Any]]]
-    ) -> Optional[str]:
-        """
-        Find similar Person entity among candidates.
-
-        Args:
-            person: Person entity to match
-            candidates: List of (entity_id, entity_data) tuples
-
-        Returns:
-            Entity ID if match found, None otherwise
-        """
-        best_match_id = None
-        best_similarity = 0.0
-
-        person_name = person.name if hasattr(person, 'name') else ""
-
-        for entity_id, entity_data in candidates:
-            candidate_name = entity_data.get("name", "")
-
-            # Calculate name similarity
-            similarity = self._calculate_name_similarity(person_name, candidate_name)
-
-            # Track best match
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_match_id = entity_id
-
-        # Return match if above threshold
-        if best_similarity >= self.threshold:
-            return best_match_id
-
-        return None
+        entity_data: Dict[str, Any],
+        entity_type: str
+    ) -> Dict[str, Any]:
+        """Extract fields from graph node data."""
+        if entity_type == "PERSON":
+            return {
+                'name': entity_data.get('name') or '',
+                'birth_date': entity_data.get('birth_date') or '',
+                'death_date': entity_data.get('death_date') or '',
+                'residence': entity_data.get('residence') or '',
+                'profession': entity_data.get('profession') or '',
+                'nationality': entity_data.get('nationality') or '',
+            }
+        elif entity_type == "LOCATION":
+            return {
+                'name': entity_data.get('name') or '',
+                'location_type': entity_data.get('location_type') or '',
+                'country': entity_data.get('country') or '',
+                'parent_location_id': entity_data.get('parent_location_id') or '',
+            }
+        elif entity_type == "PROPERTY":
+            return {
+                'name': entity_data.get('name') or '',
+                'property_type': entity_data.get('property_type') or '',
+                'location_id': entity_data.get('location_id') or '',
+                'area': str(entity_data.get('area') or ''),
+            }
+        elif entity_type == "ORGANIZATION":
+            return {
+                'name': entity_data.get('name') or '',
+                'org_type': entity_data.get('org_type') or '',
+                'location_id': entity_data.get('location_id') or '',
+            }
+        else:
+            return {}
 
     def merge_entities(
         self,
         existing: Dict[str, Any],
-        new: BaseEntity
+        new: BaseEntity,
+        match_confidence: float = 0.8
     ) -> Dict[str, Any]:
         """
-        Merge new entity data into existing entity.
+        Merge entities using confidence-weighted approach.
 
-        For conflicting fields, creates lists with document provenance:
-        Example: birth_date = ["1920 (doc_001)", "1922 (doc_005)"]
+        For high-confidence matches (≥0.8), prefer higher quality data.
+        For lower confidence, create conflict lists with provenance.
 
         Args:
             existing: Existing entity data from graph
-            new: New entity to merge in
+            new: New entity to merge
+            match_confidence: Dedupe match confidence (0.0-1.0)
 
         Returns:
             Merged entity data dictionary
@@ -147,28 +209,29 @@ class EntityResolver:
         merged = existing.copy()
         new_data = new.model_dump()
 
-        # Handle extracted_from (always combine)
+        # Always combine sources (preserve order for conflict provenance)
         existing_sources = existing.get("extracted_from", "")
         new_source = new_data.get("extracted_from", "")
 
-        # Convert to list if needed
         if isinstance(existing_sources, str):
             existing_sources = [existing_sources] if existing_sources else []
         if isinstance(new_source, str):
             new_source = [new_source] if new_source else []
 
-        merged["extracted_from"] = list(set(existing_sources + new_source))
+        # Preserve order while removing duplicates
+        all_sources = existing_sources + new_source
+        seen = set()
+        merged["extracted_from"] = [s for s in all_sources if not (s in seen or seen.add(s))]
 
         # Merge other fields
         for field, new_value in new_data.items():
             if field in ("id", "entity_type", "extracted_from", "created_at", "updated_at"):
-                continue  # Skip metadata fields
+                continue
 
             existing_value = existing.get(field)
 
-            # Handle None values
             if new_value is None:
-                continue  # Keep existing value
+                continue
             if existing_value is None:
                 merged[field] = new_value
                 continue
@@ -181,20 +244,60 @@ class EntityResolver:
                     merged[field] = new_value
                 continue
 
-            # Handle conflicts (different values)
+            # Both have values - decide merge strategy
             if existing_value != new_value:
-                # Create provenance list
-                existing_source = existing.get("extracted_from", ["unknown"])[0] if isinstance(existing.get("extracted_from"), list) else existing.get("extracted_from", "unknown")
-                new_source_str = new_source[0] if new_source else "unknown"
-
-                if isinstance(existing_value, list):
-                    # Already a conflict list, append new value
-                    merged[field] = existing_value + [f"{new_value} ({new_source_str})"]
+                if match_confidence >= 0.8:
+                    # High confidence - choose better value
+                    merged[field] = self._choose_better_value(
+                        existing_value,
+                        new_value,
+                        existing.get('verification', {}).get('confidence', 0.5),
+                        new.verification.confidence
+                    )
                 else:
-                    # Create new conflict list
-                    merged[field] = [
-                        f"{existing_value} ({existing_source})",
-                        f"{new_value} ({new_source_str})"
-                    ]
+                    # Lower confidence - create conflict list
+                    merged[field] = self._create_conflict_list(
+                        existing_value,
+                        new_value,
+                        merged["extracted_from"]
+                    )
 
         return merged
+
+    def _choose_better_value(
+        self,
+        existing_value: Any,
+        new_value: Any,
+        existing_confidence: float,
+        new_confidence: float
+    ) -> Any:
+        """Choose better value based on confidence and completeness."""
+        # Confidence difference > 0.1 is significant
+        if new_confidence - existing_confidence > 0.1:
+            return new_value
+        if existing_confidence - new_confidence > 0.1:
+            return existing_value
+
+        # Confidence similar - prefer more complete
+        if isinstance(existing_value, str) and isinstance(new_value, str):
+            if len(new_value) > len(existing_value) * 1.2:
+                return new_value
+            return existing_value
+
+        return existing_value
+
+    def _create_conflict_list(
+        self,
+        existing_value: Any,
+        new_value: Any,
+        sources: List[str]
+    ) -> List[str]:
+        """Create conflict list with provenance."""
+        if isinstance(existing_value, list):
+            # Already a conflict list
+            return existing_value + [f"{new_value} ({sources[-1]})"]
+        else:
+            return [
+                f"{existing_value} ({sources[0] if sources else 'unknown'})",
+                f"{new_value} ({sources[-1] if len(sources) > 1 else 'unknown'})"
+            ]
