@@ -3,7 +3,7 @@
 import pytest
 from farmer_factory.structure.builder import GraphBuilder
 from farmer_factory.structure import KnowledgeGraph
-from farmer_factory.structure.resolver import EntityResolver
+from farmer_factory.structure.resolver import DedupeEntityResolver
 from farmer_factory.extract import ExtractionResult
 from farmer_factory.structure.schema import (
     Person, Property, EntityType, Verification, VerificationTier,
@@ -15,7 +15,7 @@ from farmer_factory.prepare import DocumentPath
 def test_builder_initialization():
     """Test GraphBuilder can be initialized."""
     graph = KnowledgeGraph(case_id="test_case")
-    resolver = EntityResolver()
+    resolver = DedupeEntityResolver()
 
     builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
@@ -33,7 +33,7 @@ def test_builder_initialization():
 def test_add_extraction_single_entity():
     """Test adding extraction with single entity."""
     graph = KnowledgeGraph(case_id="test_case")
-    resolver = EntityResolver()
+    resolver = DedupeEntityResolver()
     builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
     # Create extraction result with one person
@@ -78,7 +78,7 @@ def test_add_extraction_single_entity():
 def test_add_extraction_with_relation():
     """Test adding extraction with entity and relation."""
     graph = KnowledgeGraph(case_id="test_case")
-    resolver = EntityResolver()
+    resolver = DedupeEntityResolver()
     builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
     # Create person and property
@@ -150,8 +150,33 @@ def test_add_extraction_with_relation():
 
 def test_add_extraction_with_merge():
     """Test adding extraction that merges with existing entity."""
+    from unittest.mock import Mock
+
     graph = KnowledgeGraph(case_id="test_case")
-    resolver = EntityResolver(similarity_threshold=0.85)
+    resolver = Mock()
+
+    # Configure resolver to return p1 as match for p2, None for p1
+    def find_similar(entity, graph):
+        if entity.id == "p2":
+            return "p1"
+        return None
+
+    def merge_func(existing, new, match_confidence=0.8):
+        existing_sources = existing.get("extracted_from", [])
+        if isinstance(existing_sources, str):
+            existing_sources = [existing_sources]
+        new_sources = [new.extracted_from] if isinstance(new.extracted_from, str) else new.extracted_from
+
+        return {
+            **existing,
+            "birth_date": [f"{existing['birth_date']} (doc_001)", f"{new.birth_date} (doc_002)"],
+            "roles": list(set(existing.get("roles", []) + new.roles)),
+            "extracted_from": list(set(existing_sources + new_sources))
+        }
+
+    resolver.find_similar_entity = Mock(side_effect=find_similar)
+    resolver.merge_entities = Mock(side_effect=merge_func)
+
     builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
     # First extraction
@@ -227,8 +252,32 @@ def test_add_extraction_with_merge():
 
 def test_add_extraction_with_merge_and_relations():
     """Test that relations are remapped correctly when entities are merged."""
+    from unittest.mock import Mock
+
     graph = KnowledgeGraph(case_id="test_case")
-    resolver = EntityResolver(similarity_threshold=0.85)
+    resolver = Mock()
+
+    # Configure resolver to merge p2 into p1, no match for others
+    def find_similar(entity, graph):
+        if entity.id == "p2":
+            return "p1"
+        return None
+
+    def merge_func(existing, new, match_confidence=0.8):
+        existing_sources = existing.get("extracted_from", [])
+        if isinstance(existing_sources, str):
+            existing_sources = [existing_sources]
+        new_sources = [new.extracted_from] if isinstance(new.extracted_from, str) else new.extracted_from
+
+        return {
+            **existing,
+            "roles": list(set(existing.get("roles", []) + new.roles)),
+            "extracted_from": list(set(existing_sources + new_sources))
+        }
+
+    resolver.find_similar_entity = Mock(side_effect=find_similar)
+    resolver.merge_entities = Mock(side_effect=merge_func)
+
     builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
     # First extraction: person + property + relation
@@ -364,7 +413,7 @@ def test_add_extraction_with_merge_and_relations():
 def test_build_from_document_batch():
     """Test processing multiple extractions in batch."""
     graph = KnowledgeGraph(case_id="test_case")
-    resolver = EntityResolver()
+    resolver = DedupeEntityResolver()
     builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
     # Create multiple extractions
