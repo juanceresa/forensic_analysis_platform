@@ -73,9 +73,4 @@ temp/
 
 # Claude
 .claude
-docs/*
-!docs/plans/
-!docs/CLI_USAGE.md
-!docs/README.md
-!docs/architecture/
-!docs/guides/
+docs/plans/*
