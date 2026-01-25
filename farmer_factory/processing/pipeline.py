@@ -102,7 +102,7 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
                 use_real_api=use_google_ocr,
                 credentials_path=None  # Use Application Default Credentials (gcloud auth)
             ),
-            vision_service=VisionExtractionService(),
+            vision_service=VisionExtractionService(api_key=settings.anthropic_api_key),
             llm_service=LLMExtractionService(api_key=settings.anthropic_api_key),
             validator=SchemaValidator()
         )
