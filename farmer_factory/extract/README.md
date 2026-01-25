@@ -175,6 +175,14 @@ Orchestrates the two-path extraction process.
 - TYPED: `combined_confidence = min(ocr_confidence, llm_confidence)`
 - HANDWRITTEN: `vision_confidence`
 
+## Prompts
+
+All extraction prompts are documented in `PROMPTS.md` in this directory:
+- **Prompt 1:** Entity Extraction (Structured Format)
+- **Prompt 2:** Relation Extraction
+
+See `PROMPTS.md` for complete prompt templates and design rationale.
+
 ## Testing
 
 Run all extraction tests:
