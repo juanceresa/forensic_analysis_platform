@@ -334,27 +334,32 @@ Example response with NO relations:
         Returns:
             Entity ID if match found, None otherwise
         """
-        # Step 1: Exact match on name
-        for entity in entities:
-            if hasattr(entity, 'name') and entity.name == entity_name:
-                return entity.id
+        # Normalize entity name for better matching
+        entity_name_normalized = entity_name.lower().strip()
 
-        # Step 2: Exact match on alternate names
+        # Step 1: Exact match on name (case-insensitive)
         for entity in entities:
-            if hasattr(entity, 'alternate_names'):
-                if entity_name in entity.alternate_names:
+            if hasattr(entity, 'name') and entity.name:
+                if entity.name.lower().strip() == entity_name_normalized:
                     return entity.id
 
-        # Step 3: Fuzzy matching with SequenceMatcher
+        # Step 2: Exact match on alternate names (case-insensitive)
+        for entity in entities:
+            if hasattr(entity, 'alternate_names') and entity.alternate_names:
+                for alt_name in entity.alternate_names:
+                    if alt_name.lower().strip() == entity_name_normalized:
+                        return entity.id
+
+        # Step 3: Fuzzy matching with SequenceMatcher (lowered threshold to 0.75)
         best_match_id = None
         best_similarity = 0.0
 
         for entity in entities:
-            if hasattr(entity, 'name'):
+            if hasattr(entity, 'name') and entity.name:
                 # Calculate similarity
-                similarity = SequenceMatcher(None, entity_name.lower(), entity.name.lower()).ratio()
+                similarity = SequenceMatcher(None, entity_name_normalized, entity.name.lower().strip()).ratio()
 
-                if similarity >= 0.85 and similarity > best_similarity:
+                if similarity >= 0.75 and similarity > best_similarity:
                     best_match_id = entity.id
                     best_similarity = similarity
 
@@ -362,7 +367,20 @@ Example response with NO relations:
             logger.info(f"Fuzzy matched '{entity_name}' to entity (similarity: {best_similarity:.2f})")
             return best_match_id
 
-        # Step 4: No match found
+        # Step 4: Partial match - check if entity name is contained in or contains the extracted name
+        for entity in entities:
+            if hasattr(entity, 'name') and entity.name:
+                entity_name_lower = entity.name.lower().strip()
+                # Check if one is substring of the other
+                if (entity_name_normalized in entity_name_lower or
+                    entity_name_lower in entity_name_normalized):
+                    # Require at least 60% of the shorter string to match
+                    min_len = min(len(entity_name_normalized), len(entity_name_lower))
+                    if min_len >= 3:  # Only for names with 3+ chars
+                        logger.info(f"Partial matched '{entity_name}' to entity '{entity.name}'")
+                        return entity.id
+
+        # Step 5: No match found
         logger.warning(f"Could not match entity '{entity_name}' - relation will be skipped")
         return None
 
