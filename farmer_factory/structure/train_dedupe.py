@@ -141,11 +141,12 @@ def _prepare_training_data(
                 'parent_location_id': entity_data.get('parent_location_id', ''),
             }
         elif entity_type == "PROPERTY":
+            area_value = entity_data.get('area')
             data_dict[entity_id] = {
                 'name': entity_data.get('name', ''),
                 'property_type': entity_data.get('property_type', ''),
                 'location_id': entity_data.get('location_id', ''),
-                'area': str(entity_data.get('area', '')),
+                'area': float(area_value) if area_value is not None else None,
             }
         elif entity_type == "ORGANIZATION":
             data_dict[entity_id] = {
