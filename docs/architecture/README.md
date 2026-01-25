@@ -11,6 +11,7 @@ This directory contains high-level architecture and design documentation for the
 ### System Architecture
 - **ARCHITECTURE.md** - System design, Air Gap architecture, zones A & B
 - **SECURITY.md** - Authentication, authorization, audit logging
+- **TESTING.md** - Testing strategy, quality assurance, test coverage
 
 ### Domain Architecture
 - **POSTURING.md** - Organizational strategy, Farmer House vs Civic Table
