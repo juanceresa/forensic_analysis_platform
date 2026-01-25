@@ -77,3 +77,4 @@ docs/*
 !docs/plans/
 !docs/CLI_USAGE.md
 !docs/architecture/
+!docs/guides/
