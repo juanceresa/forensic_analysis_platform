@@ -1,267 +1,198 @@
-# Extraction Module
+# Extract Module
 
-OCR and entity extraction from preprocessed document images.
+> **Version:** 1.2.0
+> **Last Updated:** 2026-01-25
+> **Status:** Refactored for maintainability
+
+Entity and relation extraction from OCR text using Claude API.
+
+---
 
 ## Overview
 
-The `extract` module performs OCR and entity extraction on preprocessed documents from the `prepare` module. It implements a two-path architecture optimized for typed and handwritten documents, outputting validated Pydantic models ready for knowledge graph construction.
+This module handles:
+- OCR text processing (Google Cloud Vision)
+- Structured entity extraction (Claude API with custom prompts)
+- Relation extraction between entities
+- Schema validation with Pydantic
 
-## Architecture
+---
+
+## Module Structure
 
 ```
-Preprocessed Images (from prepare module)
-    ↓
-Path Router (based on triage result)
-    ↓
-┌─────────────────────┬─────────────────────┐
-│   TYPED Path        │  HANDWRITTEN Path   │
-│                     │                     │
-│ Google Cloud Vision │  Claude Vision API  │
-│ OCR                 │  (direct on image)  │
-│    ↓                │                     │
-│ Raw Text            │                     │
-│    ↓                │                     │
-│ Claude LLM          │                     │
-│ (entity extraction  │                     │
-│  from text)         │                     │
-└─────────────────────┴─────────────────────┘
-    ↓
-Validated Pydantic Models
-(Person, Property, Organization, Location, Document)
-    ↓
-All entities tagged: verification.tier = TIER_3_AI
-    ↓
-Structure module (graph building)
+extract/
+├── models.py              # Pydantic models for extraction schemas
+├── api_client.py          # Claude API client with retry logic
+├── llm.py                 # LLM extraction service (main interface)
+├── ocr.py                 # Google Cloud Vision OCR
+├── vision.py              # Vision API extraction (stub)
+├── validator.py           # Schema validation
+└── pipeline.py            # Extraction pipeline orchestration
 ```
 
-## Usage
-
-```python
-from farmer_factory.prepare import PreprocessingPipeline
-from farmer_factory.extract import (
-    ExtractionPipeline,
-    OCRService,
-    VisionExtractionService,
-    LLMExtractionService,
-    SchemaValidator,
-)
-import cv2
-
-# Initialize pipelines
-prep_pipeline = PreprocessingPipeline()
-extract_pipeline = ExtractionPipeline(
-    ocr_service=OCRService(),
-    vision_service=VisionExtractionService(),
-    llm_service=LLMExtractionService(),
-    validator=SchemaValidator()
-)
-
-# Load and preprocess image
-raw_image = cv2.imread("document.png", cv2.IMREAD_GRAYSCALE)
-preprocessed = prep_pipeline.process_page(raw_image)
-
-# Extract entities
-extraction = extract_pipeline.extract_page(preprocessed, document_id="doc_123")
-
-# Access results
-print(f"Path: {extraction.path}")
-print(f"Entities found: {len(extraction.entities)}")
-print(f"Confidence: {extraction.confidence_scores}")
-
-for entity in extraction.entities:
-    print(f"- {entity.entity_type}: {entity}")
-    print(f"  Verification: {entity.verification.tier} ({entity.verification.confidence:.2f})")
-```
+---
 
 ## Components
 
-### OCR Service (`ocr.py`)
+### 1. Extraction Models (`models.py`)
 
-Wraps Google Cloud Vision API for typed documents.
+Pydantic models for structured extraction:
 
-**Features:**
-- Text extraction with confidence scoring
-- Structured text blocks with bounding boxes
-- Language detection
-- Mocked for testing (no real API calls)
+**PersonExtraction:**
+- Core: name, alternate_names
+- Demographics: birth_date, death_date, nationality, residence, profession, marital_status
+- **Family relationships:** mother, father, spouse, children, siblings
+- Roles: list of roles in document
 
-**Example:**
+**PropertyExtraction:**
+- Identity: name, property_type
+- Location: location, address, description
+- Measurements: area, area_unit
+- Registry: registry_number, cadastral_info, folio_number
+
+**OrganizationExtraction:**
+- name, org_type, location, address
+
+**LocationExtraction:**
+- name, location_type, parent_location, country
+
+### 2. Claude API Client (`api_client.py`)
+
+Handles communication with Anthropic Claude API:
+
 ```python
-from farmer_factory.extract import OCRService
+from farmer_factory.extract.api_client import ClaudeAPIClient
 
-service = OCRService()
-result = service.extract_text(binary_image)
-
-print(f"Text: {result.text}")
-print(f"Confidence: {result.confidence}")
-print(f"Blocks: {len(result.blocks)}")
+client = ClaudeAPIClient(api_key="sk-...")
+response = client.call_with_retry(
+    prompt="Extract entities from: ...",
+    model="claude-sonnet-4-20250514",
+    max_retries=3
+)
 ```
 
-### Vision Extraction Service (`vision.py`)
-
-Wraps Claude Vision API for handwritten documents.
-
 **Features:**
-- Direct entity extraction from images
-- Handles cursive handwriting and aged documents
-- Returns validated Pydantic models
-- Mocked for testing
+- Exponential backoff for rate limits
+- Automatic model upgrade on timeout (Haiku → Sonnet)
+- Connection error handling
+- Configurable retry logic
 
-**Example:**
-```python
-from farmer_factory.extract import VisionExtractionService
+### 3. LLM Extraction Service (`llm.py`)
 
-service = VisionExtractionService()
-result = service.extract_from_image(grayscale_image, document_id="doc_123")
+Main interface for entity and relation extraction:
 
-print(f"Entities: {len(result.entities)}")
-print(f"Relations: {len(result.relations)}")
-print(f"Reasoning: {result.reasoning}")
-```
-
-### LLM Extraction Service (`llm.py`)
-
-Wraps Claude text API for entity extraction from OCR text.
-
-**Features:**
-- Entity extraction from OCR text
-- Combines OCR and LLM confidence scores
-- JSON schema-constrained output
-- Mocked for testing
-
-**Example:**
 ```python
 from farmer_factory.extract import LLMExtractionService
 
-service = LLMExtractionService()
+service = LLMExtractionService(api_key="sk-...")
+
+# Extract entities from OCR text
 result = service.extract_from_text(
-    text=ocr_text,
+    text="En el año 1958, Don Mario Ceresa...",
     ocr_confidence=0.92,
-    document_id="doc_123"
+    document_id="doc_001"
 )
 
-print(f"Entities: {len(result.entities)}")
-print(f"Combined confidence: {result.confidence}")
+# Extract relations between entities
+relations = service.extract_relations(
+    text="...",
+    entities=[person1, person2, property1],
+    document_id="doc_001"
+)
 ```
 
-### Schema Validator (`validator.py`)
+**Methods:**
+- `extract_from_text()` - Extract entities with full structured data
+- `extract_relations()` - Extract relations between entities
+- Both return validated Pydantic models
 
-Ensures all extracted data conforms to Pydantic schema.
+---
 
-**Features:**
-- Validates entities and relations
-- Returns partial results (skips invalid items)
-- Logs validation errors
-- Never fails entire extraction
+## Usage
 
-**Example:**
+### Basic Extraction
+
 ```python
-from farmer_factory.extract import SchemaValidator
-from farmer_factory.structure.schema import EntityType
+from farmer_factory.extract import LLMExtractionService
+from farmer_factory.config.settings import settings
 
-validator = SchemaValidator()
-entity = validator.validate_entity(entity_dict, EntityType.PERSON)
+# Initialize service
+service = LLMExtractionService(api_key=settings.anthropic_api_key)
+
+# Extract from OCR text
+ocr_text = "En 1958, Mario Ceresa, hijo de Juan Ceresa..."
+result = service.extract_from_text(
+    text=ocr_text,
+    ocr_confidence=0.9,
+    document_id="doc_001"
+)
+
+# Access extracted entities
+for entity in result.entities:
+    if isinstance(entity, PersonExtraction):
+        print(f"Person: {entity.name}")
+        print(f"  Mother: {entity.mother}")
+        print(f"  Father: {entity.father}")
 ```
 
-### Extraction Pipeline (`pipeline.py`)
+### With Pipeline
 
-Orchestrates the two-path extraction process.
+```python
+from farmer_factory.extract import ExtractionPipeline, OCRService, LLMExtractionService
 
-**Path Routing:**
-- **TYPED path**: OCR → LLM → Validate → TIER_3_AI tagging
-- **HANDWRITTEN path**: Vision → Validate → TIER_3_AI tagging
+pipeline = ExtractionPipeline(
+    ocr_service=OCRService(use_real_api=True),
+    llm_service=LLMExtractionService(api_key="sk-..."),
+)
 
-**Confidence Tracking:**
-- TYPED: `combined_confidence = min(ocr_confidence, llm_confidence)`
-- HANDWRITTEN: `vision_confidence`
+# Process a preprocessed page
+extraction = pipeline.extract_page(
+    preprocessed_page=preprocessed,
+    document_id="doc_001"
+)
+```
+
+---
 
 ## Prompts
 
-All extraction prompts are documented in `PROMPTS.md` in this directory:
+All extraction prompts defined in `.claude/PROMPTS.md`:
 - **Prompt 1:** Entity Extraction (Structured Format)
 - **Prompt 2:** Relation Extraction
 
-See `PROMPTS.md` for complete prompt templates and design rationale.
+Prompts are embedded in code but documented externally for review.
+
+---
 
 ## Testing
 
-Run all extraction tests:
-
 ```bash
-pytest tests/extract/ -v
+# Unit tests
+python -m pytest tests/extract/ -v
+
+# Test specific component
+python -m pytest tests/extract/test_llm.py::test_entity_extraction -v
 ```
 
-**Test Coverage:**
-- Unit tests for each component (OCR, Vision, LLM, Validator)
-- Pipeline orchestration tests
-- Integration tests (end-to-end with prepare module)
-- Module export tests
+---
 
-**Test Files:**
-- `test_ocr.py` - OCR service tests
-- `test_vision.py` - Vision extraction tests
-- `test_llm.py` - LLM extraction tests
-- `test_validator.py` - Schema validation tests
-- `test_pipeline.py` - Pipeline orchestration tests
-- `test_integration.py` - End-to-end tests
-- `test_module_exports.py` - Module export tests
+## Version History
 
-## Mocked APIs
+**v1.2.0 (2026-01-25):**
+- Refactored into focused modules (models, api_client)
+- Removed deprecated ExtractedEntity class
+- Added family relationship extraction
+- Updated documentation
 
-All API calls are mocked for testing:
-- **Google Cloud Vision**: Returns synthetic OCR results
-- **Claude Vision API**: Returns mock entity extractions
-- **Claude Text API**: Returns mock entity extractions from text
+**v1.1.0 (2026-01-24):**
+- Added structured entity extraction
+- Replaced simple value/normalized with full schemas
 
-This enables:
-- Fast test execution (no API latency)
-- Offline development
-- Predictable test behavior
-- No API costs during development
+**v1.0.0 (2026-01-22):**
+- Initial implementation with Claude API
+- Basic entity and relation extraction
 
-## Data Flow
+---
 
-```
-Input: ProcessedPage from prepare module
-  - image: np.ndarray (binary for TYPED, grayscale for HANDWRITTEN)
-  - path: DocumentPath.TYPED or DocumentPath.HANDWRITTEN
-  - metadata: preprocessing metadata
-
-Output: ExtractionResult
-  - entities: List[BaseEntity] (Person, Property, etc.)
-  - relations: List[Relation]
-  - confidence_scores: Dict[str, float]
-  - path: DocumentPath
-  - verification: All entities tagged TIER_3_AI
-
-Next Stage: Structure module
-  - Consumes ExtractionResult
-  - Builds knowledge graph (NetworkX)
-  - Handles entity resolution/merging
-```
-
-## Verification Tiers
-
-All extracted entities are tagged with `verification.tier = TIER_3_AI`:
-
-```python
-verification = Verification(
-    tier=VerificationTier.TIER_3_AI,
-    confidence=combined_confidence,
-    verified_by=None,
-    verified_at=None,
-    notes=None
-)
-```
-
-This indicates:
-- **TIER_3_AI**: Unverified AI extraction
-- Requires analyst review for promotion to **TIER_2_ANALYST**
-- Confidence score tracked for prioritization
-
-## See Also
-
-- `docs/plans/2026-01-22-extract-module-design.md`: Design document
-- `docs/plans/2026-01-22-extract-implementation.md`: Implementation plan
-- `farmer_factory/prepare/README.md`: Preprocessing pipeline
-- `.claude/CLAUDE.md`: Project constraints and legal posture
+*For implementation details, see source files in `farmer_factory/extract/`*
