@@ -9,6 +9,14 @@ The `prepare` module implements a two-path preprocessing pipeline:
 - **TYPED Path**: For typewritten documents → Binary images for Google Cloud Vision OCR
 - **HANDWRITTEN Path**: For handwritten documents → Grayscale images for Claude Vision API
 
+## Complete Documentation
+
+See `PREPROCESSING.md` for detailed pipeline specification:
+- Algorithm descriptions
+- Parameter tuning
+- Quality metrics
+- Design decisions
+
 ## Architecture
 
 ```
@@ -151,6 +159,6 @@ Example: 3000×2000px page ≈ 24MB peak memory
 
 ## See Also
 
+- `PREPROCESSING.md`: Complete pipeline specification
 - `docs/plans/2026-01-22-prepare-module-design.md`: Design document
 - `docs/plans/2026-01-22-prepare-implementation.md`: Implementation plan
-- `docs/PREPROCESSING.md`: Original specification
