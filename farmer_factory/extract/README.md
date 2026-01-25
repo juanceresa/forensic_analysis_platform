@@ -157,11 +157,11 @@ extraction = pipeline.extract_page(
 
 ## Prompts
 
-All extraction prompts defined in `.claude/PROMPTS.md`:
+All extraction prompts documented in `PROMPTS.md` in this directory:
 - **Prompt 1:** Entity Extraction (Structured Format)
 - **Prompt 2:** Relation Extraction
 
-Prompts are embedded in code but documented externally for review.
+See `PROMPTS.md` for complete prompt templates and design rationale.
 
 ---
 
