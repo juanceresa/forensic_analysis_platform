@@ -1,187 +1,30 @@
 """LLM extraction service for entity extraction from OCR text using Claude API."""
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Literal
-from enum import Enum
+from typing import List, Dict, Any, Optional
 from difflib import SequenceMatcher
 import logging
 import json
-import time
 import uuid
 
 from pydantic import BaseModel, Field
 
 from farmer_factory.structure.schema import BaseEntity, Relation
+from farmer_factory.extract.models import (
+    IntermediateEntityType,
+    PersonExtraction,
+    PropertyExtraction,
+    OrganizationExtraction,
+    LocationExtraction,
+    StructuredEntity,
+    StructuredEntityExtractionResult,
+    TemporalInfo,
+    ExtractedRelation,
+    RelationExtractionResult
+)
+from farmer_factory.extract.api_client import ClaudeAPIClient
 
 logger = logging.getLogger(__name__)
-
-
-# ============================================================================
-# Intermediate Models (match PROMPTS.md schema)
-# ============================================================================
-
-
-class IntermediateEntityType(str, Enum):
-    """Entity types from PROMPTS.md extraction schema."""
-    PERSON = "PERSON"
-    ORGANIZATION = "ORGANIZATION"
-    PROPERTY = "PROPERTY"
-    LOCATION = "LOCATION"
-    DATE = "DATE"
-    MONETARY_VALUE = "MONETARY_VALUE"
-    REGISTRY_REFERENCE = "REGISTRY_REFERENCE"
-
-
-class ExtractedEntity(BaseModel):
-    """Single entity extracted from document (intermediate format - deprecated)."""
-    entity_type: IntermediateEntityType
-    value: str = Field(description="Original extracted text")
-    normalized: Optional[str] = Field(default=None, description="Normalized form")
-    confidence: float = Field(ge=0.0, le=1.0)
-    context: str = Field(description="Surrounding text quote")
-    notes: Optional[str] = None
-
-
-# ============================================================================
-# Structured Entity Extraction Models
-# ============================================================================
-
-class PersonExtraction(BaseModel):
-    """Structured Person entity extraction."""
-    entity_type: Literal["PERSON"] = "PERSON"
-
-    # Core identity
-    name: str
-    alternate_names: List[str] = Field(default_factory=list)
-
-    # Demographics
-    birth_date: Optional[str] = None
-    death_date: Optional[str] = None
-    nationality: Optional[str] = None
-    residence: Optional[str] = None
-    profession: Optional[str] = None
-    marital_status: Optional[str] = None
-
-    # Family relationships (names as strings)
-    mother: Optional[str] = None
-    father: Optional[str] = None
-    spouse: Optional[str] = None
-    children: List[str] = Field(default_factory=list)
-    siblings: List[str] = Field(default_factory=list)
-
-    # Roles
-    roles: List[str] = Field(default_factory=list)
-
-    # Extraction metadata
-    confidence: float = Field(ge=0.0, le=1.0)
-    context: str = Field(description="Quote from document mentioning this person")
-    notes: Optional[str] = None
-
-
-class PropertyExtraction(BaseModel):
-    """Structured Property entity extraction."""
-    entity_type: Literal["PROPERTY"] = "PROPERTY"
-
-    # Identity
-    name: Optional[str] = None
-    property_type: Optional[str] = None
-
-    # Location & Description
-    location: Optional[str] = Field(None, description="Location name (will be linked to Location entity)")
-    address: Optional[str] = None
-    description: Optional[str] = None
-
-    # Measurements
-    area: Optional[float] = None
-    area_unit: Optional[str] = None
-
-    # Registry info
-    registry_number: Optional[str] = None
-    cadastral_info: Optional[str] = None
-    folio_number: Optional[str] = None
-
-    # Extraction metadata
-    confidence: float = Field(ge=0.0, le=1.0)
-    context: str = Field(description="Quote from document mentioning this property")
-    notes: Optional[str] = None
-
-
-class OrganizationExtraction(BaseModel):
-    """Structured Organization entity extraction."""
-    entity_type: Literal["ORGANIZATION"] = "ORGANIZATION"
-
-    name: str
-    org_type: Optional[str] = None
-    location: Optional[str] = Field(None, description="Location name (will be linked to Location entity)")
-    address: Optional[str] = None
-
-    # Extraction metadata
-    confidence: float = Field(ge=0.0, le=1.0)
-    context: str = Field(description="Quote from document mentioning this organization")
-    notes: Optional[str] = None
-
-
-class LocationExtraction(BaseModel):
-    """Structured Location entity extraction."""
-    entity_type: Literal["LOCATION"] = "LOCATION"
-
-    name: str
-    location_type: Optional[str] = None
-    parent_location: Optional[str] = Field(None, description="Parent location name (e.g., 'Camagüey' for 'Florida')")
-    country: str = "Cuba"
-
-    # Extraction metadata
-    confidence: float = Field(ge=0.0, le=1.0)
-    context: str = Field(description="Quote from document mentioning this location")
-    notes: Optional[str] = None
-
-
-# Union type for structured entities
-StructuredEntity = PersonExtraction | PropertyExtraction | OrganizationExtraction | LocationExtraction
-
-
-class EntityExtractionResult(BaseModel):
-    """Result from Claude entity extraction (intermediate format)."""
-    entities: List[ExtractedEntity]
-    document_date: Optional[str] = None
-    document_date_confidence: Optional[float] = None
-    extraction_notes: Optional[str] = None
-
-
-class StructuredEntityExtractionResult(BaseModel):
-    """Result from Claude structured entity extraction."""
-    entities: List[StructuredEntity]
-    dates: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted dates")
-    monetary_values: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted monetary values")
-    registry_refs: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted registry references")
-    document_date: Optional[str] = None
-    document_date_confidence: Optional[float] = None
-    extraction_notes: Optional[str] = None
-
-
-class TemporalInfo(BaseModel):
-    """Temporal information for a relation."""
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    ongoing: bool = False
-    date_precision: Literal["exact", "month", "year", "decade", "unknown"] = "unknown"
-
-
-class ExtractedRelation(BaseModel):
-    """Single relation extracted from document (intermediate format)."""
-    relation_type: str  # Will be validated against RelationType enum
-    source_entity: str  # Entity name as string (not ID yet)
-    target_entity: str  # Entity name as string (not ID yet)
-    confidence: float = Field(ge=0.0, le=1.0)
-    temporal: Optional[TemporalInfo] = None
-    evidence: str  # Quote from document
-    notes: Optional[str] = None
-
-
-class RelationExtractionResult(BaseModel):
-    """Result from Claude relation extraction (intermediate format)."""
-    relations: List[ExtractedRelation]
-    extraction_notes: Optional[str] = None
 
 
 # ============================================================================
@@ -230,7 +73,7 @@ class LLMExtractionService:
                     If None, loads from environment variable.
         """
         self.api_key = api_key
-        self._client = None  # Lazy initialization
+        self.api_client = ClaudeAPIClient(api_key=api_key)
 
     def _build_entity_prompt(
         self,
@@ -797,7 +640,7 @@ Example response with NO relations:
 
             # Call Claude API with retry logic
             logger.info(f"Calling Claude API for relation extraction from {document_id}...")
-            response_text = self._call_claude_api_with_retry(
+            response_text = self.api_client.call_with_retry(
                 prompt=prompt,
                 max_retries=settings.max_retries,
                 retry_delay=settings.retry_delay,
@@ -832,108 +675,6 @@ Example response with NO relations:
             logger.debug(f"Error details: {type(e).__name__}: {str(e)}")
             # Return empty list - document will be flagged as incomplete
             return []
-
-    def _get_client(self):
-        """Get or initialize Anthropic client (lazy initialization)."""
-        if self._client is None:
-            try:
-                import anthropic
-                self._client = anthropic.Anthropic(api_key=self.api_key)
-            except ImportError:
-                raise ImportError(
-                    "anthropic package not installed. "
-                    "Install with: pip install anthropic"
-                )
-        return self._client
-
-    def _call_claude_api_with_retry(
-        self,
-        prompt: str,
-        model: str = None,
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
-        api_timeout: int = 120
-    ) -> str:
-        """
-        Call Claude API with exponential backoff retry logic.
-
-        Args:
-            prompt: The prompt to send
-            model: Model to use (defaults to settings)
-            max_retries: Maximum retry attempts
-            retry_delay: Initial retry delay in seconds
-            api_timeout: API timeout in seconds
-
-        Returns:
-            Claude's response text
-
-        Raises:
-            Exception: If all retries fail
-        """
-        from farmer_factory.config.settings import settings
-
-        if model is None:
-            model = settings.claude_model
-
-        client = self._get_client()
-        retry_model = settings.claude_model_retry
-
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Calling Claude API (attempt {attempt + 1}/{max_retries}, model: {model})")
-
-                response = client.messages.create(
-                    model=model,
-                    max_tokens=4096,
-                    temperature=0.1,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=api_timeout
-                )
-
-                # Extract text from response
-                if response.content and len(response.content) > 0:
-                    return response.content[0].text
-                else:
-                    raise ValueError("Empty response from Claude API")
-
-            except Exception as e:
-                error_type = type(e).__name__
-                logger.warning(f"Claude API error (attempt {attempt + 1}): {error_type}: {str(e)}")
-
-                # Check if we should retry
-                is_last_attempt = (attempt == max_retries - 1)
-
-                # Rate limit errors - exponential backoff
-                if "rate_limit" in str(e).lower() or "RateLimitError" in error_type:
-                    if not is_last_attempt:
-                        delay = retry_delay * (2 ** attempt)
-                        logger.info(f"Rate limited, waiting {delay}s before retry...")
-                        time.sleep(delay)
-                        continue
-
-                # Timeout errors - retry with upgrade to Sonnet
-                if "timeout" in str(e).lower() or "APITimeoutError" in error_type:
-                    if not is_last_attempt and model != retry_model:
-                        logger.info(f"Timeout, upgrading to {retry_model} for retry...")
-                        model = retry_model
-                        time.sleep(retry_delay)
-                        continue
-
-                # Connection/server errors - simple retry
-                if any(keyword in str(e).lower() for keyword in ["connection", "server", "503", "502", "500"]):
-                    if not is_last_attempt:
-                        time.sleep(retry_delay)
-                        continue
-
-                # If we've exhausted retries or it's a non-retryable error, raise
-                if is_last_attempt:
-                    logger.error(f"All Claude API retries exhausted: {str(e)}")
-                    raise
-
-                # For other errors, just wait and retry
-                time.sleep(retry_delay)
-
-        raise Exception("Claude API retries exhausted (should not reach here)")
 
     def _parse_extraction_response(self, response_text: str) -> StructuredEntityExtractionResult:
         """
@@ -1137,7 +878,7 @@ Example response with NO relations:
 
         # Call Claude API
         logger.info(f"Calling Claude API for entity extraction from {document_id}...")
-        response_text = self._call_claude_api_with_retry(
+        response_text = self.api_client.call_with_retry(
             prompt=prompt,
             max_retries=settings.max_retries,
             retry_delay=settings.retry_delay,
