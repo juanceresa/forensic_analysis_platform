@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Civic Table - Knowledge Graph Viewer</title>
+    <script src="https://unpkg.com/force-graph@1.43.0/dist/force-graph.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            background: #0f172a;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        #header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #1e293b;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #334155;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        #graph {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 400px;
+            max-height: calc(100vh - 100px);
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: none;
+        }
+
+        #panel.visible {
+            display: block;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #f1f5f9;
+        }
+
+        .field {
+            margin-bottom: 0.75rem;
+        }
+
+        .field-label {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .field-value {
+            font-size: 0.875rem;
+            color: #e2e8f0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .badge-tier-3 {
+            background: #374151;
+            color: #9ca3af;
+        }
+
+        .badge-tier-2 {
+            background: #854d0e;
+            color: #fbbf24;
+        }
+
+        .badge-tier-1 {
+            background: #1e3a8a;
+            color: #60a5fa;
+        }
+
+        .entity-type {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .type-person { background: #7c3aed; color: #fff; }
+        .type-location { background: #0891b2; color: #fff; }
+        .type-property { background: #059669; color: #fff; }
+        .type-organization { background: #dc2626; color: #fff; }
+        .type-document { background: #64748b; color: #fff; }
+
+        .stats {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .stat {
+            margin-bottom: 0.5rem;
+        }
+
+        .stat:last-child {
+            margin-bottom: 0;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+        }
+
+        .stat-value {
+            color: #f1f5f9;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Civic Table - TEST-CERESA Knowledge Graph</h1>
+    </div>
+
+    <div id="graph"></div>
+
+    <div id="panel">
+        <div class="panel-title">Entity Details</div>
+        <div id="panel-content"></div>
+    </div>
+
+    <div class="stats">
+        <div class="stat">
+            <span class="stat-label">Entities:</span>
+            <span class="stat-value" id="stat-entities">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Relations:</span>
+            <span class="stat-value" id="stat-relations">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Click entity to view details</span>
+        </div>
+    </div>
+
+    <script>
+        // Load graph data
+        fetch('cases/TEST-CERESA/output/graph_data.json')
+            .then(res => res.json())
+            .then(data => {
+                console.log('Loaded graph data:', data);
+
+                // Update stats
+                document.getElementById('stat-entities').textContent = data.nodes.length;
+                document.getElementById('stat-relations').textContent = data.links.length;
+
+                // Entity type colors
+                const typeColors = {
+                    'PERSON': '#7c3aed',
+                    'LOCATION': '#0891b2',
+                    'PROPERTY': '#059669',
+                    'ORGANIZATION': '#dc2626',
+                    'DOCUMENT': '#64748b'
+                };
+
+                // Verification tier colors
+                const tierColors = {
+                    'TIER_3_AI': '#6b7280',
+                    'TIER_2_ANALYST': '#f59e0b',
+                    'TIER_2_INSTITUTIONAL': '#f59e0b',
+                    'TIER_1_CERTIFIED': '#3b82f6'
+                };
+
+                // Create graph
+                const Graph = ForceGraph()
+                    (document.getElementById('graph'))
+                    .graphData(data)
+                    .nodeId('id')
+                    .nodeLabel(node => node.name || node.id)
+                    .nodeColor(node => {
+                        const tier = node.verification?.tier || 'TIER_3_AI';
+                        return tierColors[tier];
+                    })
+                    .nodeRelSize(6)
+                    .linkLabel(link => link.type)
+                    .linkColor(() => '#475569')
+                    .linkWidth(2)
+                    .linkDirectionalArrowLength(6)
+                    .linkDirectionalArrowRelPos(1)
+                    .backgroundColor('#0f172a')
+                    .onNodeClick(node => {
+                        showPanel(node);
+                    });
+
+                // Panel display
+                function showPanel(node) {
+                    const panel = document.getElementById('panel');
+                    const content = document.getElementById('panel-content');
+
+                    let html = `
+                        <span class="entity-type type-${node.entity_type.toLowerCase()}">${node.entity_type}</span>
+                        <br>
+                    `;
+
+                    // Verification badge
+                    const tier = node.verification?.tier || 'TIER_3_AI';
+                    const tierClass = tier.toLowerCase().replace(/_/g, '-');
+                    html += `<span class="badge badge-${tierClass}">${tier.replace('TIER_', 'Tier ')}</span>`;
+                    html += `<br><br>`;
+
+                    // Entity fields
+                    for (const [key, value] of Object.entries(node)) {
+                        if (['id', 'entity_type', 'verification', 'created_at', 'updated_at'].includes(key)) {
+                            continue;
+                        }
+
+                        if (value && value !== '' && value.length > 0) {
+                            html += `
+                                <div class="field">
+                                    <div class="field-label">${key.replace(/_/g, ' ')}</div>
+                                    <div class="field-value">${formatValue(value)}</div>
+                                </div>
+                            `;
+                        }
+                    }
+
+                    // Verification details
+                    if (node.verification) {
+                        html += `<br><div class="field-label">Verification Details</div>`;
+                        html += `<div class="field-value">Confidence: ${(node.verification.confidence * 100).toFixed(0)}%</div>`;
+                        if (node.verification.verified_by) {
+                            html += `<div class="field-value">Verified by: ${node.verification.verified_by}</div>`;
+                        }
+                    }
+
+                    content.innerHTML = html;
+                    panel.classList.add('visible');
+                }
+
+                function formatValue(value) {
+                    if (Array.isArray(value)) {
+                        return value.join(', ');
+                    }
+                    if (typeof value === 'object' && value !== null) {
+                        return JSON.stringify(value, null, 2);
+                    }
+                    return value;
+                }
+
+                // Close panel on background click
+                document.getElementById('graph').addEventListener('click', (e) => {
+                    if (e.target.id === 'graph') {
+                        document.getElementById('panel').classList.remove('visible');
+                    }
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load graph data:', err);
+                alert('Failed to load graph data. Make sure you have run: python cli.py process TEST-CERESA');
+            });
+    </script>
+</body>
+</html>

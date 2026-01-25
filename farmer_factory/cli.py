@@ -5,8 +5,17 @@ Command-line interface for document processing pipeline.
 """
 
 import os
-import click
+import sys
 from pathlib import Path
+
+# Add the parent directory to sys.path to allow absolute imports of farmer_factory
+current_dir = Path(__file__).resolve().parent
+if current_dir.name == 'farmer_factory':
+    root_dir = current_dir.parent
+    if str(root_dir) not in sys.path:
+        sys.path.insert(0, str(root_dir))
+
+import click
 import logging
 from datetime import datetime
 
@@ -230,7 +239,10 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int):
     Example:
         python cli.py train-deduplication TEST-CERESA --entity-type PERSON
     """
-    from farmer_factory.structure.train_dedupe import train_dedupe_model
+    try:
+        from farmer_factory.structure.train_dedupe import train_dedupe_model
+    except ModuleNotFoundError:
+        from structure.train_dedupe import train_dedupe_model
 
     case_dir = Path('cases') / case_id
     extractions_dir = case_dir / 'extractions'
@@ -274,6 +286,59 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int):
     click.echo(f"  1. Test models: python cli.py process {case_id} --force-typed")
     click.echo(f"  2. Review deduplication in: cases/{case_id}/output/graph_data.json")
     click.echo(f"  3. If quality is good, process new cases with trained models")
+
+
+@cli.command()
+@click.argument('case_id')
+@click.option('--confirm', is_flag=True, help='Skip confirmation prompt')
+def clean(case_id: str, confirm: bool):
+    """Clean case outputs for fresh processing.
+
+    Removes all processed outputs while keeping source PDFs intact:
+    - extractions/ (AI-extracted entities)
+    - ocr/ (OCR text files)
+    - preprocessed/ (processed images)
+    - output/ (graph_data.json)
+
+    Your intake/ PDFs are never deleted.
+    """
+    case_dir = Path('cases') / case_id
+
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+
+    intake_dir = case_dir / 'intake'
+    if not intake_dir.exists() or not list(intake_dir.glob('*.pdf')):
+        raise click.ClickException(f"No PDFs found in {intake_dir}/")
+
+    # Show what will be deleted
+    click.echo(f"\nCleaning case: {case_id}")
+    click.echo("\nWill remove:")
+    click.echo("  - extractions/")
+    click.echo("  - ocr/")
+    click.echo("  - preprocessed/")
+    click.echo("  - output/")
+    click.echo("\nWill keep:")
+    click.echo(f"  - intake/ ({len(list(intake_dir.glob('*.pdf')))} PDFs)")
+
+    if not confirm:
+        click.echo("\nThis cannot be undone.")
+        if not click.confirm("Continue?"):
+            click.echo("Aborted.")
+            return
+
+    # Clean directories
+    dirs_to_clean = ['extractions', 'ocr', 'preprocessed', 'output']
+    for dir_name in dirs_to_clean:
+        dir_path = case_dir / dir_name
+        if dir_path.exists():
+            import shutil
+            shutil.rmtree(dir_path)
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+    click.echo(f"\n✓ Case {case_id} cleaned successfully")
+    click.echo(f"\nReady for fresh processing:")
+    click.echo(f"  python cli.py process {case_id}")
 
 
 @cli.command()
