@@ -21,6 +21,16 @@ This module transforms extracted entities into a unified knowledge graph with ML
 
 ## Components
 
+### Complete Schema Specification
+
+See `SCHEMA.md` in this directory for:
+- Full JSON schema definitions
+- TypeScript type definitions
+- Force-graph export format
+- Validation rules
+
+`SCHEMA.md` is the canonical schema reference for both Python (Pydantic) and TypeScript implementations.
+
 ### 1. Schema Models (`schema.py`)
 
 #### Verification System
