@@ -91,7 +91,7 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
             default_creds.exists()
         )
 
-        use_anthropic = bool(os.getenv('ANTHROPIC_API_KEY'))
+        use_anthropic = bool(settings.anthropic_api_key)
 
         if use_google_ocr:
             logger.info("✓ Google Cloud credentials detected - using real OCR")
