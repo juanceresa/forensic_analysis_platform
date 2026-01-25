@@ -1,6 +1,7 @@
 """Main processing pipeline orchestration."""
 
 import logging
+import os
 import cv2
 from pathlib import Path
 from typing import Dict, Any
@@ -9,7 +10,6 @@ try:
     from farmer_factory.prepare import PreprocessingPipeline
 except (ModuleNotFoundError, ImportError):
     import sys
-    import os
     sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from farmer_factory.prepare import PreprocessingPipeline
 from farmer_factory.extract import (
@@ -25,6 +25,7 @@ from farmer_factory.structure import (
     GraphBuilder,
     GraphExporter
 )
+from farmer_factory.config.settings import settings
 from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, setup_logging
 from .exceptions import ProcessingError
 
@@ -79,9 +80,6 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
     logger.info("Initializing pipelines...")
     try:
         # Check if real APIs should be used
-        import os
-        from farmer_factory.config.settings import settings
-
         # Check for Google Cloud credentials
         # gcloud auth saves to default location, doesn't set env var
         default_creds = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
