@@ -31,6 +31,13 @@ See `SCHEMA.md` in this directory for:
 
 `SCHEMA.md` is the canonical schema reference for both Python (Pydantic) and TypeScript implementations.
 
+### Data Dictionary
+
+See `DATA_DICTIONARY.md` for field-level reference:
+- All entity and relation fields
+- Field types and constraints
+- Examples and usage notes
+
 ### 1. Schema Models (`schema.py`)
 
 #### Verification System
