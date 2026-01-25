@@ -141,7 +141,7 @@ class DedupeEntityResolver:
                 'name': entity.name or '',
                 'property_type': entity.property_type or '',
                 'location_id': entity.location_id or '',
-                'area': str(entity.area or ''),
+                'area': float(entity.area) if entity.area is not None else None,
             }
         elif entity_type == "ORGANIZATION":
             return {
@@ -175,11 +175,12 @@ class DedupeEntityResolver:
                 'parent_location_id': entity_data.get('parent_location_id') or '',
             }
         elif entity_type == "PROPERTY":
+            area_value = entity_data.get('area')
             return {
                 'name': entity_data.get('name') or '',
                 'property_type': entity_data.get('property_type') or '',
                 'location_id': entity_data.get('location_id') or '',
-                'area': str(entity_data.get('area') or ''),
+                'area': float(area_value) if area_value is not None else None,
             }
         elif entity_type == "ORGANIZATION":
             return {

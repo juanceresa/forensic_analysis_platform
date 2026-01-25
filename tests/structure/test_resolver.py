@@ -102,7 +102,7 @@ def test_entity_data_preparation_property():
 
     assert data['name'] == "Finca Aguaras"
     assert data['property_type'] == "finca"
-    assert data['area'] == "50.5"  # Converted to string
+    assert data['area'] == 50.5  # Numeric value for dedupe
 
 
 def test_entity_data_preparation_organization():
