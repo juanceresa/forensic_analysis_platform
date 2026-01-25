@@ -1,36 +1,38 @@
-"""Dedupe field configurations for entity types."""
+"""Dedupe field configurations for entity types (dedupe 3.0 API)."""
+
+import dedupe.variables
 
 # Person fields - multi-attribute matching
 PERSON_FIELDS = [
-    {'field': 'name', 'type': 'String'},
-    {'field': 'birth_date', 'type': 'String', 'has missing': True},
-    {'field': 'death_date', 'type': 'String', 'has missing': True},
-    {'field': 'residence', 'type': 'String', 'has missing': True},
-    {'field': 'profession', 'type': 'String', 'has missing': True},
-    {'field': 'nationality', 'type': 'String', 'has missing': True},
+    dedupe.variables.String('name'),
+    dedupe.variables.String('birth_date', has_missing=True),
+    dedupe.variables.String('death_date', has_missing=True),
+    dedupe.variables.String('residence', has_missing=True),
+    dedupe.variables.String('profession', has_missing=True),
+    dedupe.variables.String('nationality', has_missing=True),
 ]
 
 # Location fields
 LOCATION_FIELDS = [
-    {'field': 'name', 'type': 'String'},
-    {'field': 'location_type', 'type': 'String', 'has missing': True},
-    {'field': 'country', 'type': 'String', 'has missing': True},
-    {'field': 'parent_location_id', 'type': 'String', 'has missing': True},
+    dedupe.variables.String('name'),
+    dedupe.variables.String('location_type', has_missing=True),
+    dedupe.variables.String('country', has_missing=True),
+    dedupe.variables.String('parent_location_id', has_missing=True),
 ]
 
 # Property fields
 PROPERTY_FIELDS = [
-    {'field': 'name', 'type': 'String', 'has missing': True},
-    {'field': 'property_type', 'type': 'String', 'has missing': True},
-    {'field': 'location_id', 'type': 'String', 'has missing': True},
-    {'field': 'area', 'type': 'Price', 'has missing': True},
+    dedupe.variables.String('name', has_missing=True),
+    dedupe.variables.String('property_type', has_missing=True),
+    dedupe.variables.String('location_id', has_missing=True),
+    dedupe.variables.Price('area', has_missing=True),
 ]
 
 # Organization fields
 ORGANIZATION_FIELDS = [
-    {'field': 'name', 'type': 'String'},
-    {'field': 'org_type', 'type': 'String', 'has missing': True},
-    {'field': 'location_id', 'type': 'String', 'has missing': True},
+    dedupe.variables.String('name'),
+    dedupe.variables.String('org_type', has_missing=True),
+    dedupe.variables.String('location_id', has_missing=True),
 ]
 
 # Field configuration mapping
