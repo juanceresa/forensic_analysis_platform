@@ -67,6 +67,10 @@ class DedupeEntityResolver:
         if entity_type_str not in self.dedupers:
             return None
 
+        # Handle None graph gracefully
+        if graph is None:
+            return None
+
         # Get all entities of same type from graph
         candidates = []
         for node_id, node_data in graph.graph.nodes(data=True):
