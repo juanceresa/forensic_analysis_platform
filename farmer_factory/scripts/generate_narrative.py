@@ -43,9 +43,7 @@ def main():
         if not graph_path.exists():
             raise FileNotFoundError(f"Graph not found: {graph_path}")
 
-        graph = KnowledgeGraph(case_id=args.case_id)
-        # Note: If KnowledgeGraph doesn't have a load method, implement it
-        # For now, assuming graph loads its data in __init__
+        graph = KnowledgeGraph.load(graph_path)
 
         # Generate narrative
         generator = NarrativeGenerator(api_key=args.api_key, use_cache=True)

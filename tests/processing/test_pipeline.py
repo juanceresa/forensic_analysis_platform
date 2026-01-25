@@ -85,7 +85,7 @@ def test_process_case_no_pdfs(tmp_path):
     (case_dir / 'extractions').mkdir()
     (case_dir / 'output').mkdir()
 
-    # Should complete successfully but process 0 documents
-    stats = process_case(case_id, base_dir=cases_dir)
+    with pytest.raises(ProcessingError) as exc_info:
+        process_case(case_id, base_dir=cases_dir)
 
-    assert stats['documents_processed'] == 0
+    assert "no pdfs found" in str(exc_info.value).lower()

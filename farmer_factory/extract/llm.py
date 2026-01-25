@@ -492,11 +492,20 @@ Example response with NO relations:
         Returns:
             List of final Relation objects
         """
-        from farmer_factory.structure.schema import Verification, VerificationTier
+        from farmer_factory.structure.schema import Verification, VerificationTier, RelationType
 
         final_relations = []
 
         for rel in extraction.relations:
+            try:
+                relation_type = RelationType(rel.relation_type)
+            except ValueError:
+                logger.warning(
+                    f"Skipping relation with invalid type '{rel.relation_type}' "
+                    f"from {document_id}"
+                )
+                continue
+
             # Match source and target entities
             source_id = self._match_entity(rel.source_entity, entities)
             target_id = self._match_entity(rel.target_entity, entities)
@@ -523,7 +532,7 @@ Example response with NO relations:
             # Determine if needs review (low confidence or missing temporal data)
             needs_review = (
                 rel.confidence < 0.70 or
-                (rel.relation_type in TEMPORAL_RELATIONS and temporal_info.date_precision == "unknown")
+                (relation_type.value in TEMPORAL_RELATIONS and temporal_info.date_precision == "unknown")
             )
 
             # Build notes with review flag if needed
@@ -531,13 +540,13 @@ Example response with NO relations:
             if needs_review:
                 if rel.confidence < 0.70:
                     final_notes += f" Low confidence ({rel.confidence:.2f}) - requires analyst review."
-                if rel.relation_type in TEMPORAL_RELATIONS and temporal_info.date_precision == "unknown":
+                if relation_type.value in TEMPORAL_RELATIONS and temporal_info.date_precision == "unknown":
                     final_notes += " Missing temporal data for event relation."
 
             # Create final relation
             relation = Relation(
                 id=f"{document_id}_rel_{uuid.uuid4().hex[:8]}",
-                type=rel.relation_type,
+                type=relation_type,
                 source_id=source_id,
                 target_id=target_id,
                 verification=verification,
@@ -612,7 +621,8 @@ Example response with NO relations:
         text: str,
         entities: List[BaseEntity],
         document_id: str,
-        ocr_confidence: float
+        ocr_confidence: float,
+        document_date: Optional[str]
     ) -> List[Relation]:
         """
         Extract relations from OCR text using Claude API.
@@ -622,6 +632,7 @@ Example response with NO relations:
             entities: Previously extracted entities
             document_id: Document identifier
             ocr_confidence: OCR confidence for logging
+            document_date: Document date for temporal fallback
 
         Returns:
             List of Relation objects (empty if extraction fails)
@@ -649,10 +660,6 @@ Example response with NO relations:
 
             # Parse response
             extraction = self._parse_relation_response(response_text)
-
-            # Get document date from metadata (if available)
-            # This would come from entity extraction phase
-            document_date = None  # TODO: pass this from entity extraction
 
             # Transform to final relations
             relations = self._transform_to_final_relations(
@@ -944,7 +951,8 @@ Example response with NO relations:
                     text=text,
                     entities=entities,
                     document_id=document_id,
-                    ocr_confidence=ocr_confidence
+                    ocr_confidence=ocr_confidence,
+                    document_date=document_date
                 )
             else:
                 logger.info(

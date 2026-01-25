@@ -50,7 +50,7 @@ class DedupeEntityResolver:
         self,
         entity: BaseEntity,
         graph: KnowledgeGraph
-    ) -> Optional[str]:
+    ) -> Optional[Tuple[str, float]]:
         """
         Find matching entity using dedupe.
 
@@ -108,11 +108,18 @@ class DedupeEntityResolver:
         # Find cluster containing new entity
         for cluster_id, (record_ids, scores) in enumerate(clustered_dupes):
             if entity.id in record_ids:
-                # Found a match - return first existing entity in cluster
-                for record_id in record_ids:
-                    if record_id != entity.id:
-                        logger.debug(f"Matched {entity.id} with {record_id}")
-                        return record_id
+                best_match_id = None
+                best_score = None
+                for record_id, score in zip(record_ids, scores):
+                    if record_id == entity.id:
+                        continue
+                    if best_score is None or score > best_score:
+                        best_match_id = record_id
+                        best_score = score
+
+                if best_match_id is not None and best_score is not None:
+                    logger.debug(f"Matched {entity.id} with {best_match_id} (score={best_score:.2f})")
+                    return best_match_id, float(best_score)
 
         return None
 
@@ -226,7 +233,8 @@ class DedupeEntityResolver:
         # Preserve order while removing duplicates
         all_sources = existing_sources + new_source
         seen = set()
-        merged["extracted_from"] = [s for s in all_sources if not (s in seen or seen.add(s))]
+        merged_sources = [s for s in all_sources if not (s in seen or seen.add(s))]
+        merged["extracted_from"] = ",".join(merged_sources)
 
         # Merge other fields
         for field, new_value in new_data.items():
@@ -264,7 +272,7 @@ class DedupeEntityResolver:
                     merged[field] = self._create_conflict_list(
                         existing_value,
                         new_value,
-                        merged["extracted_from"]
+                        merged_sources
                     )
 
         return merged

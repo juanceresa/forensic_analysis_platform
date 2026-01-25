@@ -54,12 +54,17 @@ class GraphBuilder:
             self.processing_stats["entities_extracted"] += 1
 
             # Check if similar entity exists
-            similar_id = self.resolver.find_similar_entity(entity, self.graph)
+            match = self.resolver.find_similar_entity(entity, self.graph)
 
-            if similar_id:
+            if match:
+                similar_id, match_confidence = match
                 # Merge with existing entity
                 existing_data = self.graph.get_entity(similar_id)
-                merged_data = self.resolver.merge_entities(existing_data, entity)
+                merged_data = self.resolver.merge_entities(
+                    existing_data,
+                    entity,
+                    match_confidence=match_confidence
+                )
 
                 # Update graph node
                 self.graph.graph.nodes[similar_id].update(merged_data)

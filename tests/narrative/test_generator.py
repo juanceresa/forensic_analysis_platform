@@ -121,3 +121,19 @@ def test_simple_entity_narrative(mock_api_client, sample_graph):
 
     # Should handle gracefully (2 entities < 3 threshold)
     assert result.is_simple_entity or len(result.main_narrative) > 0
+
+
+def test_build_graph_context_dedupes_relations(sample_graph):
+    """Test graph context relation list does not duplicate edges."""
+    generator = NarrativeGenerator(api_key="test_key", use_cache=False)
+
+    constellation = {"person_001", "prop_001"}
+    context = generator._build_graph_context(
+        focal_entity_id="prop_001",
+        focal_entity_name="Villa Aurelia",
+        focal_entity_type="PROPERTY",
+        constellation=constellation,
+        graph=sample_graph
+    )
+
+    assert len(context["relations"]) == 1

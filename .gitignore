@@ -46,7 +46,7 @@ logs/
 # Output
 output/
 !output/.gitkeep
-cases/
+/cases/
 *.pdf
 *.png
 *.jpg

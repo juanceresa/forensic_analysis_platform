@@ -214,6 +214,7 @@ class NarrativeGenerator:
         entities = []
         relations = []
         documents = set()
+        seen_relations = set()
 
         for entity_id in constellation:
             entity = graph.get_entity(entity_id)
@@ -232,6 +233,12 @@ class NarrativeGenerator:
                 source = rel.get("source")
                 target = rel.get("target")
                 if source in constellation and target in constellation:
+                    relation_id = rel.get("relation_id")
+                    if not relation_id:
+                        relation_id = f"{source}->{target}:{rel.get('relation_type')}"
+                    if relation_id in seen_relations:
+                        continue
+                    seen_relations.add(relation_id)
                     source_entity = graph.get_entity(source)
                     target_entity = graph.get_entity(target)
                     rel_type = rel.get("relation_type", "UNKNOWN")

@@ -158,7 +158,7 @@ def test_add_extraction_with_merge():
     # Configure resolver to return p1 as match for p2, None for p1
     def find_similar(entity, graph):
         if entity.id == "p2":
-            return "p1"
+            return ("p1", 0.7)
         return None
 
     def merge_func(existing, new, match_confidence=0.8):
@@ -171,7 +171,7 @@ def test_add_extraction_with_merge():
             **existing,
             "birth_date": [f"{existing['birth_date']} (doc_001)", f"{new.birth_date} (doc_002)"],
             "roles": list(set(existing.get("roles", []) + new.roles)),
-            "extracted_from": list(set(existing_sources + new_sources))
+            "extracted_from": ",".join(list(set(existing_sources + new_sources)))
         }
 
     resolver.find_similar_entity = Mock(side_effect=find_similar)
@@ -248,6 +248,8 @@ def test_add_extraction_with_merge():
     entity_data = graph.get_entity("p1")
     assert isinstance(entity_data["birth_date"], list)  # Conflicting dates
     assert set(entity_data["roles"]) == {"owner", "seller"}  # Merged roles
+    resolver.merge_entities.assert_called()
+    assert resolver.merge_entities.call_args.kwargs["match_confidence"] == 0.7
 
 
 def test_add_extraction_with_merge_and_relations():
@@ -260,7 +262,7 @@ def test_add_extraction_with_merge_and_relations():
     # Configure resolver to merge p2 into p1, no match for others
     def find_similar(entity, graph):
         if entity.id == "p2":
-            return "p1"
+            return ("p1", 0.9)
         return None
 
     def merge_func(existing, new, match_confidence=0.8):
@@ -272,7 +274,7 @@ def test_add_extraction_with_merge_and_relations():
         return {
             **existing,
             "roles": list(set(existing.get("roles", []) + new.roles)),
-            "extracted_from": list(set(existing_sources + new_sources))
+            "extracted_from": ",".join(list(set(existing_sources + new_sources)))
         }
 
     resolver.find_similar_entity = Mock(side_effect=find_similar)

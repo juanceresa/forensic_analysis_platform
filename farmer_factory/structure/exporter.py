@@ -106,7 +106,7 @@ class GraphExporter:
             nodes.append(node)
 
         # Export links
-        for source, target, edge_data in self.graph.graph.edges(data=True):
+        for source, target, key, edge_data in self.graph.graph.edges(keys=True, data=True):
             link = {
                 "source": source,
                 "target": target,

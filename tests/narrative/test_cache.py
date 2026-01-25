@@ -92,9 +92,12 @@ def test_graph_hash_calculation():
     from farmer_factory.structure.graph import KnowledgeGraph
     from farmer_factory.structure.schema import (
         Property,
+        Person,
+        Relation,
         EntityType,
         VerificationTier,
-        Verification
+        Verification,
+        RelationType
     )
 
     cache = InMemoryCache()
@@ -109,7 +112,26 @@ def test_graph_hash_calculation():
     )
     kg.add_entity(prop)
 
-    constellation = {"prop_001"}
+    person = Person(
+        id="person_001",
+        name="Mario Ceresa",
+        entity_type=EntityType.PERSON,
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.80),
+        extracted_from="doc_001"
+    )
+    kg.add_entity(person)
+
+    relation = Relation(
+        id="rel_001",
+        type=RelationType.OWNS,
+        source_id="person_001",
+        target_id="prop_001",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.85),
+        evidence="Initial evidence"
+    )
+    kg.add_relation(relation)
+
+    constellation = {"prop_001", "person_001"}
     hash1 = cache.calculate_graph_hash(constellation, kg)
 
     # Update verification tier
@@ -120,3 +142,9 @@ def test_graph_hash_calculation():
 
     # Hash should change (cache invalidation)
     assert hash1 != hash2
+
+    # Update relation data
+    kg.graph.edges["person_001", "prop_001", "rel_001"]["evidence"] = "Updated evidence"
+    hash3 = cache.calculate_graph_hash(constellation, kg)
+
+    assert hash2 != hash3

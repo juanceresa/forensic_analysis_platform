@@ -141,7 +141,7 @@ class ConstellationAnalyzer:
         entity_count = len(constellation)
 
         # Count relations within constellation
-        all_relations = []
+        relation_ids = set()
         for entity_id in constellation:
             relations = graph.get_relations(entity_id, direction="both")
             # Only count relations between entities in constellation
@@ -149,9 +149,12 @@ class ConstellationAnalyzer:
                 source = rel.get("source")
                 target = rel.get("target")
                 if source in constellation and target in constellation:
-                    all_relations.append(rel)
+                    relation_id = rel.get("relation_id")
+                    if not relation_id:
+                        relation_id = f"{source}->{target}:{rel.get('relation_type')}"
+                    relation_ids.add(relation_id)
 
-        relation_count = len(all_relations)
+        relation_count = len(relation_ids)
 
         # Count unique documents
         unique_docs = set()

@@ -6,6 +6,8 @@ Provides graph construction, entity/relation management, and conflict resolution
 
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+import json
+from pathlib import Path
 import networkx as nx
 
 from .schema import (
@@ -25,9 +27,54 @@ class KnowledgeGraph:
             case_id: Unique identifier for this case
         """
         self.case_id = case_id
-        self.graph = nx.DiGraph()
+        self.graph = nx.MultiDiGraph()
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
+
+    @classmethod
+    def load(cls, path: str | Path) -> "KnowledgeGraph":
+        """Load a knowledge graph from graph_data.json."""
+        graph_path = Path(path)
+        data = json.loads(graph_path.read_text())
+        metadata = data.get("metadata", {})
+        case_id = metadata.get("case_id") or "unknown"
+        graph = cls(case_id=case_id)
+
+        created_at = metadata.get("created_at")
+        if isinstance(created_at, str):
+            try:
+                graph.created_at = datetime.fromisoformat(created_at)
+            except ValueError:
+                pass
+
+        updated_at = metadata.get("updated_at")
+        if isinstance(updated_at, str):
+            try:
+                graph.updated_at = datetime.fromisoformat(updated_at)
+            except ValueError:
+                pass
+
+        for node in data.get("nodes", []):
+            node_id = node.get("id")
+            if node_id is None:
+                continue
+            attrs = {k: v for k, v in node.items() if k != "id"}
+            graph.graph.add_node(node_id, **attrs)
+
+        links = data.get("links") or data.get("edges") or []
+        for link in links:
+            source = link.get("source")
+            target = link.get("target")
+            if source is None or target is None:
+                continue
+            attrs = {k: v for k, v in link.items() if k not in ("source", "target")}
+            relation_id = attrs.get("relation_id")
+            if relation_id:
+                graph.graph.add_edge(source, target, key=relation_id, **attrs)
+            else:
+                graph.graph.add_edge(source, target, **attrs)
+
+        return graph
 
     def add_entity(self, entity: BaseEntity) -> None:
         """Add entity as node with all attributes.
@@ -60,6 +107,7 @@ class KnowledgeGraph:
         self.graph.add_edge(
             relation.source_id,
             relation.target_id,
+            key=relation.id,
             relation_id=relation.id,
             relation_type=relation.type.value,
             verification=relation.verification.model_dump(),
@@ -93,20 +141,22 @@ class KnowledgeGraph:
         relations = []
 
         if direction in ("out", "both"):
-            for target in self.graph.successors(entity_id):
-                edge_data = self.graph.edges[entity_id, target]
+            for source, target, key, edge_data in self.graph.out_edges(entity_id, keys=True, data=True):
+                relation_id = edge_data.get("relation_id", key)
                 relations.append({
-                    "source": entity_id,
+                    "source": source,
                     "target": target,
+                    "relation_id": relation_id,
                     **edge_data
                 })
 
         if direction in ("in", "both"):
-            for source in self.graph.predecessors(entity_id):
-                edge_data = self.graph.edges[source, entity_id]
+            for source, target, key, edge_data in self.graph.in_edges(entity_id, keys=True, data=True):
+                relation_id = edge_data.get("relation_id", key)
                 relations.append({
                     "source": source,
-                    "target": entity_id,
+                    "target": target,
+                    "relation_id": relation_id,
                     **edge_data
                 })
 

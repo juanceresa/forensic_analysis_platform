@@ -131,6 +131,8 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
             raise ProcessingError(f"File not found in intake/: {single_file}")
         logger.info(f"Processing single file: {single_file}")
     else:
+        if not pdfs:
+            raise ProcessingError(f"No PDFs found in intake/: {intake_dir}")
         logger.info(f"Found {len(pdfs)} PDFs to process")
 
     for pdf_idx, pdf_path in enumerate(pdfs, 1):

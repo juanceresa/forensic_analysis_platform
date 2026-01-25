@@ -3,6 +3,7 @@
 import hashlib
 import time
 import logging
+import json
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, Set
 
@@ -70,6 +71,9 @@ class NarrativeCache(ABC):
         Returns:
             Hash string
         """
+        def _stable_dump(value: Any) -> str:
+            return json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
+
         hash_components = []
 
         # Sort entities for consistent hashing
@@ -78,20 +82,24 @@ class NarrativeCache(ABC):
         for entity_id in sorted_entities:
             entity = graph.get_entity(entity_id)
             if entity:
-                # Include verification tier (changes when analyst verifies)
-                verification = entity.get("verification", {})
-                tier = verification.get("tier", "UNKNOWN")
-                confidence = verification.get("confidence", 0.0)
+                hash_components.append(f"entity:{entity_id}:{_stable_dump(entity)}")
 
-                hash_components.append(f"{entity_id}:{tier}:{confidence:.2f}")
-
-        # Include relation count
-        relation_count = 0
-        for entity_id in constellation:
+        # Include relations with full data
+        seen_relations = set()
+        for entity_id in sorted_entities:
             relations = graph.get_relations(entity_id, direction="both")
-            relation_count += len(relations)
-
-        hash_components.append(f"relations:{relation_count}")
+            for rel in relations:
+                source = rel.get("source")
+                target = rel.get("target")
+                if source not in constellation or target not in constellation:
+                    continue
+                relation_id = rel.get("relation_id")
+                if relation_id is None:
+                    relation_id = f"{source}->{target}:{rel.get('relation_type')}"
+                if relation_id in seen_relations:
+                    continue
+                seen_relations.add(relation_id)
+                hash_components.append(f"relation:{relation_id}:{_stable_dump(rel)}")
 
         # Calculate hash
         hash_input = "|".join(hash_components)

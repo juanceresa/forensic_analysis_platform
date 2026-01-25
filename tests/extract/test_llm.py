@@ -238,6 +238,112 @@ def test_match_entity_alternate_name():
     assert matched_id == "person_123"
 
 
+def test_transform_relations_skips_invalid_types():
+    """Test invalid relation types are skipped without dropping valid ones."""
+    from farmer_factory.extract.models import ExtractedRelation, RelationExtractionResult
+    from farmer_factory.structure.schema import (
+        Person, Property, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    prop = Property(
+        id="prop_123",
+        entity_type=EntityType.PROPERTY,
+        name="Villa Aurelia",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.90),
+        extracted_from="test_doc"
+    )
+
+    extraction = RelationExtractionResult(
+        relations=[
+            ExtractedRelation(
+                relation_type="FAKE_RELATION",
+                source_entity="Mario Ceresa",
+                target_entity="Villa Aurelia",
+                confidence=0.9,
+                temporal=None,
+                evidence="Invalid relation type"
+            ),
+            ExtractedRelation(
+                relation_type="OWNS",
+                source_entity="Mario Ceresa",
+                target_entity="Villa Aurelia",
+                confidence=0.9,
+                temporal=None,
+                evidence="Valid relation type"
+            ),
+        ]
+    )
+
+    relations = service._transform_to_final_relations(
+        extraction=extraction,
+        entities=[person, prop],
+        document_id="test_doc",
+        document_date=None
+    )
+
+    assert len(relations) == 1
+    assert relations[0].type.value == "OWNS"
+
+
+def test_transform_relations_uses_document_date_fallback():
+    """Test document date fallback sets relation date for temporal relations."""
+    from farmer_factory.extract.models import ExtractedRelation, RelationExtractionResult
+    from farmer_factory.structure.schema import (
+        Person, Property, EntityType, Verification, VerificationTier
+    )
+
+    service = LLMExtractionService()
+
+    person = Person(
+        id="person_123",
+        entity_type=EntityType.PERSON,
+        name="Mario Ceresa",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.95),
+        extracted_from="test_doc"
+    )
+
+    prop = Property(
+        id="prop_123",
+        entity_type=EntityType.PROPERTY,
+        name="Villa Aurelia",
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.90),
+        extracted_from="test_doc"
+    )
+
+    extraction = RelationExtractionResult(
+        relations=[
+            ExtractedRelation(
+                relation_type="SOLD",
+                source_entity="Mario Ceresa",
+                target_entity="Villa Aurelia",
+                confidence=0.85,
+                temporal=None,
+                evidence="Sale mentioned in document"
+            )
+        ]
+    )
+
+    relations = service._transform_to_final_relations(
+        extraction=extraction,
+        entities=[person, prop],
+        document_id="test_doc",
+        document_date="1958-03-15"
+    )
+
+    assert len(relations) == 1
+    assert relations[0].date == "1958-03-15"
+
+
 def test_match_entity_fuzzy():
     """Test entity matching with fuzzy matching."""
     from farmer_factory.structure.schema import (

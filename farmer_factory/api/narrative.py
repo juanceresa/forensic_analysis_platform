@@ -77,8 +77,7 @@ def generate_narrative_endpoint(
 
     # Note: Assuming KnowledgeGraph has a load method
     # If not, you'll need to implement it or load differently
-    graph = KnowledgeGraph(case_id=case_id)
-    # graph.load_from_file(str(graph_path))  # Implement if needed
+    graph = KnowledgeGraph.load(graph_path)
 
     # Initialize generator
     generator = NarrativeGenerator(api_key=api_key, use_cache=True)

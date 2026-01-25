@@ -151,7 +151,7 @@ def test_merge_entities_combines_sources():
     existing = {
         'name': 'Mario Ceresa',
         'birth_date': '1920',
-        'extracted_from': ['doc_1'],
+        'extracted_from': 'doc_1',
         'verification': {'confidence': 0.7}
     }
 
@@ -167,9 +167,7 @@ def test_merge_entities_combines_sources():
     merged = resolver.merge_entities(existing, new_person, match_confidence=0.8)
 
     # Should combine sources
-    assert 'doc_1' in merged['extracted_from']
-    assert 'doc_2' in merged['extracted_from']
-    assert len(merged['extracted_from']) == 2
+    assert merged['extracted_from'] == "doc_1,doc_2"
 
 
 def test_merge_entities_high_confidence():
@@ -179,7 +177,7 @@ def test_merge_entities_high_confidence():
     existing = {
         'name': 'Mario Ceresa',
         'birth_date': '1920',
-        'extracted_from': ['doc_1'],
+        'extracted_from': 'doc_1',
         'verification': {'confidence': 0.7}
     }
 
@@ -196,8 +194,7 @@ def test_merge_entities_high_confidence():
     merged = resolver.merge_entities(existing, new_person, match_confidence=0.8)
 
     # Should pick better value based on confidence or completeness
-    assert 'doc_1' in merged['extracted_from']
-    assert 'doc_2' in merged['extracted_from']
+    assert merged['extracted_from'] == "doc_1,doc_2"
     # Birth date should pick higher confidence value (new: 0.9 vs existing: 0.7)
     assert merged['birth_date'] == '1922'
 
