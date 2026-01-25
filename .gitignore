@@ -74,3 +74,4 @@ temp/
 # Claude
 .claude
 docs/plans/*
+docs/internal_docx/*
