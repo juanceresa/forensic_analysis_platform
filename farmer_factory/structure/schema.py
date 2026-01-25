@@ -64,6 +64,28 @@ class Person(BaseEntity):
     profession: Optional[str] = None
     marital_status: Optional[str] = None
 
+    # Family relationships (names as strings, not IDs - for easy reading/querying)
+    mother: Optional[str] = Field(
+        default=None,
+        description="Name of mother (e.g., 'María López de Queral')"
+    )
+    father: Optional[str] = Field(
+        default=None,
+        description="Name of father (e.g., 'Manuel Queral')"
+    )
+    spouse: Optional[str] = Field(
+        default=None,
+        description="Name of spouse (e.g., 'Juan Ceresa'). For multiple spouses, use first/primary."
+    )
+    children: List[str] = Field(
+        default_factory=list,
+        description="Names of children (e.g., ['Mario Ceresa', 'Rosa Ceresa'])"
+    )
+    siblings: List[str] = Field(
+        default_factory=list,
+        description="Names of siblings (e.g., ['Carlos Queral', 'Ana Queral'])"
+    )
+
     # Roles
     roles: List[str] = Field(default_factory=list)
 

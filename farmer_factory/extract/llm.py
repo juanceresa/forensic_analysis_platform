@@ -33,7 +33,7 @@ class IntermediateEntityType(str, Enum):
 
 
 class ExtractedEntity(BaseModel):
-    """Single entity extracted from document (intermediate format)."""
+    """Single entity extracted from document (intermediate format - deprecated)."""
     entity_type: IntermediateEntityType
     value: str = Field(description="Original extracted text")
     normalized: Optional[str] = Field(default=None, description="Normalized form")
@@ -42,9 +42,118 @@ class ExtractedEntity(BaseModel):
     notes: Optional[str] = None
 
 
+# ============================================================================
+# Structured Entity Extraction Models
+# ============================================================================
+
+class PersonExtraction(BaseModel):
+    """Structured Person entity extraction."""
+    entity_type: Literal["PERSON"] = "PERSON"
+
+    # Core identity
+    name: str
+    alternate_names: List[str] = Field(default_factory=list)
+
+    # Demographics
+    birth_date: Optional[str] = None
+    death_date: Optional[str] = None
+    nationality: Optional[str] = None
+    residence: Optional[str] = None
+    profession: Optional[str] = None
+    marital_status: Optional[str] = None
+
+    # Family relationships (names as strings)
+    mother: Optional[str] = None
+    father: Optional[str] = None
+    spouse: Optional[str] = None
+    children: List[str] = Field(default_factory=list)
+    siblings: List[str] = Field(default_factory=list)
+
+    # Roles
+    roles: List[str] = Field(default_factory=list)
+
+    # Extraction metadata
+    confidence: float = Field(ge=0.0, le=1.0)
+    context: str = Field(description="Quote from document mentioning this person")
+    notes: Optional[str] = None
+
+
+class PropertyExtraction(BaseModel):
+    """Structured Property entity extraction."""
+    entity_type: Literal["PROPERTY"] = "PROPERTY"
+
+    # Identity
+    name: Optional[str] = None
+    property_type: Optional[str] = None
+
+    # Location & Description
+    location: Optional[str] = Field(None, description="Location name (will be linked to Location entity)")
+    address: Optional[str] = None
+    description: Optional[str] = None
+
+    # Measurements
+    area: Optional[float] = None
+    area_unit: Optional[str] = None
+
+    # Registry info
+    registry_number: Optional[str] = None
+    cadastral_info: Optional[str] = None
+    folio_number: Optional[str] = None
+
+    # Extraction metadata
+    confidence: float = Field(ge=0.0, le=1.0)
+    context: str = Field(description="Quote from document mentioning this property")
+    notes: Optional[str] = None
+
+
+class OrganizationExtraction(BaseModel):
+    """Structured Organization entity extraction."""
+    entity_type: Literal["ORGANIZATION"] = "ORGANIZATION"
+
+    name: str
+    org_type: Optional[str] = None
+    location: Optional[str] = Field(None, description="Location name (will be linked to Location entity)")
+    address: Optional[str] = None
+
+    # Extraction metadata
+    confidence: float = Field(ge=0.0, le=1.0)
+    context: str = Field(description="Quote from document mentioning this organization")
+    notes: Optional[str] = None
+
+
+class LocationExtraction(BaseModel):
+    """Structured Location entity extraction."""
+    entity_type: Literal["LOCATION"] = "LOCATION"
+
+    name: str
+    location_type: Optional[str] = None
+    parent_location: Optional[str] = Field(None, description="Parent location name (e.g., 'Camagüey' for 'Florida')")
+    country: str = "Cuba"
+
+    # Extraction metadata
+    confidence: float = Field(ge=0.0, le=1.0)
+    context: str = Field(description="Quote from document mentioning this location")
+    notes: Optional[str] = None
+
+
+# Union type for structured entities
+StructuredEntity = PersonExtraction | PropertyExtraction | OrganizationExtraction | LocationExtraction
+
+
 class EntityExtractionResult(BaseModel):
     """Result from Claude entity extraction (intermediate format)."""
     entities: List[ExtractedEntity]
+    document_date: Optional[str] = None
+    document_date_confidence: Optional[float] = None
+    extraction_notes: Optional[str] = None
+
+
+class StructuredEntityExtractionResult(BaseModel):
+    """Result from Claude structured entity extraction."""
+    entities: List[StructuredEntity]
+    dates: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted dates")
+    monetary_values: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted monetary values")
+    registry_refs: List[Dict[str, Any]] = Field(default_factory=list, description="Extracted registry references")
     document_date: Optional[str] = None
     document_date_confidence: Optional[float] = None
     extraction_notes: Optional[str] = None
@@ -131,7 +240,9 @@ class LLMExtractionService:
         ocr_quality: float = 0.0
     ) -> str:
         """
-        Build entity extraction prompt using PROMPTS.md template.
+        Build structured entity extraction prompt.
+
+        Extracts entities with full biographical and family relationship data.
 
         Args:
             text: OCR-extracted text
@@ -154,29 +265,108 @@ class LLMExtractionService:
 
         prompt = f"""You are a forensic document analyst extracting entities from historical Cuban property documents. Extract factual information only — never make legal conclusions.
 
-Analyze the following OCR text from a historical document and extract all entities.
+Analyze the following OCR text and extract all entities with their detailed attributes.
 
-For each entity, provide:
-1. entity_type: One of [PERSON, ORGANIZATION, PROPERTY, LOCATION, DATE, MONETARY_VALUE, REGISTRY_REFERENCE]
-2. value: The extracted text (preserve original Spanish)
-3. normalized: Normalized form (for dates: YYYY-MM-DD, for money: amount + currency)
-4. confidence: 0.0-1.0 based on OCR clarity and context
-5. context: Brief quote showing where this appears in the document
-6. notes: Any relevant observations (OCR issues, ambiguity, etc.)
+ENTITY TYPES:
+1. PERSON - Extract biographical and family relationship data
+2. PROPERTY - Extract property details
+3. ORGANIZATION - Extract organization details
+4. LOCATION - Extract geographic information
+5. DATE - Dates mentioned in document (returned separately)
+6. MONETARY_VALUE - Financial amounts (returned separately)
+7. REGISTRY_REFERENCE - Registry references (returned separately)
 
-ENTITY TYPE DEFINITIONS:
-- PERSON: Individual humans (owners, witnesses, notaries, officials)
-- ORGANIZATION: Companies, government bodies, registries, institutions
-- PROPERTY: Real property (land, buildings, mills, estates) — extract name, type, and location if available
-- LOCATION: Geographic locations (provinces, municipalities, addresses)
-- DATE: Any dates mentioned (document date, transaction date, etc.)
-- MONETARY_VALUE: Financial amounts (purchase prices, valuations, taxes)
-- REGISTRY_REFERENCE: References to official registries, folio numbers, book numbers
+PERSON ENTITY SCHEMA:
+{{
+  "entity_type": "PERSON",
+  "name": "Mario Ceresa",  // Required: Full name as written in document
+  "alternate_names": ["Don Mario Ceresa", "M. Ceresa"],  // Optional: Titles, abbreviations
+
+  // Demographics (extract if mentioned):
+  "birth_date": "1920" or "1920-03-15",  // Year or full date
+  "death_date": null,
+  "nationality": "Cuban",
+  "residence": "Miramar, Havana",  // Where they live
+  "profession": "industrialist",
+  "marital_status": "married" or "casado/casada",
+
+  // Family relationships (CRITICAL - extract if mentioned):
+  "mother": "María López de Queral",  // Mother's name
+  "father": "Juan Ceresa",  // Father's name
+  "spouse": "Rosa Queral",  // Spouse name (use primary if multiple)
+  "children": ["Mario Ceresa Jr.", "Rosa Ceresa"],  // List of children's names
+  "siblings": ["Carlos Ceresa"],  // List of siblings' names
+
+  // Roles (what they're doing in this document):
+  "roles": ["owner", "seller"],  // e.g., owner, buyer, seller, witness, notary
+
+  // Extraction metadata:
+  "confidence": 0.95,  // 0.0-1.0 based on OCR clarity
+  "context": "...comparece Don Mario Ceresa, hijo de Juan Ceresa y María López...",
+  "notes": "Family relationships mentioned in preamble"
+}}
+
+IMPORTANT - Family Relationships:
+- Look for phrases like "hijo de" (son of), "hija de" (daughter of)
+- "casado con" (married to), "esposa de" (wife of), "esposo de" (husband of)
+- "hermano de" (brother of), "hermana de" (sister of)
+- Extract EXACTLY as written, preserve Spanish names completely
+- If only partial info (e.g., just father mentioned), that's fine
+- Don't invent relationships not stated in the text
+
+PROPERTY ENTITY SCHEMA:
+{{
+  "entity_type": "PROPERTY",
+  "name": "Central Santa Maria",  // Property name
+  "property_type": "sugar mill" or "ingenio",  // Type: finca, ingenio, central, hacienda
+  "location": "Florida, Camagüey",  // Location as text (will be linked later)
+  "address": "Carretera Central Km 15",
+  "description": "Sugar mill with 500 hectares",
+  "area": 500.0,
+  "area_unit": "hectares" or "caballerías",
+  "registry_number": "Folio 123, Tomo V",
+  "cadastral_info": "Finca 456",
+  "folio_number": "123",
+  "confidence": 0.90,
+  "context": "...la finca Central Santa Maria...",
+  "notes": "Area mentioned in cadastral description"
+}}
+
+ORGANIZATION ENTITY SCHEMA:
+{{
+  "entity_type": "ORGANIZATION",
+  "name": "Banco Núñez",
+  "org_type": "bank" or "banco",
+  "location": "Havana",
+  "address": "Calle Obispo 305",
+  "confidence": 0.85,
+  "context": "...el Banco Núñez...",
+  "notes": null
+}}
+
+LOCATION ENTITY SCHEMA:
+{{
+  "entity_type": "LOCATION",
+  "name": "Florida",
+  "location_type": "municipality" or "municipio",
+  "parent_location": "Camagüey",  // Parent location (e.g., province)
+  "country": "Cuba",
+  "confidence": 0.95,
+  "context": "...en el municipio de Florida...",
+  "notes": null
+}}
 
 OCR QUALITY CONSIDERATIONS:
-- If text is unclear, note this in confidence score and notes
+- If text is unclear, lower confidence score and note in "notes"
 - Common OCR errors in Spanish: ñ→n, á→a, rn→m, ll→U
 - Handwritten text may have lower confidence
+
+EXTRACTION RULES:
+- Extract only what the document explicitly states
+- Preserve original Spanish terms and names
+- If a field is not mentioned, use null or empty list []
+- For PERSON entities, family relationships are HIGH PRIORITY
+- Don't guess or infer data not in the text
 
 DOCUMENT METADATA:
 Document ID: {document_id}
@@ -187,21 +377,23 @@ Language: Spanish
 OCR TEXT:
 {text}
 
-Respond with a JSON object:
+Respond with JSON in this format:
 {{
   "entities": [
-    {{
-      "entity_type": "PERSON",
-      "value": "Mario Ceresa",
-      "normalized": "Mario Ceresa",
-      "confidence": 0.95,
-      "context": "...comparece Don Mario Ceresa, propietario...",
-      "notes": "Clear handwriting, name appears multiple times"
-    }}
+    // Array of PERSON, PROPERTY, ORGANIZATION, LOCATION entities
   ],
-  "document_date": "1958-03-15",
+  "dates": [
+    // Dates found: {{"value": "15 de marzo de 1958", "normalized": "1958-03-15", "context": "..."}}
+  ],
+  "monetary_values": [
+    // Money amounts: {{"value": "$50,000 pesos", "normalized": {{"amount": 50000, "currency": "pesos"}}, "context": "..."}}
+  ],
+  "registry_refs": [
+    // Registry references: {{"value": "Folio 123", "normalized": "Folio 123, Tomo V", "context": "..."}}
+  ],
+  "document_date": "1958-03-15",  // Main document date
   "document_date_confidence": 0.90,
-  "extraction_notes": "Overall good OCR quality. Some marginalia illegible."
+  "extraction_notes": "Overall good OCR quality. Family relationships extracted from preamble."
 }}"""
         return prompt
 
@@ -743,9 +935,9 @@ Example response with NO relations:
 
         raise Exception("Claude API retries exhausted (should not reach here)")
 
-    def _parse_extraction_response(self, response_text: str) -> EntityExtractionResult:
+    def _parse_extraction_response(self, response_text: str) -> StructuredEntityExtractionResult:
         """
-        Parse Claude response into EntityExtractionResult.
+        Parse Claude response into StructuredEntityExtractionResult.
 
         Handles markdown code blocks and validates JSON schema.
 
@@ -753,7 +945,7 @@ Example response with NO relations:
             response_text: Raw response from Claude
 
         Returns:
-            Validated EntityExtractionResult
+            Validated StructuredEntityExtractionResult
 
         Raises:
             ValueError: If JSON parsing or validation fails
@@ -780,7 +972,7 @@ Example response with NO relations:
             data = json.loads(cleaned_text)
 
             # Validate with Pydantic model
-            result = EntityExtractionResult(**data)
+            result = StructuredEntityExtractionResult(**data)
             return result
 
         except json.JSONDecodeError as e:
@@ -795,18 +987,18 @@ Example response with NO relations:
 
     def _transform_to_final_entities(
         self,
-        extraction: EntityExtractionResult,
+        extraction: StructuredEntityExtractionResult,
         document_id: str,
         ocr_confidence: float
     ) -> List[BaseEntity]:
         """
-        Transform intermediate entities to final schema entities.
+        Transform structured entities to final schema entities.
 
-        Filters to supported types (PERSON, PROPERTY, ORGANIZATION, LOCATION)
-        and creates proper entity objects with verification tiers.
+        Takes structured PersonExtraction, PropertyExtraction, etc. and creates
+        final Pydantic models with all fields populated.
 
         Args:
-            extraction: Intermediate extraction result from Claude
+            extraction: Structured extraction result from Claude
             document_id: Document identifier
             ocr_confidence: OCR confidence score
 
@@ -819,13 +1011,6 @@ Example response with NO relations:
         )
 
         final_entities = []
-
-        # Store DATE, MONETARY_VALUE, REGISTRY_REFERENCE for notes/metadata
-        metadata_entities = {
-            "dates": [],
-            "monetary_values": [],
-            "registry_refs": []
-        }
 
         for entity in extraction.entities:
             # Combined confidence: min of OCR and entity confidence
@@ -842,94 +1027,87 @@ Example response with NO relations:
 
             # Generate unique entity ID
             short_id = str(uuid.uuid4())[:8]
-            entity_id = f"{document_id}_{entity.entity_type.value.lower()}_{short_id}"
+            entity_id = f"{document_id}_{entity.entity_type.lower()}_{short_id}"
 
             # Transform based on entity type
-            if entity.entity_type == IntermediateEntityType.PERSON:
+            if isinstance(entity, PersonExtraction):
                 person = Person(
                     id=entity_id,
                     entity_type=EntityType.PERSON,
-                    name=entity.normalized or entity.value,
-                    alternate_names=[entity.value] if entity.normalized and entity.value != entity.normalized else [],
+                    name=entity.name,
+                    alternate_names=entity.alternate_names,
+                    birth_date=entity.birth_date,
+                    death_date=entity.death_date,
+                    nationality=entity.nationality,
+                    residence=entity.residence,
+                    profession=entity.profession,
+                    marital_status=entity.marital_status,
+                    mother=entity.mother,
+                    father=entity.father,
+                    spouse=entity.spouse,
+                    children=entity.children,
+                    siblings=entity.siblings,
+                    roles=entity.roles,
                     verification=verification,
                     extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100]}..."
+                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}..."
                 )
                 final_entities.append(person)
 
-            elif entity.entity_type == IntermediateEntityType.ORGANIZATION:
-                org = Organization(
-                    id=entity_id,
-                    entity_type=EntityType.ORGANIZATION,
-                    name=entity.normalized or entity.value,
-                    alternate_names=[entity.value] if entity.normalized and entity.value != entity.normalized else [],
-                    verification=verification,
-                    extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100]}..."
-                )
-                final_entities.append(org)
-
-            elif entity.entity_type == IntermediateEntityType.PROPERTY:
+            elif isinstance(entity, PropertyExtraction):
                 prop = Property(
                     id=entity_id,
                     entity_type=EntityType.PROPERTY,
-                    name=entity.normalized or entity.value,
-                    property_type="unknown",  # Would need to be extracted separately
+                    name=entity.name,
+                    property_type=entity.property_type,
+                    address=entity.address,
+                    description=entity.description,
+                    area=entity.area,
+                    area_unit=entity.area_unit,
+                    registry_number=entity.registry_number,
+                    cadastral_info=entity.cadastral_info,
+                    folio_number=entity.folio_number,
                     verification=verification,
                     extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100]}..."
+                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}..."
                 )
+                # Note: location field will be linked in graph building phase
                 final_entities.append(prop)
 
-            elif entity.entity_type == IntermediateEntityType.LOCATION:
+            elif isinstance(entity, OrganizationExtraction):
+                org = Organization(
+                    id=entity_id,
+                    entity_type=EntityType.ORGANIZATION,
+                    name=entity.name,
+                    org_type=entity.org_type,
+                    address=entity.address,
+                    verification=verification,
+                    extracted_from=document_id,
+                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}..."
+                )
+                # Note: location field will be linked in graph building phase
+                final_entities.append(org)
+
+            elif isinstance(entity, LocationExtraction):
                 location = Location(
                     id=entity_id,
                     entity_type=EntityType.LOCATION,
-                    name=entity.normalized or entity.value,
-                    location_type="unknown",  # Would need to be extracted separately
+                    name=entity.name,
+                    location_type=entity.location_type,
+                    country=entity.country,
                     verification=verification,
                     extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100]}..."
+                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}..."
                 )
+                # Note: parent_location field will be linked in graph building phase
                 final_entities.append(location)
 
-            elif entity.entity_type == IntermediateEntityType.DATE:
-                metadata_entities["dates"].append({
-                    "value": entity.value,
-                    "normalized": entity.normalized,
-                    "context": entity.context
-                })
-
-            elif entity.entity_type == IntermediateEntityType.MONETARY_VALUE:
-                metadata_entities["monetary_values"].append({
-                    "value": entity.value,
-                    "normalized": entity.normalized,
-                    "context": entity.context
-                })
-
-            elif entity.entity_type == IntermediateEntityType.REGISTRY_REFERENCE:
-                # Try to attach to Property entity if we have one
-                if entity.normalized:
-                    # Store for potential attachment to properties
-                    metadata_entities["registry_refs"].append({
-                        "value": entity.value,
-                        "normalized": entity.normalized,
-                        "context": entity.context
-                    })
-
-        # Attach registry references to properties if we found any
-        if metadata_entities["registry_refs"] and final_entities:
-            properties = [e for e in final_entities if isinstance(e, Property)]
-            if properties and metadata_entities["registry_refs"]:
-                # Attach first registry ref to first property (simple heuristic)
-                properties[0].registry_number = metadata_entities["registry_refs"][0]["normalized"]
-
         logger.info(
-            f"Transformed {len(extraction.entities)} intermediate entities → "
+            f"Transformed {len(extraction.entities)} structured entities → "
             f"{len(final_entities)} final entities "
-            f"({len(metadata_entities['dates'])} dates, "
-            f"{len(metadata_entities['monetary_values'])} monetary values, "
-            f"{len(metadata_entities['registry_refs'])} registry refs stored as metadata)"
+            f"({len(extraction.dates)} dates, "
+            f"{len(extraction.monetary_values)} monetary values, "
+            f"{len(extraction.registry_refs)} registry refs stored as metadata)"
         )
 
         return final_entities
