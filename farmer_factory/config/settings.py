@@ -41,7 +41,8 @@ class Settings(BaseSettings):
     output_dir: Path = Path("./output")
 
     # Model Configuration
-    claude_model: str = "claude-3-haiku-20240307"  # Default to Haiku (cheap)
+    # NOTE: Anthropic requires explicit version dates, update these when new versions release
+    claude_model: str = "claude-3-5-haiku-20241022"  # Default to Haiku (cheap)
     claude_model_retry: str = "claude-3-5-sonnet-20241022"  # Upgrade on retry
 
     # API Limits
