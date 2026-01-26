@@ -49,54 +49,57 @@ export function EntitySidebar({
 
   if (isCollapsed) {
     return (
-      <div className="w-12 shrink-0 border-l border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm flex flex-col items-center relative group transition-all duration-300">
+      <div className="w-12 shrink-0 border-l border-cyan-500/20 bg-slate-900 flex flex-col items-center relative group transition-all duration-300 z-20">
         {/* Vertical scan line effect */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
-        {/* Expand button - top */}
+        {/* Expand button - FULL HEIGHT CLICKABLE */}
         <button
           onClick={onToggleCollapse}
           aria-label="Expand sidebar"
-          className="w-full h-14 flex items-center justify-center text-cyan-400/60 hover:text-cyan-300 hover:bg-cyan-500/10 transition-all duration-200 relative z-10 group/btn"
-          title="Expand Panel"
+          className="w-full flex-1 flex flex-col items-center justify-center text-cyan-300 hover:text-cyan-100 hover:bg-cyan-500/10 transition-all duration-200 relative z-10 group/btn gap-8"
+          title="Expand Panel [Click anywhere]"
         >
-          <svg
-            className="w-5 h-5 transition-transform group-hover/btn:translate-x-0.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-        </button>
-
-        {/* Vertical indicator dots */}
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 py-8">
-          {hasSelection && (
-            <div
-              className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.6)]"
-              title="Node selected"
-            />
-          )}
-          <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-          <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-          <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-        </div>
-
-        {/* Vertical text label */}
-        <div className="pb-6">
-          <div
-            className="text-[10px] font-display uppercase tracking-widest text-slate-500 origin-center"
-            style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-          >
-            Panel
+          {/* Chevron icon - top */}
+          <div className="flex items-center justify-center">
+            <svg
+              className="w-6 h-6 transition-transform group-hover/btn:translate-x-1 drop-shadow-[0_0_4px_rgba(6,182,212,0.5)]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
           </div>
-        </div>
+
+          {/* Vertical indicator dots - middle */}
+          <div className="flex flex-col items-center gap-3">
+            {hasSelection && (
+              <div
+                className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_rgba(6,182,212,0.6)]"
+                title="Node selected"
+              />
+            )}
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-600/50" />
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-600/50" />
+            <div className="w-1.5 h-1.5 rounded-full bg-slate-600/50" />
+          </div>
+
+          {/* Vertical text label - bottom */}
+          <div>
+            <div
+              className="text-[10px] font-display uppercase tracking-widest text-slate-400 origin-center group-hover/btn:text-cyan-300 transition-colors"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              Panel
+            </div>
+          </div>
+        </button>
       </div>
     );
   }
