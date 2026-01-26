@@ -89,9 +89,11 @@ export function KnowledgeGraph({
         return;
       }
       const { width, height } = entry.contentRect;
+      // PREMIUM: Account for device pixel ratio for crisp rendering on retina
+      const dpr = window.devicePixelRatio || 1;
       setDimensions({
-        width: Math.floor(width),
-        height: Math.floor(height),
+        width: Math.floor(width * dpr) / dpr,
+        height: Math.floor(height * dpr) / dpr,
       });
     });
 
@@ -357,7 +359,7 @@ export function KnowledgeGraph({
     };
   }, [selectedNodeId, hoveredNodeId, prefersReducedMotion]);
 
-  // Custom node renderer - simple flat circles with size based on connections
+  // Custom node renderer with subtle depth and glow effects
   const nodeCanvasObject = useMemo(
     () => (node: any, ctx: CanvasRenderingContext2D, globalScale?: number) => {
       // Skip rendering if node position not yet calculated
@@ -373,53 +375,108 @@ export function KnowledgeGraph({
 
       // Calculate size based on number of connections (hub nodes are larger)
       const degree = nodeDegrees.get(nodeId) || 0;
-      // Obsidian-style sizing: all nodes clearly visible at any zoom level
+      // Dynamic sizing: all nodes clearly visible at any zoom level
       const size = settings.nodeSizeBase + Math.pow(degree, 0.5) * settings.nodeSizeMultiplier;
 
       ctx.save();
 
-      ctx.shadowBlur = 0;
+      // PREMIUM ENHANCEMENT: Subtle depth with soft inner shadow
+      if (!isDimmed) {
+        // Soft ambient glow for all nodes (very subtle)
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = withAlpha(color, 0.18);
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
 
-      // Simple flat circle
+      // Main node circle with enhanced rendering
       ctx.beginPath();
       ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
       if (isDimmed) {
-        const dimAlpha = hasActiveHighlight ? 1 - 0.2 * activeAlpha : 1;
-        ctx.fillStyle = `rgba(${hexToRgb(color)}, ${dimAlpha})`;
+        const dimAlpha = hasActiveHighlight ? 1 - 0.25 * activeAlpha : 1;
+        ctx.fillStyle = `rgba(${hexToRgb(color)}, ${dimAlpha * 0.7})`;
       } else {
         ctx.fillStyle = color;
       }
       ctx.fill();
 
+      // Reset shadow for subsequent draws
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+
+      // PREMIUM ENHANCEMENT: Subtle highlight on top for depth
+      if (!isDimmed) {
+        const gradient = ctx.createRadialGradient(
+          node.x - size * 0.3,
+          node.y - size * 0.3,
+          0,
+          node.x,
+          node.y,
+          size
+        );
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.04)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+
+      // PREMIUM ENHANCEMENT: Smooth selection/hover state with multi-layer glow
       const ringAlpha = isHovered ? hoverAlpha : isSelected ? selectedAlpha : 0;
       if (ringAlpha > 0) {
-        const borderAlpha = Math.max(ringAlpha, 0.55);
-        ctx.shadowBlur = 14 * ringAlpha;
-        ctx.shadowColor = withAlpha(graphTheme.nodeFocus, 0.45 * ringAlpha);
+        const borderAlpha = Math.max(ringAlpha * 0.75, 0.5);
 
-        // Cyan hover ring outside the node
+        // Outer glow (largest, softest)
+        ctx.shadowBlur = 24 * ringAlpha;
+        ctx.shadowColor = withAlpha(graphTheme.nodeFocus, 0.35 * ringAlpha);
+
+        // Cyan ring - slightly thicker and smoother
         ctx.beginPath();
-        ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI);
-        ctx.strokeStyle = withAlpha(graphTheme.nodeFocus, ringAlpha);
-        ctx.lineWidth = 1.5;
+        ctx.arc(node.x, node.y, size + 3.5, 0, 2 * Math.PI);
+        ctx.strokeStyle = withAlpha(graphTheme.nodeFocus, ringAlpha * 0.85);
+        ctx.lineWidth = 2;
         ctx.stroke();
 
-        // White border on the node itself
+        // Reset shadow
+        ctx.shadowBlur = 0;
+
+        // Inner ring for definition
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, size + 1.5, 0, 2 * Math.PI);
+        ctx.strokeStyle = withAlpha(graphTheme.nodeFocus, ringAlpha * 0.4);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // White border on the node itself - smoother transition
         ctx.beginPath();
         ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
         ctx.strokeStyle = `rgba(255, 255, 255, ${borderAlpha})`;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.8;
         ctx.stroke();
       }
 
+      // PREMIUM ENHANCEMENT: Better label rendering with subtle shadow
       if (typeof globalScale === 'number' && globalScale > 1.05) {
         const labelAlpha = Math.min(1, (globalScale - 1.05) / 0.9);
-        const fontSize = Math.max(8, Math.min(13, 12 / globalScale));
-        ctx.font = `${fontSize}px "Space Grotesk", "Helvetica Neue", Arial, sans-serif`;
+        const fontSize = Math.max(9, Math.min(14, 12.5 / globalScale));
+        ctx.font = `500 ${fontSize}px "Space Grotesk", "Helvetica Neue", system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillStyle = withAlpha(graphTheme.text, 0.65 * labelAlpha);
-        ctx.fillText(node.name || node.id, node.x, node.y + size + 4);
+
+        // Subtle text shadow for readability
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowOffsetY = 1;
+
+        ctx.fillStyle = withAlpha(graphTheme.text, 0.75 * labelAlpha);
+        ctx.fillText(node.name || node.id, node.x, node.y + size + 5);
+
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
       }
 
       ctx.restore();
@@ -436,24 +493,27 @@ export function KnowledgeGraph({
       settings.nodeSizeMultiplier,
       settings.entityColors,
       graphTheme.nodeFocus,
-      graphTheme.text
+      graphTheme.text,
+      hoverAlpha,
+      selectedAlpha
     ]
   );
 
-  // Custom link color - highlight constellation links
+  // Custom link color - Premium gradient-enhanced constellation links
   const getLinkColor = useCallback(
     (link: any) => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
 
       if (selectedNodeId && (sourceId === selectedNodeId || targetId === selectedNodeId)) {
-        return withAlpha(graphTheme.lineHighlight, baseHighlightAlpha * selectedAlpha);
+        // Brighter highlight for selected constellation
+        return withAlpha(graphTheme.lineHighlight, (baseHighlightAlpha + 0.1) * selectedAlpha);
       }
 
       const isHoveredLink = hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId);
 
       if (isHoveredLink) {
-        return withAlpha(graphTheme.lineHighlight, baseHighlightAlpha * hoverAlpha);
+        return withAlpha(graphTheme.lineHighlight, (baseHighlightAlpha + 0.08) * hoverAlpha);
       }
 
       return graphTheme.line;
@@ -469,7 +529,7 @@ export function KnowledgeGraph({
     ]
   );
 
-  // Custom link width - make constellation links thicker
+  // Custom link width - make constellation links thicker with smooth transitions
   const getLinkWidth = useCallback(
     (link: any) => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
@@ -483,7 +543,7 @@ export function KnowledgeGraph({
         return settings.linkWidth + settings.constellationLinkWidth * hoverAlpha;
       }
 
-      return settings.linkWidth; // Thin but visible
+      return settings.linkWidth;
     },
     [
       hoveredNodeId,
@@ -492,6 +552,58 @@ export function KnowledgeGraph({
       selectedAlpha,
       settings.linkWidth,
       settings.constellationLinkWidth
+    ]
+  );
+
+  // PREMIUM ENHANCEMENT: Custom link renderer for smoother, higher-quality lines
+  const linkCanvasObject = useMemo(
+    () => (link: any, ctx: CanvasRenderingContext2D, globalScale?: number) => {
+      const source = typeof link.source === 'object' ? link.source : null;
+      const target = typeof link.target === 'object' ? link.target : null;
+
+      if (!source || !target || typeof source.x !== 'number' || typeof target.x !== 'number') {
+        return;
+      }
+
+      const sourceId = source.id;
+      const targetId = target.id;
+
+      const isSelected = selectedNodeId && (sourceId === selectedNodeId || targetId === selectedNodeId);
+      const isHovered = hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId);
+
+      const width = getLinkWidth(link);
+      const color = getLinkColor(link);
+
+      ctx.save();
+
+      // PREMIUM: Anti-aliasing and smooth line rendering
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // PREMIUM: Subtle glow for highlighted links
+      if (isSelected || isHovered) {
+        const glowAlpha = isSelected ? selectedAlpha : hoverAlpha;
+        ctx.shadowBlur = 8 * glowAlpha;
+        ctx.shadowColor = withAlpha(graphTheme.lineHighlight, 0.4 * glowAlpha);
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(source.x, source.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.stroke();
+
+      ctx.restore();
+    },
+    [
+      selectedNodeId,
+      hoveredNodeId,
+      selectedAlpha,
+      hoverAlpha,
+      getLinkWidth,
+      getLinkColor,
+      graphTheme.lineHighlight
     ]
   );
 
@@ -512,16 +624,22 @@ export function KnowledgeGraph({
         nodeLabel={(node: any) => `${node.name || node.id} (${node.entity_type})`}
         linkColor={getLinkColor as any}
         linkWidth={getLinkWidth as any}
+        linkCanvasObjectMode={() => 'replace'}
+        linkCanvasObject={linkCanvasObject}
         backgroundColor="rgba(0,0,0,0)"
         onNodeClick={handleNodeClick as any}
         onBackgroundClick={onBackgroundClick}
         onNodeHover={(node: any) => setHoveredNodeId(node ? node.id : null)}
         nodeCanvasObjectMode={() => 'replace'}
         nodeCanvasObject={nodeCanvasObject}
-        warmupTicks={30}
-        cooldownTicks={300}
-        d3AlphaDecay={0.03}
-        d3VelocityDecay={0.4}
+        warmupTicks={40}
+        cooldownTicks={400}
+        d3AlphaDecay={0.025}
+        d3VelocityDecay={0.35}
+        enableNodeDrag={true}
+        enableZoomInteraction={true}
+        enablePanInteraction={true}
+        cooldownTime={Infinity}
       />
     </div>
   );

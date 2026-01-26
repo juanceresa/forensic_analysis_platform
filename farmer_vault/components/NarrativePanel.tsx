@@ -99,9 +99,9 @@ export function NarrativePanel({
           aria-live="polite"
           aria-label="Generating narrative"
         >
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4" />
+          <div className="animate-spin motion-reduce:animate-none rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4" />
           <p className="text-slate-400 font-mono text-sm">
-            Analyzing evidence constellation...
+            Analyzing evidence constellation…
           </p>
         </div>
       </div>
@@ -138,7 +138,7 @@ export function NarrativePanel({
   return (
     <div className="p-4 space-y-4 overflow-y-auto">
       {/* Header */}
-      <div className="border-b border-cyan-500/20 pb-3">
+      <div className="border-b border-cyan-500/15 pb-3">
         <h2 className="text-xl font-display uppercase tracking-wide text-cyan-100">
           {narrative.focal_entity_name}
         </h2>
@@ -149,17 +149,17 @@ export function NarrativePanel({
 
       {/* Metadata Tags - Holographic Data Chips */}
       <div className="flex gap-2 flex-wrap text-xs font-mono">
-        <span className="px-3 py-1.5 bg-gradient-to-br from-cyan-950/50 to-slate-900 border border-cyan-500/30 rounded shadow-[0_0_8px_rgba(6,182,212,0.15)] text-cyan-200 backdrop-blur-sm">
+        <span className="vault-chip px-3 py-1.5 rounded text-cyan-200 backdrop-blur-sm">
           <span className="text-cyan-400 font-bold">{narrative.constellation_size}</span> entities
         </span>
-        <span className="px-3 py-1.5 bg-gradient-to-br from-blue-950/50 to-slate-900 border border-blue-500/30 rounded shadow-[0_0_8px_rgba(59,130,246,0.15)] text-blue-200 backdrop-blur-sm">
+        <span className="vault-chip px-3 py-1.5 rounded text-blue-200 backdrop-blur-sm border-blue-500/30">
           <span className="text-blue-400 font-bold">{narrative.total_documents}</span> documents
         </span>
-        <span className="px-3 py-1.5 bg-gradient-to-br from-purple-950/50 to-slate-900 border border-purple-500/30 rounded shadow-[0_0_8px_rgba(139,92,246,0.15)] text-purple-200 backdrop-blur-sm">
+        <span className="vault-chip px-3 py-1.5 rounded text-purple-200 backdrop-blur-sm border-purple-500/30">
           {narrative.model_used}
         </span>
         {narrative.from_cache && (
-          <span className="px-3 py-1.5 bg-gradient-to-br from-emerald-950/50 to-slate-900 border border-emerald-500/40 rounded shadow-[0_0_10px_rgba(16,185,129,0.2)] text-emerald-300 backdrop-blur-sm animate-pulse">
+          <span className="vault-chip px-3 py-1.5 rounded text-emerald-300 backdrop-blur-sm border-emerald-500/40 animate-pulse motion-reduce:animate-none">
             ✓ cached
           </span>
         )}
@@ -175,7 +175,7 @@ export function NarrativePanel({
             {narrative.highlighted_events.map((event, idx) => (
               <div
                 key={idx}
-                className="bg-slate-800 border border-cyan-600/50 rounded p-3 border-l-4"
+                className="vault-panel vault-panel--muted rounded p-3 border-l-4 border-l-cyan-400/70"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span>{getEventIcon(event.event_type)}</span>
@@ -214,10 +214,10 @@ export function NarrativePanel({
           </h3>
           <div className="space-y-2">
             {narrative.facts.map((fact) => (
-              <div key={fact.citation_number} className="bg-slate-800 border border-slate-700 rounded">
+              <div key={fact.citation_number} className="vault-panel vault-panel--muted rounded">
                 <button
                   onClick={() => toggleCitation(fact.citation_number)}
-                  className="w-full min-h-[44px] px-3 py-2 flex items-center justify-between hover:bg-slate-700 rounded transition-colors"
+                  className="w-full min-h-[44px] px-3 py-2 flex items-center justify-between hover:bg-slate-800/70 rounded transition-colors"
                   aria-expanded={expandedCitations.has(fact.citation_number)}
                   aria-label={`Toggle citation ${fact.citation_number}: ${fact.claim_text}`}
                 >

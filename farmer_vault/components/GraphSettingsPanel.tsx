@@ -12,7 +12,7 @@ interface GraphSettingsPanelProps {
 
 /**
  * Floating settings panel for graph visualization controls.
- * Obsidian-inspired design with collapsible sections and styled sliders.
+ * Features collapsible sections and styled sliders for real-time adjustments.
  */
 export function GraphSettingsPanel({
   settings,
@@ -50,12 +50,12 @@ export function GraphSettingsPanel({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
-          flex items-center justify-center w-10 h-10 rounded-lg
-          bg-slate-900/95 border transition-colors transition-shadow duration-200
+          flex items-center justify-center w-11 h-11 rounded-xl
+          bg-slate-900/98 border transition-all duration-300 backdrop-blur-md
           ${
             isOpen
-              ? 'border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
-              : 'border-slate-700/50 hover:border-cyan-500/30'
+              ? 'border-cyan-500/60 shadow-[0_0_24px_rgba(6,182,212,0.35),0_0_4px_rgba(6,182,212,0.2)_inset] scale-105'
+              : 'border-slate-700/60 hover:border-cyan-500/40 hover:shadow-[0_0_16px_rgba(6,182,212,0.15)] hover:scale-102'
           }
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
         `}
@@ -63,8 +63,8 @@ export function GraphSettingsPanel({
         aria-expanded={isOpen}
       >
         <svg
-          className={`w-5 h-5 transition-transform transition-colors duration-300 ${
-            isOpen ? 'text-cyan-400 rotate-90' : 'text-slate-400'
+          className={`w-5 h-5 transition-all duration-400 ${
+            isOpen ? 'text-cyan-400 rotate-180 scale-110' : 'text-slate-400 rotate-0 scale-100'
           }`}
           fill="none"
           stroke="currentColor"
@@ -89,13 +89,14 @@ export function GraphSettingsPanel({
       {/* Settings Panel with slide-in animation */}
       {isOpen && (
         <div
-          className="mt-2 rounded-lg bg-slate-900/95 border border-cyan-500/20 shadow-2xl backdrop-blur-sm
-            animate-slide-in motion-reduce:animate-none"
+          className="mt-3 rounded-xl bg-slate-900/98 border border-cyan-500/25 backdrop-blur-xl
+            animate-slide-in motion-reduce:animate-none overflow-hidden"
           role="region"
           aria-label="Graph settings panel"
           style={{
-            animation: 'slideIn 200ms ease-out forwards',
+            animation: 'slideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
             width: 'var(--graph-controls-width)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(110, 219, 227, 0.12) inset, 0 0 32px rgba(6, 182, 212, 0.2)'
           }}
         >
           {/* Header */}
@@ -280,30 +281,38 @@ function SettingsSlider({ label, value, onChange, range }: SettingsSliderProps) 
         step={range.step}
         value={value}
         onChange={(e) => handleChange(parseFloat(e.target.value))}
-        className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
+        className="w-full h-1.5 bg-slate-800/80 rounded-full appearance-none cursor-pointer
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
           [&::-webkit-slider-thumb]:appearance-none
-          [&::-webkit-slider-thumb]:w-3
-          [&::-webkit-slider-thumb]:h-3
+          [&::-webkit-slider-thumb]:w-4
+          [&::-webkit-slider-thumb]:h-4
           [&::-webkit-slider-thumb]:rounded-full
-          [&::-webkit-slider-thumb]:bg-cyan-400
-          [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(6,182,212,0.6)]
+          [&::-webkit-slider-thumb]:bg-gradient-to-br
+          [&::-webkit-slider-thumb]:from-cyan-400
+          [&::-webkit-slider-thumb]:to-cyan-500
+          [&::-webkit-slider-thumb]:shadow-[0_0_12px_rgba(6,182,212,0.7),0_2px_4px_rgba(0,0,0,0.3)]
           [&::-webkit-slider-thumb]:cursor-pointer
-          [&::-webkit-slider-thumb]:transition-[transform,box-shadow]
-          [&::-webkit-slider-thumb]:hover:shadow-[0_0_12px_rgba(6,182,212,0.8)]
-          [&::-webkit-slider-thumb]:active:scale-110
-          [&::-webkit-slider-thumb]:active:shadow-[0_0_16px_rgba(6,182,212,1)]
-          [&::-moz-range-thumb]:w-3
-          [&::-moz-range-thumb]:h-3
+          [&::-webkit-slider-thumb]:transition-all
+          [&::-webkit-slider-thumb]:duration-200
+          [&::-webkit-slider-thumb]:hover:scale-110
+          [&::-webkit-slider-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,0.9),0_3px_6px_rgba(0,0,0,0.4)]
+          [&::-webkit-slider-thumb]:active:scale-115
+          [&::-webkit-slider-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.5)]
+          [&::-moz-range-thumb]:w-4
+          [&::-moz-range-thumb]:h-4
           [&::-moz-range-thumb]:rounded-full
-          [&::-moz-range-thumb]:bg-cyan-400
+          [&::-moz-range-thumb]:bg-gradient-to-br
+          [&::-moz-range-thumb]:from-cyan-400
+          [&::-moz-range-thumb]:to-cyan-500
           [&::-moz-range-thumb]:border-0
-          [&::-moz-range-thumb]:shadow-[0_0_8px_rgba(6,182,212,0.6)]
+          [&::-moz-range-thumb]:shadow-[0_0_12px_rgba(6,182,212,0.7),0_2px_4px_rgba(0,0,0,0.3)]
           [&::-moz-range-thumb]:cursor-pointer
-          [&::-moz-range-thumb]:transition-[transform,box-shadow]
-          [&::-moz-range-thumb]:hover:shadow-[0_0_12px_rgba(6,182,212,0.8)]
-          [&::-moz-range-thumb]:active:scale-110
-          [&::-moz-range-thumb]:active:shadow-[0_0_16px_rgba(6,182,212,1)]
+          [&::-moz-range-thumb]:transition-all
+          [&::-moz-range-thumb]:duration-200
+          [&::-moz-range-thumb]:hover:scale-110
+          [&::-moz-range-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,0.9),0_3px_6px_rgba(0,0,0,0.4)]
+          [&::-moz-range-thumb]:active:scale-115
+          [&::-moz-range-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.5)]
         "
         aria-label={`${label} slider`}
         aria-valuemin={range.min}
