@@ -74,6 +74,13 @@ class NarrativeCache(ABC):
         def _stable_dump(value: Any) -> str:
             return json.dumps(value, sort_keys=True, default=str, separators=(",", ":"))
 
+        def _strip_volatile_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                key: value
+                for key, value in data.items()
+                if key not in ("created_at", "updated_at")
+            }
+
         hash_components = []
 
         # Sort entities for consistent hashing
@@ -82,7 +89,9 @@ class NarrativeCache(ABC):
         for entity_id in sorted_entities:
             entity = graph.get_entity(entity_id)
             if entity:
-                hash_components.append(f"entity:{entity_id}:{_stable_dump(entity)}")
+                hash_components.append(
+                    f"entity:{entity_id}:{_stable_dump(_strip_volatile_fields(entity))}"
+                )
 
         # Include relations with full data
         seen_relations = set()

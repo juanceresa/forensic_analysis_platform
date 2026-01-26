@@ -103,7 +103,10 @@ class StoryScorer:
 
         # Document frequency (corroboration strength)
         extracted_from = entity_data.get("extracted_from", "")
-        doc_count = len(extracted_from.split(",")) if extracted_from else 1
+        if extracted_from:
+            doc_count = len([doc for doc in extracted_from.split(",") if doc.strip()])
+        else:
+            doc_count = 1
         document_score = doc_count * self.document_multiplier
 
         # Weighted relations (important relations matter more)

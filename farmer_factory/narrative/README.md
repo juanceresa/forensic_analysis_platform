@@ -54,6 +54,7 @@ Properties score highest (optimal focal points for restitution):
 In-memory cache with graph-state invalidation:
 - Cache key: `session_id + entity_id + graph_hash`
 - Invalidates when any entity or relation data in the constellation changes
+- Graph hash ignores volatile timestamps (`created_at`, `updated_at`)
 - 1-hour TTL
 - Easy Redis migration via adapter pattern
 
@@ -63,6 +64,9 @@ Special prominence for:
 - **CONFISCATED** - Expropriations (red highlight in UI)
 - **SOLD** - Property sales
 - **INHERITED** - Estate transfers
+
+Relation context in prompts now includes source document IDs and evidence text
+when available, to ground inline citations.
 
 ```python
 for event in result.highlighted_events:

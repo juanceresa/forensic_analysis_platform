@@ -148,3 +148,37 @@ def test_graph_hash_calculation():
     hash3 = cache.calculate_graph_hash(constellation, kg)
 
     assert hash2 != hash3
+
+
+def test_graph_hash_ignores_timestamp_changes():
+    """Test graph hash is stable when only timestamps change."""
+    from farmer_factory.structure.graph import KnowledgeGraph
+    from farmer_factory.structure.schema import (
+        Property,
+        EntityType,
+        VerificationTier,
+        Verification
+    )
+    from datetime import datetime, timedelta
+
+    cache = InMemoryCache()
+
+    kg = KnowledgeGraph(case_id="test_001")
+    prop = Property(
+        id="prop_001",
+        name="Villa Aurelia",
+        entity_type=EntityType.PROPERTY,
+        verification=Verification(tier=VerificationTier.TIER_3_AI, confidence=0.75),
+        extracted_from="doc_001"
+    )
+    kg.add_entity(prop)
+
+    constellation = {"prop_001"}
+    hash1 = cache.calculate_graph_hash(constellation, kg)
+
+    kg.graph.nodes["prop_001"]["created_at"] = (datetime.now() + timedelta(days=1)).isoformat()
+    kg.graph.nodes["prop_001"]["updated_at"] = (datetime.now() + timedelta(days=1)).isoformat()
+
+    hash2 = cache.calculate_graph_hash(constellation, kg)
+
+    assert hash1 == hash2

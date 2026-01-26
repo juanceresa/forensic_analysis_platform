@@ -82,6 +82,8 @@ Focus on: who they are, what role they played, how they connect to the case.
         relations_str = "\n".join([
             f"- {r.get('type', 'UNKNOWN')}: {r.get('source', '?')} → {r.get('target', '?')}"
             f"{' (date: ' + r['date'] + ')' if r.get('date') else ''}"
+            f"{' [doc: ' + r['document_id'] + ']' if r.get('document_id') else ''}"
+            f"{' evidence: ' + r['evidence'] if r.get('evidence') else ''}"
             for r in relations
         ])
 

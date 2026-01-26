@@ -225,7 +225,7 @@ class NarrativeGenerator:
 
                 extracted_from = entity.get("extracted_from", "")
                 if extracted_from:
-                    documents.update(extracted_from.split(","))
+                    documents.update(doc.strip() for doc in extracted_from.split(",") if doc.strip())
 
             # Get relations
             rels = graph.get_relations(entity_id, direction="both")
@@ -248,7 +248,9 @@ class NarrativeGenerator:
                         "type": rel_type,
                         "source": source_entity.get("name", source) if source_entity else source,
                         "target": target_entity.get("name", target) if target_entity else target,
-                        "date": date
+                        "date": date,
+                        "document_id": rel.get("document_id") or rel.get("extracted_from"),
+                        "evidence": rel.get("evidence")
                     })
 
         return {
@@ -338,7 +340,7 @@ class NarrativeGenerator:
             if entity:
                 extracted_from = entity.get("extracted_from", "")
                 if extracted_from:
-                    unique_docs.update(extracted_from.split(","))
+                    unique_docs.update(doc.strip() for doc in extracted_from.split(",") if doc.strip())
 
         # Placeholder facts (narrative text contains inline citations)
         # In real implementation, would parse [①] markers and extract evidence
@@ -373,13 +375,16 @@ class NarrativeGenerator:
         name = entity.get("name", "Unknown")
         entity_type = entity.get("entity_type", "UNKNOWN")
         extracted_from = entity.get("extracted_from", "")
-        doc_count = len(extracted_from.split(",")) if extracted_from else 0
+        if extracted_from:
+            doc_count = len([doc for doc in extracted_from.split(",") if doc.strip()])
+        else:
+            doc_count = 0
 
         # Build context for simple prompt
         context = {
             "name": name,
             "type": entity_type,
-            "document": extracted_from.split(",")[0] if extracted_from else "unknown",
+            "document": extracted_from.split(",")[0].strip() if extracted_from else "unknown",
             "role": entity.get("profession") or entity.get("roles", [None])[0],
             "connections": []
         }

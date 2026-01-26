@@ -163,7 +163,7 @@ class ConstellationAnalyzer:
             if entity:
                 extracted_from = entity.get("extracted_from", "")
                 if extracted_from:
-                    docs = extracted_from.split(",")
+                    docs = [doc.strip() for doc in extracted_from.split(",") if doc.strip()]
                     unique_docs.update(docs)
 
         document_count = len(unique_docs)

@@ -26,7 +26,7 @@ def sample_graph():
         name="Villa Aurelia",
         entity_type=EntityType.PROPERTY,
         verification=Verification(tier=VerificationTier.TIER_2_ANALYST, confidence=0.92),
-        extracted_from="doc_001,doc_003"
+        extracted_from="doc_001, doc_003"
     )
     kg.add_entity(prop)
 
@@ -137,3 +137,4 @@ def test_build_graph_context_dedupes_relations(sample_graph):
     )
 
     assert len(context["relations"]) == 1
+    assert "document_id" in context["relations"][0]

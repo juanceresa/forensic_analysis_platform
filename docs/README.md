@@ -61,6 +61,7 @@ Context for recent updates in this session:
 - Extraction now passes document dates into relation temporal fallbacks and skips invalid relation types without dropping valid ones.
 - Graph export format is unified on `nodes` + `links`, with metadata carrying verification distribution, entity type summary, and date range.
 - Processing now persists extraction flags, validates extraction payloads, and validates exported `graph_data.json`.
+- Narrative prompts now include relation evidence/doc IDs, cache hashing ignores timestamps, and document IDs are normalized.
 
 ---
 
