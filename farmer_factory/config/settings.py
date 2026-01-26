@@ -42,8 +42,8 @@ class Settings(BaseSettings):
 
     # Model Configuration
     # NOTE: Anthropic requires explicit version dates, update these when new versions release
-    claude_model: str = "claude-3-5-haiku-20241022"  # Default to Haiku (cheap)
-    claude_model_retry: str = "claude-3-5-sonnet-20241022"  # Upgrade on retry
+    claude_model: str = "claude-haiku-4-5-20251001"  # Default to Haiku 4.5 (cheap)
+    claude_model_retry: str = "claude-sonnet-4-5-20250929"  # Upgrade on retry to Sonnet 4.5
 
     # API Limits
     max_retries: int = 3

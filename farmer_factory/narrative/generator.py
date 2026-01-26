@@ -203,7 +203,7 @@ class NarrativeGenerator:
         prompt = self.prompts.build_narrative_prompt(graph_context)
 
         # Call LLM
-        model_name = "claude-3-5-haiku-20241022" if model == "haiku" else "claude-3-5-sonnet-20241022"
+        model_name = "claude-haiku-4-5-20251001" if model == "haiku" else "claude-sonnet-4-5-20250929"
 
         narrative = self.api_client.call_with_retry(
             prompt=prompt,
@@ -417,7 +417,7 @@ class NarrativeGenerator:
 
         # Generate simple narrative
         prompt = self.prompts.build_simple_narrative_prompt(context)
-        model_name = "claude-3-5-haiku-20241022"
+        model_name = "claude-haiku-4-5-20251001"
 
         narrative = self.api_client.call_with_retry(
             prompt=prompt,
