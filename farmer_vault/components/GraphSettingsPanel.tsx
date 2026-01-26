@@ -89,7 +89,7 @@ export function GraphSettingsPanel({
       {/* Settings Panel with slide-in animation */}
       {isOpen && (
         <div
-          className="mt-3 rounded-xl bg-slate-900/98 border border-cyan-500/25 backdrop-blur-xl
+          className="mt-3 rounded-xl bg-slate-900/98 backdrop-blur-xl
             animate-slide-in motion-reduce:animate-none flex flex-col"
           role="region"
           aria-label="Graph settings panel"
@@ -97,7 +97,8 @@ export function GraphSettingsPanel({
             animation: 'slideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
             width: 'var(--graph-controls-width)',
             maxHeight: 'calc(100vh - 120px)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(110, 219, 227, 0.12) inset, 0 0 32px rgba(6, 182, 212, 0.2)',
+            border: '1px solid rgba(110, 219, 227, 0.18)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(110, 219, 227, 0.08) inset, 0 0 32px rgba(6, 182, 212, 0.15)',
             pointerEvents: 'auto'
           }}
         >
@@ -264,7 +265,7 @@ function SettingsSlider({ label, value, onChange, range }: SettingsSliderProps) 
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <label htmlFor={sliderId} className="text-xs text-slate-400">{label}</label>
         <span
@@ -283,8 +284,12 @@ function SettingsSlider({ label, value, onChange, range }: SettingsSliderProps) 
         step={range.step}
         value={value}
         onChange={(e) => handleChange(parseFloat(e.target.value))}
-        className="w-full h-1.5 bg-slate-800/80 rounded-full appearance-none cursor-pointer
+        style={{ pointerEvents: 'auto' }}
+        className="block w-full h-2 bg-slate-800 rounded-full appearance-none cursor-pointer
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
+          [&::-webkit-slider-runnable-track]:h-2
+          [&::-webkit-slider-runnable-track]:bg-slate-800
+          [&::-webkit-slider-runnable-track]:rounded-full
           [&::-webkit-slider-thumb]:appearance-none
           [&::-webkit-slider-thumb]:w-4
           [&::-webkit-slider-thumb]:h-4
@@ -300,6 +305,10 @@ function SettingsSlider({ label, value, onChange, range }: SettingsSliderProps) 
           [&::-webkit-slider-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,0.9),0_3px_6px_rgba(0,0,0,0.4)]
           [&::-webkit-slider-thumb]:active:scale-115
           [&::-webkit-slider-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.5)]
+          [&::-moz-range-track]:h-2
+          [&::-moz-range-track]:bg-slate-800
+          [&::-moz-range-track]:rounded-full
+          [&::-moz-range-track]:border-0
           [&::-moz-range-thumb]:w-4
           [&::-moz-range-thumb]:h-4
           [&::-moz-range-thumb]:rounded-full
