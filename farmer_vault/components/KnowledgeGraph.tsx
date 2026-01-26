@@ -127,8 +127,8 @@ export function KnowledgeGraph({
 
       // Calculate size based on number of connections (hub nodes are larger)
       const degree = nodeDegrees.get(nodeId) || 0;
-      const baseSize = 2;
-      const size = baseSize + Math.sqrt(degree) * 0.8;
+      // More dramatic scaling: tiny leaf nodes (1.5px) to large hubs (10-12px)
+      const size = 1.5 + Math.pow(degree, 0.6) * 1.2;
 
       ctx.save();
 
@@ -167,7 +167,7 @@ export function KnowledgeGraph({
   // Custom link color - highlight constellation links
   const getLinkColor = useCallback(
     (link: any) => {
-      if (!selectedNodeId) return '#1a1a1a';
+      if (!selectedNodeId) return '#0a0a0a';
 
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
@@ -176,7 +176,7 @@ export function KnowledgeGraph({
         return '#06B6D4'; // Cyan for constellation links
       }
 
-      return '#1a1a1a'; // Very dark gray for non-constellation
+      return '#0a0a0a'; // Almost invisible for non-constellation
     },
     [selectedNodeId, constellationNodes]
   );
@@ -184,16 +184,16 @@ export function KnowledgeGraph({
   // Custom link width - make constellation links thicker
   const getLinkWidth = useCallback(
     (link: any) => {
-      if (!selectedNodeId) return 0.5;
+      if (!selectedNodeId) return 0.3;
 
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
 
       if (constellationNodes.has(sourceId) && constellationNodes.has(targetId)) {
-        return 2; // Thicker for constellation
+        return 1.5; // Thicker for constellation
       }
 
-      return 0.5; // Thin default
+      return 0.3; // Almost invisible default
     },
     [selectedNodeId, constellationNodes]
   );
