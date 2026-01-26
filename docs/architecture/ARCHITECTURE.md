@@ -52,7 +52,7 @@ The system is strictly divided into two zones to manage liability:
 │                                                                     │
 │  • Digital dossier — READ ONLY (families cannot upload/edit/delete)│
 │  • Analysts CAN verify (promote TIER_3_AI → TIER_2_ANALYST)        │
-│  • "Palantir meets Obsidian" aesthetic                              │
+│  • Intelligence-grade evidence map aesthetic                        │
 │                                                                     │
 │  Tech: Next.js 14 (App Router), Tailwind CSS, react-force-graph-2d  │
 └─────────────────────────────────────────────────────────────────────┘
@@ -252,7 +252,7 @@ In MVP1:
 │                      VAULT RENDERING                                │
 │                                                                     │
 │   • API route fetches graph from Supabase Storage (with RLS check) │
-│   • Force-directed graph (Obsidian style)                          │
+│   • Force-directed graph (evidence map style)                      │
 │   • Node colors by verification tier                               │
 │   • Right-side dossier panel on click                              │
 │   • Analyst review panel (promote to TIER_2_ANALYST)               │
@@ -285,7 +285,7 @@ In MVP1:
 |-----------|------------|-----------|
 | Framework | Next.js 14 (App Router) | Static export, modern React |
 | Styling | Tailwind CSS | Rapid prototyping, dark mode support |
-| Graph Visualization | react-force-graph-2d | Obsidian-style physics-based layout |
+| Graph Visualization | react-force-graph-2d | Force-directed physics-based layout |
 | State Management | None (static data) | Read-only, no client state needed |
 | Deployment (MVP1) | Local | No Vercel/Supabase until MVP2 |
 
@@ -647,7 +647,7 @@ output/
 - [x] Entity and relation extraction via Anthropic Claude
 - [x] NetworkX graph construction
 - [x] JSON export for frontend
-- [x] Next.js frontend with Obsidian-style graph
+- [x] Next.js frontend with force-directed graph
 - [x] Dossier panel with source viewer
 - [x] CLI interface for pipeline execution
 

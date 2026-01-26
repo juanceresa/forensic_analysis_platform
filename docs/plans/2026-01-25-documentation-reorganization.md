@@ -363,7 +363,7 @@ You are building the **Civic Table** platform — a Forensic Intelligence servic
 - **Civic Table LLC** — Primary brand, client-facing service, platform owner
 - **Farmer House** — Methodology developer, optional institutional verifier
 
-Think "Palantir for Cuban exile land deeds" meets "academic rigor meets commercial implementation."
+Think "intelligence-grade evidence platform for Cuban exile land deeds" meets "academic rigor meets commercial implementation."
 
 ---
 

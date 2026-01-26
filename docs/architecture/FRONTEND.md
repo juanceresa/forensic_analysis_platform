@@ -14,8 +14,8 @@ Zone B (The Vault) is the client-facing read-only interface for viewing forensic
 **Core Principles:**
 - **Read-Only**: No uploads, edits, or deletions
 - **Static**: Data is pre-generated; no backend processing
-- **Obsidian-Style**: Force-directed graph with node detail panel
-- **Palantir Aesthetic**: Dark mode, monospace, high-stakes professional
+- **Evidence Map Style**: Force-directed graph with node detail panel
+- **Intelligence Aesthetic**: Dark mode, monospace, high-stakes professional
 - **Performance-First**: Optimized for graphs with 1,000+ nodes
 
 **Graph Data Contract (Aligned to `graph_data.json`):**
@@ -843,7 +843,7 @@ export function KnowledgeGraph({
         linkDirectionalArrowRelPos={1}
         onNodeClick={(node) => onNodeClick(node as Node)}
         backgroundColor="#0F172A"
-        // Physics settings for Obsidian-like feel
+        // Physics settings for a force-directed layout feel
         d3VelocityDecay={0.3}
         d3AlphaDecay={0.02}
         warmupTicks={100}

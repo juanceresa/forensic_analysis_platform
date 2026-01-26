@@ -115,7 +115,7 @@ body {
 }
 
 /* Graph theme hooks for class-based styling */
-.graph-view {
+.vault-graph {
   color: var(--graph-node);
   background:
     radial-gradient(1400px 900px at 55% 18%, rgba(18, 28, 38, 0.75), transparent 68%),
@@ -126,8 +126,8 @@ body {
   will-change: transform;
 }
 
-.graph-view::before,
-.graph-view::after {
+.vault-graph::before,
+.vault-graph::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -135,7 +135,7 @@ body {
   transform: translateZ(0);
 }
 
-.graph-view::before {
+.vault-graph::before {
   z-index: 0;
   background:
     radial-gradient(700px 450px at 68% 12%, rgba(110, 219, 227, 0.095), transparent 62%),
@@ -143,7 +143,7 @@ body {
   animation: drift-slow 40s ease-in-out infinite alternate;
 }
 
-.graph-view::after {
+.vault-graph::after {
   z-index: 2;
   opacity: 0.06;
   background-image:
@@ -152,7 +152,7 @@ body {
   mix-blend-mode: soft-light;
 }
 
-.graph-view canvas {
+.vault-graph canvas {
   position: relative;
   z-index: 1;
   /* Enable hardware acceleration for canvas */
@@ -175,40 +175,40 @@ body {
   }
 }
 
-.graph-view.color-fill {
+.vault-graph.color-fill {
   color: var(--graph-node);
 }
 
-.graph-view.color-fill-focused {
+.vault-graph.color-fill-focused {
   color: var(--graph-node-focused);
 }
 
-.graph-view.color-fill-tag {
+.vault-graph.color-fill-tag {
   color: var(--graph-node-tag);
 }
 
-.graph-view.color-fill-attachment {
+.vault-graph.color-fill-attachment {
   color: var(--graph-node-attachment);
 }
 
-.graph-view.color-fill-unresolved {
+.vault-graph.color-fill-unresolved {
   color: var(--graph-node-unresolved);
 }
 
-.graph-view.color-line {
+.vault-graph.color-line {
   color: var(--graph-line);
 }
 
-.graph-view.color-text {
+.vault-graph.color-text {
   color: var(--graph-text);
 }
 
-.graph-view.color-line-highlight,
-.graph-view.color-fill-highlight {
+.vault-graph.color-line-highlight,
+.vault-graph.color-fill-highlight {
   color: var(--graph-line-highlight);
 }
 
-.graph-controls {
+.vault-graph-controls {
   width: var(--graph-controls-width);
 }
 

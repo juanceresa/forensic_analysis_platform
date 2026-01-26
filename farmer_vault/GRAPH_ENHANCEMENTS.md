@@ -117,7 +117,7 @@ ctx.shadowOffsetY = 1;
 
 ## Future Enhancements (Optional)
 
-- **WebGL renderer**: Consider migrating to Pixi.js for even better performance
+- **WebGL renderer**: Consider migrating to a WebGL-based renderer for better performance
 - **Particle effects**: Add subtle particles around highly-connected nodes
 - **Custom cursors**: Context-aware cursor changes
 - **Minimap**: Overview panel for large graphs

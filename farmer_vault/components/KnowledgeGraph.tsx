@@ -610,7 +610,7 @@ export function KnowledgeGraph({
   return (
     <div
       ref={containerRef}
-      className="graph-view w-full h-full relative overflow-hidden"
+      className="vault-graph w-full h-full relative overflow-hidden"
       role="application"
       aria-label="Knowledge graph visualization of entities and relationships"
       style={{ zIndex: 0 }}
