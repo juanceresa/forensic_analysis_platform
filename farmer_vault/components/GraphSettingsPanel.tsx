@@ -285,45 +285,52 @@ function SettingsSlider({ label, value, onChange, range }: SettingsSliderProps) 
         value={value}
         onChange={(e) => handleChange(parseFloat(e.target.value))}
         style={{ pointerEvents: 'auto' }}
-        className="block w-full h-2 bg-slate-800 rounded-full appearance-none cursor-pointer
+        className="block w-full h-2 rounded-full appearance-none cursor-pointer bg-transparent
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
           [&::-webkit-slider-runnable-track]:h-2
           [&::-webkit-slider-runnable-track]:bg-slate-800
           [&::-webkit-slider-runnable-track]:rounded-full
+          [&::-webkit-slider-runnable-track]:border
+          [&::-webkit-slider-runnable-track]:border-slate-700/40
           [&::-webkit-slider-thumb]:appearance-none
+          [&::-webkit-slider-thumb]:-mt-1
           [&::-webkit-slider-thumb]:w-4
           [&::-webkit-slider-thumb]:h-4
           [&::-webkit-slider-thumb]:rounded-full
-          [&::-webkit-slider-thumb]:bg-gradient-to-br
-          [&::-webkit-slider-thumb]:from-cyan-400
-          [&::-webkit-slider-thumb]:to-cyan-500
-          [&::-webkit-slider-thumb]:shadow-[0_0_12px_rgba(6,182,212,0.7),0_2px_4px_rgba(0,0,0,0.3)]
-          [&::-webkit-slider-thumb]:cursor-pointer
+          [&::-webkit-slider-thumb]:bg-cyan-400
+          [&::-webkit-slider-thumb]:border-2
+          [&::-webkit-slider-thumb]:border-cyan-300
+          [&::-webkit-slider-thumb]:shadow-[0_0_12px_rgba(6,182,212,0.8),0_2px_4px_rgba(0,0,0,0.4)]
+          [&::-webkit-slider-thumb]:cursor-grab
           [&::-webkit-slider-thumb]:transition-all
-          [&::-webkit-slider-thumb]:duration-200
+          [&::-webkit-slider-thumb]:duration-150
           [&::-webkit-slider-thumb]:hover:scale-110
-          [&::-webkit-slider-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,0.9),0_3px_6px_rgba(0,0,0,0.4)]
+          [&::-webkit-slider-thumb]:hover:bg-cyan-300
+          [&::-webkit-slider-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,1),0_3px_6px_rgba(0,0,0,0.5)]
+          [&::-webkit-slider-thumb]:active:cursor-grabbing
           [&::-webkit-slider-thumb]:active:scale-115
-          [&::-webkit-slider-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.5)]
+          [&::-webkit-slider-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.6)]
           [&::-moz-range-track]:h-2
           [&::-moz-range-track]:bg-slate-800
           [&::-moz-range-track]:rounded-full
-          [&::-moz-range-track]:border-0
+          [&::-moz-range-track]:border
+          [&::-moz-range-track]:border-slate-700/40
           [&::-moz-range-thumb]:w-4
           [&::-moz-range-thumb]:h-4
           [&::-moz-range-thumb]:rounded-full
-          [&::-moz-range-thumb]:bg-gradient-to-br
-          [&::-moz-range-thumb]:from-cyan-400
-          [&::-moz-range-thumb]:to-cyan-500
-          [&::-moz-range-thumb]:border-0
-          [&::-moz-range-thumb]:shadow-[0_0_12px_rgba(6,182,212,0.7),0_2px_4px_rgba(0,0,0,0.3)]
-          [&::-moz-range-thumb]:cursor-pointer
+          [&::-moz-range-thumb]:bg-cyan-400
+          [&::-moz-range-thumb]:border-2
+          [&::-moz-range-thumb]:border-cyan-300
+          [&::-moz-range-thumb]:shadow-[0_0_12px_rgba(6,182,212,0.8),0_2px_4px_rgba(0,0,0,0.4)]
+          [&::-moz-range-thumb]:cursor-grab
           [&::-moz-range-thumb]:transition-all
-          [&::-moz-range-thumb]:duration-200
+          [&::-moz-range-thumb]:duration-150
           [&::-moz-range-thumb]:hover:scale-110
-          [&::-moz-range-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,0.9),0_3px_6px_rgba(0,0,0,0.4)]
+          [&::-moz-range-thumb]:hover:bg-cyan-300
+          [&::-moz-range-thumb]:hover:shadow-[0_0_18px_rgba(6,182,212,1),0_3px_6px_rgba(0,0,0,0.5)]
+          [&::-moz-range-thumb]:active:cursor-grabbing
           [&::-moz-range-thumb]:active:scale-115
-          [&::-moz-range-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.5)]
+          [&::-moz-range-thumb]:active:shadow-[0_0_24px_rgba(6,182,212,1),0_4px_8px_rgba(0,0,0,0.6)]
         "
         aria-label={`${label} slider`}
         aria-valuemin={range.min}
