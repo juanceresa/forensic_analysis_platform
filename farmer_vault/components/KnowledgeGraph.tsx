@@ -572,8 +572,11 @@ export function KnowledgeGraph({
           const targetDegree = nodeDegrees.get(targetId) || 0;
           const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
           const scale = typeof globalScale === 'number' && globalScale > 0 ? Math.min(1.2, 1 / globalScale) : 1;
-          const arrowLength = 6 * scale;
-          const arrowWidth = 3.5 * scale;
+
+          // Arrow size scales with link width
+          const arrowLength = width * 3 * scale;
+          const arrowWidth = width * 1.75 * scale;
+
           const arrowTipX = target.x - unitX * (targetSize + 3);
           const arrowTipY = target.y - unitY * (targetSize + 3);
           const baseX = arrowTipX - unitX * arrowLength;
