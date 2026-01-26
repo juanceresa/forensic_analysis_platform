@@ -51,11 +51,11 @@ export function GraphSettingsPanel({
         onClick={() => setIsOpen(!isOpen)}
         className={`
           flex items-center justify-center w-11 h-11 rounded-xl
-          bg-slate-900/98 border transition-all duration-300 backdrop-blur-md
+          bg-slate-900/80 backdrop-blur-md transition-all duration-300
           ${
             isOpen
-              ? 'border-cyan-500/60 shadow-[0_0_24px_rgba(6,182,212,0.35),0_0_4px_rgba(6,182,212,0.2)_inset] scale-105'
-              : 'border-slate-700/60 hover:border-cyan-500/40 hover:shadow-[0_0_16px_rgba(6,182,212,0.15)] hover:scale-102'
+              ? 'shadow-[0_0_24px_rgba(6,182,212,0.4),0_0_6px_rgba(6,182,212,0.3)_inset] scale-105'
+              : 'hover:shadow-[0_0_16px_rgba(6,182,212,0.2)] hover:scale-102'
           }
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
         `}
@@ -89,7 +89,7 @@ export function GraphSettingsPanel({
       {/* Settings Panel with slide-in animation */}
       {isOpen && (
         <div
-          className="mt-3 rounded-xl bg-slate-900/98 backdrop-blur-xl
+          className="mt-3 rounded-xl bg-slate-900/75 backdrop-blur-xl
             animate-slide-in motion-reduce:animate-none flex flex-col"
           role="region"
           aria-label="Graph settings panel"
@@ -97,8 +97,7 @@ export function GraphSettingsPanel({
             animation: 'slideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
             width: 'var(--graph-controls-width)',
             maxHeight: 'calc(100vh - 120px)',
-            border: '1px solid rgba(110, 219, 227, 0.18)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(110, 219, 227, 0.08) inset, 0 0 32px rgba(6, 182, 212, 0.15)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(110, 219, 227, 0.06) inset, 0 0 32px rgba(6, 182, 212, 0.12)',
             pointerEvents: 'auto'
           }}
         >
