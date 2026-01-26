@@ -167,7 +167,7 @@ export function KnowledgeGraph({
   // Custom link color - highlight constellation links
   const getLinkColor = useCallback(
     (link: any) => {
-      if (!selectedNodeId) return '#0a0a0a';
+      if (!selectedNodeId) return '#2a2a2a';
 
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
@@ -176,7 +176,7 @@ export function KnowledgeGraph({
         return '#06B6D4'; // Cyan for constellation links
       }
 
-      return '#0a0a0a'; // Almost invisible for non-constellation
+      return '#2a2a2a'; // Subtle dark gray for non-constellation
     },
     [selectedNodeId, constellationNodes]
   );
@@ -214,7 +214,7 @@ export function KnowledgeGraph({
         nodeLabel={(node: any) => `${node.name || node.id} (${node.entity_type})`}
         linkColor={getLinkColor as any}
         linkWidth={getLinkWidth as any}
-        backgroundColor="#000000"
+        backgroundColor="#1a1a1a"
         onNodeClick={handleNodeClick as any}
         nodeCanvasObjectMode={() => 'replace'}
         nodeCanvasObject={nodeCanvasObject}
