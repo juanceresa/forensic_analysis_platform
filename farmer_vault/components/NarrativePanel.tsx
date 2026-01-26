@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { NarrativeResult } from '@/lib/types';
 
 interface NarrativePanelProps {
@@ -16,16 +16,27 @@ export function NarrativePanel({
 }: NarrativePanelProps) {
   const [expandedCitations, setExpandedCitations] = useState<Set<number>>(new Set());
   const [displayedText, setDisplayedText] = useState('');
+  const animatedNarrativeRef = useRef<string | null>(null);
 
-  // FEATURE: Typewriter effect for narrative generation
+  // FEATURE: Typewriter effect for narrative generation (fast, one-time only)
   useEffect(() => {
     if (!narrative?.main_narrative) {
       setDisplayedText('');
+      animatedNarrativeRef.current = null;
       return;
     }
 
-    let index = 0;
     const text = narrative.main_narrative;
+
+    // Skip animation if we've already animated this exact narrative
+    if (animatedNarrativeRef.current === text) {
+      setDisplayedText(text);
+      return;
+    }
+
+    // Animate new narrative
+    animatedNarrativeRef.current = text;
+    let index = 0;
     const interval = setInterval(() => {
       if (index < text.length) {
         setDisplayedText(text.slice(0, index + 1));
@@ -33,7 +44,7 @@ export function NarrativePanel({
       } else {
         clearInterval(interval);
       }
-    }, 20); // Typewriter speed
+    }, 5); // Fast typewriter speed (4x faster than before)
 
     return () => clearInterval(interval);
   }, [narrative?.main_narrative]);
