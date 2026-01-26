@@ -127,8 +127,8 @@ export function KnowledgeGraph({
 
       // Calculate size based on number of connections (hub nodes are larger)
       const degree = nodeDegrees.get(nodeId) || 0;
-      // More dramatic scaling: tiny leaf nodes (1.5px) to large hubs (10-12px)
-      const size = 1.5 + Math.pow(degree, 0.6) * 1.2;
+      // Dramatic scaling: leaf nodes clearly visible (2.5-4.5px), large hubs (15-20px+)
+      const size = 2.5 + Math.pow(degree, 0.65) * 2;
 
       ctx.save();
 
