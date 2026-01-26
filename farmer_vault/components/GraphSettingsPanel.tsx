@@ -20,7 +20,7 @@ export function GraphSettingsPanel({
   onReset,
 }: GraphSettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'layout' | 'colors'>('layout');
+  const [activeTab, setActiveTab] = useState<'layout' | 'colors' | 'filters'>('layout');
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Click-outside-to-close behavior
@@ -141,6 +141,17 @@ export function GraphSettingsPanel({
             >
               Colors
             </button>
+            <button
+              onClick={() => setActiveTab('filters')}
+              className={`flex-1 px-4 py-2 text-xs uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                activeTab === 'filters'
+                  ? 'text-cyan-300 border-b-2 border-cyan-400'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              aria-pressed={activeTab === 'filters'}
+            >
+              Filters
+            </button>
           </div>
 
           {/* Settings Sections - Scrollable */}
@@ -217,7 +228,7 @@ export function GraphSettingsPanel({
                   </div>
                 </section>
               </>
-            ) : (
+            ) : activeTab === 'colors' ? (
               <section className="graph-control-section">
                 <h4 className="graph-control-section-header text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-2 border-b border-slate-800/50">
                   Entity Colors
@@ -259,6 +270,71 @@ export function GraphSettingsPanel({
                 })}
                 </div>
               </section>
+            ) : (
+              <>
+                {/* Entity Types Section */}
+                <section className="graph-control-section">
+                  <h4 className="graph-control-section-header text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-2 border-b border-slate-800/50">
+                    Entity Types
+                  </h4>
+                  <div className="space-y-3">
+                    {Object.entries(settings.entityTypeFilters).map(([entityType, isVisible]) => (
+                      <div key={entityType} className="flex items-center justify-between">
+                        <label htmlFor={`filter-${entityType.toLowerCase()}`} className="text-xs text-slate-400">
+                          {entityType}
+                        </label>
+                        <button
+                          id={`filter-${entityType.toLowerCase()}`}
+                          role="switch"
+                          aria-checked={isVisible}
+                          onClick={() =>
+                            onUpdateSetting('entityTypeFilters', {
+                              ...settings.entityTypeFilters,
+                              [entityType]: !isVisible,
+                            })
+                          }
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                            isVisible ? 'bg-cyan-500' : 'bg-slate-700'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${
+                              isVisible ? 'translate-x-5' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Visibility Section */}
+                <section className="graph-control-section">
+                  <h4 className="graph-control-section-header text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-2 border-b border-slate-800/50">
+                    Visibility
+                  </h4>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="hide-orphans-toggle" className="text-xs text-slate-400">
+                      {SETTING_LABELS.hideOrphans}
+                    </label>
+                    <button
+                      id="hide-orphans-toggle"
+                      role="switch"
+                      aria-checked={settings.hideOrphans}
+                      onClick={() => onUpdateSetting('hideOrphans', !settings.hideOrphans)}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                        settings.hideOrphans ? 'bg-cyan-500' : 'bg-slate-700'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${
+                          settings.hideOrphans ? 'translate-x-5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </section>
+              </>
             )}
           </div>
         </div>

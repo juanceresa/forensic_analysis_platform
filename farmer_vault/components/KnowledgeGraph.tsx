@@ -79,6 +79,43 @@ export function KnowledgeGraph({
     return degrees;
   }, [data.nodes, data.links]);
 
+  // Filter data based on settings
+  const filteredData: GraphData = useMemo(() => {
+    // Filter nodes by entity type and orphan status
+    const visibleNodes = data.nodes.filter(node => {
+      // Check entity type filter
+      if (!settings.entityTypeFilters[node.entity_type]) {
+        return false;
+      }
+
+      // Check orphan filter
+      if (settings.hideOrphans) {
+        const degree = nodeDegrees.get(node.id) || 0;
+        if (degree === 0) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Create set of visible node IDs for quick lookup
+    const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+
+    // Filter links where both source and target are visible
+    const visibleLinks = data.links.filter(link => {
+      const sourceId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+      const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
+
+    return {
+      metadata: data.metadata,
+      nodes: visibleNodes,
+      links: visibleLinks,
+    };
+  }, [data.metadata, data.nodes, data.links, settings.entityTypeFilters, settings.hideOrphans, nodeDegrees]);
+
   useLayoutEffect(() => {
     if (!containerRef.current) {
       return;
@@ -153,7 +190,7 @@ export function KnowledgeGraph({
       if (processed.has(currentId)) continue;
       processed.add(currentId);
 
-      data.links.forEach((link) => {
+      filteredData.links.forEach((link: any) => {
         if (link.source === currentId || (typeof link.source === 'object' && (link.source as any).id === currentId)) {
           const targetId = typeof link.target === 'string' ? link.target : (link.target as any).id;
           if (!constellation.has(targetId)) {
@@ -172,7 +209,7 @@ export function KnowledgeGraph({
     }
 
     return constellation;
-  }, [selectedNodeId, data.links]);
+  }, [selectedNodeId, filteredData.links]);
 
   const hoveredNodeSet = useMemo(() => {
     if (!hoveredNodeId) {
@@ -180,7 +217,7 @@ export function KnowledgeGraph({
     }
 
     const connected = new Set<string>([hoveredNodeId]);
-    data.links.forEach((link) => {
+    filteredData.links.forEach((link: any) => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
       if (sourceId === hoveredNodeId && targetId) {
@@ -192,7 +229,7 @@ export function KnowledgeGraph({
     });
 
     return connected;
-  }, [hoveredNodeId, data.links]);
+  }, [hoveredNodeId, filteredData.links]);
 
   const selectedNodeSet = useMemo(() => {
     if (!selectedNodeId) {
@@ -200,7 +237,7 @@ export function KnowledgeGraph({
     }
 
     const connected = new Set<string>([selectedNodeId]);
-    data.links.forEach((link) => {
+    filteredData.links.forEach((link: any) => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
       if (sourceId === selectedNodeId && targetId) {
@@ -212,7 +249,7 @@ export function KnowledgeGraph({
     });
 
     return connected;
-  }, [selectedNodeId, data.links]);
+  }, [selectedNodeId, filteredData.links]);
 
   const activeNodeSet = selectedNodeSet ?? hoveredNodeSet;
   const activeAlpha = selectedNodeId ? selectedAlpha : hoverAlpha;
@@ -282,8 +319,7 @@ export function KnowledgeGraph({
       settings.repelForce === DEFAULT_SETTINGS.repelForce &&
       settings.linkForce === DEFAULT_SETTINGS.linkForce &&
       settings.nodeSizeMultiplier === DEFAULT_SETTINGS.nodeSizeMultiplier &&
-      settings.linkWidth === DEFAULT_SETTINGS.linkWidth &&
-      settings.constellationLinkWidth === DEFAULT_SETTINGS.constellationLinkWidth;
+      settings.linkWidth === DEFAULT_SETTINGS.linkWidth;
 
     if (resetToDefaults && graphRef.current) {
       graphRef.current.zoomToFit(400, 60);
@@ -551,7 +587,7 @@ export function KnowledgeGraph({
       const isSelected = selectedNodeId && (sourceId === selectedNodeId || targetId === selectedNodeId);
       const isHovered = hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId);
 
-      const width = getLinkWidth(link);
+      const width = getLinkWidth();
       const color = getLinkColor(link);
 
       ctx.save();
@@ -634,7 +670,7 @@ export function KnowledgeGraph({
     >
       <ForceGraph2D
         ref={graphRef}
-        graphData={data as any}
+        graphData={filteredData as any}
         width={dimensions.width || undefined}
         height={dimensions.height || undefined}
         nodeColor={((node: any) => getNodeColor(node, settings.entityColors)) as any}

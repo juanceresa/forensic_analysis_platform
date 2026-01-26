@@ -23,6 +23,10 @@ export interface GraphSettings {
   // Color Settings
   entityColors: EntityColorMap;
   linkColor: string;            // Base link color
+
+  // Filter Settings
+  entityTypeFilters: Record<EntityType, boolean>; // true = visible
+  hideOrphans: boolean;         // Hide nodes with no connections
 }
 
 export const DEFAULT_SETTINGS: GraphSettings = {
@@ -45,6 +49,16 @@ export const DEFAULT_SETTINGS: GraphSettings = {
     DOCUMENT: '#64748b',
   },
   linkColor: '#ffffff',
+
+  // Filters
+  entityTypeFilters: {
+    PERSON: true,
+    LOCATION: true,
+    PROPERTY: true,
+    ORGANIZATION: true,
+    DOCUMENT: true,
+  },
+  hideOrphans: false,
 };
 
 export interface SettingRange {
@@ -67,6 +81,10 @@ export const SETTINGS_RANGES: Record<keyof GraphSettings, SettingRange> = {
   // Colors (not used by sliders)
   entityColors: { min: 0, max: 0, step: 0 },
   linkColor: { min: 0, max: 0, step: 0 },
+
+  // Filters (not used by sliders)
+  entityTypeFilters: { min: 0, max: 0, step: 0 },
+  hideOrphans: { min: 0, max: 1, step: 1 }, // Boolean toggle
 };
 
 export const SETTING_LABELS: Record<keyof GraphSettings, string> = {
@@ -78,6 +96,8 @@ export const SETTING_LABELS: Record<keyof GraphSettings, string> = {
   linkForce: 'Link Distance',
   entityColors: 'Entity Colors',
   linkColor: 'Link Color',
+  entityTypeFilters: 'Entity Type Filters',
+  hideOrphans: 'Hide Orphans',
 };
 
 export const SETTING_DESCRIPTIONS: Record<keyof GraphSettings, string> = {
@@ -89,4 +109,6 @@ export const SETTING_DESCRIPTIONS: Record<keyof GraphSettings, string> = {
   linkForce: 'Target distance between connected nodes',
   entityColors: 'Custom colors for entity types',
   linkColor: 'Base color for connection lines',
+  entityTypeFilters: 'Control visibility of entity types',
+  hideOrphans: 'Hide nodes with no connections',
 };
