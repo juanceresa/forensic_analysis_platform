@@ -5,6 +5,7 @@ import type { GraphData, BaseNode } from '@/lib/types';
 import { Header } from '@/components/Header';
 import { KnowledgeGraph } from '@/components/KnowledgeGraph';
 import { EntitySidebar } from '@/components/EntitySidebar';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 type TabType = 'details' | 'narrative';
 
@@ -20,31 +21,33 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
   const selectedNode = initialData.nodes.find((n) => n.id === selectedNodeId) || null;
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950">
-      <Header graphData={initialData} caseId={caseId} />
+    <ErrorBoundary>
+      <div className="h-screen flex flex-col bg-slate-950">
+        <Header graphData={initialData} caseId={caseId} />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Graph (flexible width) */}
-        <div className="flex-1">
-          <KnowledgeGraph
-            data={initialData}
-            selectedNodeId={selectedNodeId}
-            onNodeClick={(node: BaseNode) => {
-              setSelectedNodeId(node.id);
-              setActiveTab('details'); // Reset to details on new selection
-            }}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: Graph (flexible width) */}
+          <div className="flex-1">
+            <KnowledgeGraph
+              data={initialData}
+              selectedNodeId={selectedNodeId}
+              onNodeClick={(node: BaseNode) => {
+                setSelectedNodeId(node.id);
+                setActiveTab('details'); // Reset to details on new selection
+              }}
+            />
+          </div>
+
+          {/* Right: Tabbed Sidebar (500px fixed) */}
+          <EntitySidebar
+            selectedNode={selectedNode}
+            graphData={initialData}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            caseId={caseId}
           />
         </div>
-
-        {/* Right: Tabbed Sidebar (500px fixed) */}
-        <EntitySidebar
-          selectedNode={selectedNode}
-          graphData={initialData}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          caseId={caseId}
-        />
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
