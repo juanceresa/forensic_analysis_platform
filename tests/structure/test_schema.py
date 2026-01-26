@@ -438,7 +438,15 @@ def test_graph_export():
         factory_version="1.0.0",
         entity_count=2,
         relation_count=1,
-        document_count=1
+        document_count=1,
+        verification_distribution={"TIER_3_AI": 3},
+        entity_type_summary={"PERSON": 1, "PROPERTY": 1},
+        date_range={
+            "earliest_document": "1958-01-01",
+            "latest_document": "1958-12-31",
+            "earliest_event": "1958-01-01",
+            "latest_event": "1958-12-31"
+        }
     )
 
     export = GraphExport(
@@ -450,17 +458,15 @@ def test_graph_export():
                 "name": "Test Person"
             }
         ],
-        edges=[
+        links=[
             {
                 "source": "person_123",
                 "target": "property_456",
                 "relation_type": "OWNS"
             }
-        ],
-        verification_summary={"TIER_3_AI": 3},
-        entity_type_summary={"PERSON": 1, "PROPERTY": 1}
+        ]
     )
 
     assert len(export.nodes) == 1
-    assert len(export.edges) == 1
-    assert export.verification_summary["TIER_3_AI"] == 3
+    assert len(export.links) == 1
+    assert export.metadata.verification_distribution["TIER_3_AI"] == 3

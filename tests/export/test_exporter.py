@@ -69,13 +69,11 @@ def test_export_to_dict():
 
     assert "metadata" in data
     assert "nodes" in data
-    assert "edges" in data
-    assert "verification_summary" in data
-    assert "entity_type_summary" in data
+    assert "links" in data
 
     assert data["metadata"]["case_id"] == "case_001"
     assert len(data["nodes"]) == 2
-    assert len(data["edges"]) == 1
+    assert len(data["links"]) == 1
 
 
 def test_export_to_json(tmp_path):
@@ -128,8 +126,8 @@ def test_verification_summary():
     exporter = GraphExporter(kg)
     data = exporter.export_to_dict(factory_version="1.0.0")
 
-    assert data["verification_summary"]["TIER_3_AI"] == 2
-    assert data["verification_summary"]["TIER_2_ANALYST"] == 1
+    assert data["metadata"]["verification_distribution"]["TIER_3_AI"] == 2
+    assert data["metadata"]["verification_distribution"]["TIER_2_ANALYST"] == 1
 
 
 def test_entity_type_summary():
@@ -163,5 +161,5 @@ def test_entity_type_summary():
     exporter = GraphExporter(kg)
     data = exporter.export_to_dict(factory_version="1.0.0")
 
-    assert data["entity_type_summary"]["PERSON"] == 1
-    assert data["entity_type_summary"]["PROPERTY"] == 1
+    assert data["metadata"]["entity_type_summary"]["PERSON"] == 1
+    assert data["metadata"]["entity_type_summary"]["PROPERTY"] == 1

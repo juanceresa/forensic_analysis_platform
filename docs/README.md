@@ -53,6 +53,16 @@ Implementation-level documentation:
 
 ---
 
+## Recent Changes
+
+Context for recent updates in this session:
+- Narrative API now loads `graph_data.json`, and relation counting/model selection uses unique edges.
+- Knowledge graph supports multiple relations between the same nodes (multi-edge) and cache invalidation hashes full graph state.
+- Extraction now passes document dates into relation temporal fallbacks and skips invalid relation types without dropping valid ones.
+- Graph export format is unified on `nodes` + `links`, with metadata carrying verification distribution, entity type summary, and date range.
+
+---
+
 ## Implementation Plans
 
 Dated design and implementation documents:

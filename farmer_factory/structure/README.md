@@ -102,6 +102,8 @@ class Property(BaseEntity):
 #### Export Models
 - `GraphMetadata` - Statistics and processing info
 - `GraphExport` - Force-graph format for visualization
+  - Export uses top-level `nodes` + `links`, with `metadata` carrying
+    `verification_distribution`, `entity_type_summary`, and `date_range`
 
 ---
 
@@ -123,6 +125,10 @@ kg.add_relation(owns_relation)
 entity = kg.get_entity("person_123")
 relations = kg.get_relations("person_123", direction="outgoing")
 ```
+
+**Notes:**
+- Graph uses a multi-edge directed model, so multiple relations between the same
+  node pair are preserved (e.g., OWNS + SOLD).
 
 **Methods:**
 - `add_entity(entity)` - Add node with all attributes

@@ -187,12 +187,20 @@ class GraphExporter:
             tier = node.get("verification", {}).get("tier", "TIER_3_AI")
             verification_dist[tier] += 1
 
+        # Calculate entity type summary
+        entity_type_counts = Counter()
+        for node in nodes:
+            entity_type = node.get("entity_type")
+            if entity_type:
+                entity_type_counts[entity_type] += 1
+
         # Calculate date range
         date_range = self._calculate_date_range(nodes, links)
 
         return {
             **base_metadata.model_dump(),
             "verification_distribution": dict(verification_dist),
+            "entity_type_summary": dict(entity_type_counts),
             "date_range": date_range
         }
 

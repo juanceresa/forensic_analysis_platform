@@ -227,13 +227,13 @@ class GraphMetadata(BaseModel):
     relation_count: int
     document_count: int
     processing_stats: Dict[str, Any] = Field(default_factory=dict)
+    verification_distribution: Dict[str, int] = Field(default_factory=dict)
+    entity_type_summary: Dict[str, int] = Field(default_factory=dict)
+    date_range: Optional[Dict[str, Optional[str]]] = None
 
 
 class GraphExport(BaseModel):
     """Export format for graph_data.json."""
     metadata: GraphMetadata
     nodes: List[Dict[str, Any]]
-    edges: List[Dict[str, Any]]
-    verification_summary: Dict[str, int]
-    entity_type_summary: Dict[str, int]
-    date_range: Optional[tuple[str, str]] = None
+    links: List[Dict[str, Any]]

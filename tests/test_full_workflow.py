@@ -92,9 +92,9 @@ def test_full_graph_workflow(tmp_path):
 
     assert "metadata" in data
     assert "nodes" in data
-    assert "edges" in data
-    assert "verification_summary" in data
-    assert "entity_type_summary" in data
+    assert "links" in data
+    assert "verification_distribution" in data["metadata"]
+    assert "entity_type_summary" in data["metadata"]
 
     # Validate metadata
     assert data["metadata"]["case_id"] == "integration_test_001"
@@ -109,8 +109,8 @@ def test_full_graph_workflow(tmp_path):
     assert "property_aguaras" in node_ids
 
     # Validate edges
-    assert len(data["edges"]) == 1
-    edge = data["edges"][0]
+    assert len(data["links"]) == 1
+    edge = data["links"][0]
     assert edge["source"] == "person_mario"
     assert edge["target"] == "property_aguaras"
     assert edge["relation_type"] == "OWNS"

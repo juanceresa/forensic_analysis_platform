@@ -252,7 +252,9 @@ class DedupeEntityResolver:
             # Handle list fields (union)
             if isinstance(new_value, list):
                 if isinstance(existing_value, list):
-                    merged[field] = list(set(existing_value + new_value))
+                    merged[field] = existing_value + [
+                        item for item in new_value if item not in existing_value
+                    ]
                 else:
                     merged[field] = new_value
                 continue

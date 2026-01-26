@@ -53,7 +53,7 @@ Properties score highest (optimal focal points for restitution):
 ### Caching Strategy
 In-memory cache with graph-state invalidation:
 - Cache key: `session_id + entity_id + graph_hash`
-- Invalidates when verification tiers change
+- Invalidates when any entity or relation data in the constellation changes
 - 1-hour TTL
 - Easy Redis migration via adapter pattern
 

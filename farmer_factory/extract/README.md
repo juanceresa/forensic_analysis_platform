@@ -104,8 +104,9 @@ relations = service.extract_relations(
 
 **Methods:**
 - `extract_from_text()` - Extract entities with full structured data
-- `extract_relations()` - Extract relations between entities
-- Both return validated Pydantic models
+- Relation extraction runs after entity extraction and uses the document date
+  for temporal fallbacks when needed
+- Invalid relation types are skipped without dropping valid relations
 
 ---
 
