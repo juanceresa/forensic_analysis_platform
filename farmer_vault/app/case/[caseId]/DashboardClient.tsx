@@ -17,6 +17,7 @@ interface DashboardClientProps {
 export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('details');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const selectedNode = initialData.nodes.find((n) => n.id === selectedNodeId) || null;
 
@@ -34,7 +35,7 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Graph (flexible width) */}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0 relative z-0">
             <KnowledgeGraph
               data={initialData}
               selectedNodeId={selectedNodeId}
@@ -53,6 +54,8 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
             activeTab={activeTab}
             onTabChange={setActiveTab}
             caseId={caseId}
+            isCollapsed={isSidebarCollapsed}
+            onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           />
         </div>
       </div>

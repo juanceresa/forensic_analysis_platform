@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useMemo } from 'react';
+import { useRef, useCallback, useMemo, useState, useLayoutEffect } from 'react';
 import dynamic from 'next/dynamic';
 import type { GraphData, BaseNode } from '@/lib/types';
 import { getNodeColor, getNodeSize } from '@/lib/graph-utils';
@@ -30,6 +30,30 @@ export function KnowledgeGraph({
   onNodeClick,
 }: KnowledgeGraphProps) {
   const graphRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+
+  useLayoutEffect(() => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+      const { width, height } = entry.contentRect;
+      setDimensions({
+        width: Math.floor(width),
+        height: Math.floor(height),
+      });
+    });
+
+    observer.observe(containerRef.current);
+
+    return () => observer.disconnect();
+  }, []);
 
   // PERFORMANCE: Memoize callback to prevent re-renders
   const handleNodeClick = useCallback(
@@ -64,13 +88,16 @@ export function KnowledgeGraph({
 
   return (
     <div
-      className="w-full h-full"
+      ref={containerRef}
+      className="w-full h-full relative overflow-hidden"
       role="application"
       aria-label="Knowledge graph visualization of entities and relationships"
     >
       <ForceGraph2D
         ref={graphRef}
         graphData={data as any}
+        width={dimensions.width || undefined}
+        height={dimensions.height || undefined}
         nodeColor={getNodeColor as any}
         nodeVal={getNodeSize as any}
         nodeLabel={(node: any) => `${node.name || node.id} (${node.entity_type})`}

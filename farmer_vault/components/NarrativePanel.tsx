@@ -88,7 +88,7 @@ export function NarrativePanel({
           aria-live="polite"
           aria-label="Generating narrative"
         >
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500 mx-auto mb-4" />
           <p className="text-slate-400 font-mono text-sm">
             Analyzing evidence constellation...
           </p>
@@ -127,8 +127,8 @@ export function NarrativePanel({
   return (
     <div className="p-4 space-y-4 overflow-y-auto">
       {/* Header */}
-      <div className="border-b border-amber-500/20 pb-3">
-        <h2 className="text-xl font-display uppercase tracking-wide text-amber-100">
+      <div className="border-b border-cyan-500/20 pb-3">
+        <h2 className="text-xl font-display uppercase tracking-wide text-cyan-100">
           {narrative.focal_entity_name}
         </h2>
         <p className="text-xs text-slate-400 font-mono uppercase tracking-wider mt-1">
@@ -164,11 +164,11 @@ export function NarrativePanel({
             {narrative.highlighted_events.map((event, idx) => (
               <div
                 key={idx}
-                className="bg-slate-800 border border-amber-600/50 rounded p-3 border-l-4"
+                className="bg-slate-800 border border-cyan-600/50 rounded p-3 border-l-4"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span>{getEventIcon(event.event_type)}</span>
-                  <span className="font-display text-xs uppercase tracking-wider text-amber-400">
+                  <span className="font-display text-xs uppercase tracking-wider text-cyan-400">
                     {event.event_type}
                   </span>
                   {event.date && (
@@ -220,7 +220,7 @@ export function NarrativePanel({
                 {expandedCitations.has(fact.citation_number) && (
                   <div className="px-3 pb-3 space-y-2">
                     {fact.evidence.map((citation, idx) => (
-                      <div key={idx} className="border-l-2 border-amber-600 pl-3">
+                      <div key={idx} className="border-l-2 border-cyan-600 pl-3">
                         <p className="text-xs text-slate-400 mb-1 font-mono">
                           {citation.doc_id}{citation.page ? ` • p.${citation.page}` : ''}
                         </p>
@@ -249,9 +249,9 @@ export function NarrativePanel({
       )}
 
       {/* Footer Disclaimer */}
-      <div className="border-t border-amber-500/20 pt-4 space-y-2">
-        <p className="text-xs text-amber-400 font-mono leading-relaxed">
-          <strong className="text-amber-500">⚠️ FORENSIC INTELLIGENCE ONLY:</strong>{' '}
+      <div className="border-t border-cyan-500/20 pt-4 space-y-2">
+        <p className="text-xs text-cyan-400 font-mono leading-relaxed">
+          <strong className="text-cyan-500">⚠️ FORENSIC INTELLIGENCE ONLY:</strong>{' '}
           This analysis synthesizes documentary evidence and does not constitute legal
           advice or proof of ownership.
         </p>

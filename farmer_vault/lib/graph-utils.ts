@@ -2,10 +2,10 @@ import type { BaseNode, VerificationTier, EntityType } from './types';
 
 export function getNodeColor(node: BaseNode): string {
   const tierColors: Record<VerificationTier, string> = {
-    TIER_1_CERTIFIED: '#3B82F6',     // Blue
-    TIER_2_INSTITUTIONAL: '#D97706',  // Dark Amber
-    TIER_2_ANALYST: '#F59E0B',        // Amber
-    TIER_3_AI: '#6B7280',             // Gray
+    TIER_1_CERTIFIED: '#06B6D4',     // Cyan - Certified
+    TIER_2_ANALYST: '#3B82F6',       // Blue - Analyst Verified
+    TIER_2_INSTITUTIONAL: '#8B5CF6', // Purple - Institutional
+    TIER_3_AI: '#64748B',            // Slate - AI Generated
   };
   return tierColors[node.verification.tier];
 }

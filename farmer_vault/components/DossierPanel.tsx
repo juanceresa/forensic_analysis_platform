@@ -62,8 +62,11 @@ export function DossierPanel({
       {/* Generate Narrative Button */}
       <button
         onClick={onGenerateNarrative}
-        className="w-full min-h-[44px] px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-600 rounded font-display text-sm uppercase tracking-wider transition-all shadow-lg hover:shadow-amber-500/50"
+        className="w-full min-h-[44px] px-4 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 rounded font-display text-sm uppercase tracking-wider transition-all shadow-lg hover:shadow-cyan-500/50 text-slate-900 font-bold"
         aria-label="Generate narrative for this entity"
+        style={{
+          textShadow: '0 0 10px rgba(6, 182, 212, 0.3)'
+        }}
       >
         📖 Generate Intelligence Briefing
       </button>
@@ -75,13 +78,13 @@ export function DossierPanel({
         </h3>
         <p className="text-sm text-slate-300">
           Confidence:{' '}
-          <span className="font-mono text-amber-400">
+          <span className="font-mono text-cyan-300">
             {(node.verification.confidence * 100).toFixed(0)}%
           </span>
         </p>
         {node.verification.tier === 'TIER_3_AI' && (
-          <div className="mt-2 p-2 bg-amber-950/50 border border-amber-700/50 rounded">
-            <p className="text-xs text-amber-400 font-mono">
+          <div className="mt-2 p-2 bg-cyan-950/30 border border-cyan-700/50 rounded">
+            <p className="text-xs text-cyan-300 font-mono">
               ⚠️ UNVERIFIED: AI-extracted data. Requires analyst review.
             </p>
           </div>
@@ -100,7 +103,7 @@ export function DossierPanel({
               const otherNode = graphData.nodes.find((n) => n.id === otherId);
               return (
                 <li key={idx} className="text-slate-300">
-                  <span className="font-mono text-xs text-amber-500">
+                  <span className="font-mono text-xs text-cyan-400">
                     {link.relation_type}
                   </span>
                   {' → '}
