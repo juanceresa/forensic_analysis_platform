@@ -866,6 +866,28 @@ export async function GET() {
 }
 ```
 
+**2.5 Map Python endpoint errors to HTTP status codes**
+
+When a Python endpoint (e.g., `generate_narrative_endpoint`) returns a payload
+with `status_code`, map it to the HTTP response status in your Next.js route.
+
+```typescript
+// app/api/cases/[id]/narrative/route.ts
+import { NextRequest } from 'next/server'
+import { generateNarrative } from '@/lib/factory' // thin wrapper around Python call
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json()
+  const result = await generateNarrative(params.id, body)
+
+  if (result?.status_code) {
+    return Response.json(result, { status: result.status_code })
+  }
+
+  return Response.json(result, { status: 200 })
+}
+```
+
 **Acceptance Criteria:**
 - ✅ New Clerk users auto-sync to Supabase
 - ✅ User A cannot query user B's cases (tested with SQL)
