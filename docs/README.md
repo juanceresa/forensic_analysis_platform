@@ -60,6 +60,7 @@ Context for recent updates in this session:
 - Knowledge graph supports multiple relations between the same nodes (multi-edge) and cache invalidation hashes full graph state.
 - Extraction now passes document dates into relation temporal fallbacks and skips invalid relation types without dropping valid ones.
 - Graph export format is unified on `nodes` + `links`, with metadata carrying verification distribution, entity type summary, and date range.
+- Processing now persists extraction flags, validates extraction payloads, and validates exported `graph_data.json`.
 
 ---
 

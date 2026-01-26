@@ -98,9 +98,12 @@ class ExtractionPipeline:
 
         # Step 3: Validate entities and relations
         # (LLM already returns Pydantic models, but validator ensures consistency)
-        # Note: For mocked implementation, entities are already valid
-        validated_entities = llm_result.entities
-        validated_relations = llm_result.relations
+        entity_dicts = [e.model_dump(mode="json") for e in llm_result.entities]
+        relation_dicts = [r.model_dump(mode="json") for r in llm_result.relations]
+        validated_entities, validated_relations = self.validator.validate_extraction(
+            entities=entity_dicts,
+            relations=relation_dicts
+        )
 
         # Calculate combined confidence: min of OCR and LLM
         combined_confidence = min(ocr_result.confidence, llm_result.confidence)
@@ -167,8 +170,12 @@ class ExtractionPipeline:
 
         # Step 2: Validate entities and relations
         # (Vision already returns Pydantic models, but validator ensures consistency)
-        validated_entities = vision_result.entities
-        validated_relations = vision_result.relations
+        entity_dicts = [e.model_dump(mode="json") for e in vision_result.entities]
+        relation_dicts = [r.model_dump(mode="json") for r in vision_result.relations]
+        validated_entities, validated_relations = self.validator.validate_extraction(
+            entities=entity_dicts,
+            relations=relation_dicts
+        )
 
         # Build confidence scores
         confidence_scores = {

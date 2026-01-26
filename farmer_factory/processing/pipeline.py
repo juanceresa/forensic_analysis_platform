@@ -209,6 +209,19 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
     except Exception as e:
         raise ProcessingError(f"Failed to export graph: {e}")
 
+    # 5b. Validate export output
+    try:
+        import json
+        from farmer_factory.structure.schema import GraphExport
+
+        graph_file = output_dir / 'graph_data.json'
+        with open(graph_file, 'r', encoding='utf-8') as f:
+            export_data = json.load(f)
+
+        GraphExport.model_validate(export_data)
+    except Exception as e:
+        raise ProcessingError(f"Export validation failed: {e}")
+
     # 6. Get summary statistics
     stats = builder.processing_stats
     logger.info("Processing complete!")

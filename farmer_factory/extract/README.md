@@ -107,6 +107,7 @@ relations = service.extract_relations(
 - Relation extraction runs after entity extraction and uses the document date
   for temporal fallbacks when needed
 - Invalid relation types are skipped without dropping valid relations
+- Extraction results are validated via `SchemaValidator` before returning
 
 ---
 

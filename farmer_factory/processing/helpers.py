@@ -104,7 +104,8 @@ def save_extraction_json(extraction, output_path: Path) -> None:
         'ocr_result': _serialize_ocr_result(extraction.ocr_result) if extraction.ocr_result else None,
         'confidence_scores': extraction.confidence_scores,
         'path': extraction.path.value,
-        'processing_metadata': extraction.processing_metadata
+        'processing_metadata': extraction.processing_metadata,
+        'extraction_flags': extraction.extraction_flags
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -2,7 +2,15 @@
 
 import pytest
 from pathlib import Path
-from farmer_factory.processing.helpers import load_pdf_pages
+from farmer_factory.processing.helpers import load_pdf_pages, save_extraction_json
+from farmer_factory.extract.pipeline import ExtractionResult
+from farmer_factory.prepare import DocumentPath
+from farmer_factory.structure.schema import (
+    Person,
+    EntityType,
+    VerificationTier,
+    Verification
+)
 
 
 def test_load_pdf_pages_single_page(tmp_path):
@@ -65,3 +73,33 @@ def test_load_pdf_pages_naming_convention(tmp_path):
     first_page = page_paths[0]
     expected_stem = f"{sample_pdf.stem}_page_0"
     assert first_page.stem == expected_stem
+
+
+def test_save_extraction_json_includes_flags(tmp_path):
+    """Test extraction flags are persisted in JSON output."""
+    person = Person(
+        id="p1",
+        entity_type=EntityType.PERSON,
+        name="Test Person",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_001"
+    )
+
+    extraction = ExtractionResult(
+        entities=[person],
+        relations=[],
+        ocr_result=None,
+        confidence_scores={"overall": 0.85},
+        path=DocumentPath.TYPED,
+        processing_metadata={},
+        extraction_flags=["RELATION_EXTRACTION_FAILED"]
+    )
+
+    output_path = tmp_path / "extraction.json"
+    save_extraction_json(extraction, output_path)
+
+    data = output_path.read_text()
+    assert "RELATION_EXTRACTION_FAILED" in data
