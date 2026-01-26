@@ -499,60 +499,34 @@ export function KnowledgeGraph({
     ]
   );
 
-  // Custom link color - Premium gradient-enhanced constellation links
+  // Custom link color - Change line color directly on hover/selection
   const getLinkColor = useCallback(
     (link: any) => {
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
 
       if (selectedNodeId && (sourceId === selectedNodeId || targetId === selectedNodeId)) {
-        // Brighter highlight for selected constellation
-        return withAlpha(graphTheme.lineHighlight, (baseHighlightAlpha + 0.1) * selectedAlpha);
+        return graphTheme.lineHighlight;
       }
 
-      const isHoveredLink = hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId);
-
-      if (isHoveredLink) {
-        return withAlpha(graphTheme.lineHighlight, (baseHighlightAlpha + 0.08) * hoverAlpha);
+      if (hoveredNodeId && (sourceId === hoveredNodeId || targetId === hoveredNodeId)) {
+        return graphTheme.lineHighlight;
       }
 
       return graphTheme.line;
     },
     [
       hoveredNodeId,
-      hoverAlpha,
       selectedNodeId,
-      selectedAlpha,
       graphTheme.lineHighlight,
-      graphTheme.line,
-      baseHighlightAlpha
+      graphTheme.line
     ]
   );
 
-  // Custom link width - make constellation links thicker with smooth transitions
+  // Custom link width - Consistent width, no highlighting
   const getLinkWidth = useCallback(
-    (link: any) => {
-      const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
-      const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
-
-      if (selectedNodeId && (sourceId === selectedNodeId || targetId === selectedNodeId)) {
-        return settings.linkWidth + settings.constellationLinkWidth * selectedAlpha;
-      }
-
-      if (hoveredNodeId && hoverAlpha > 0 && (sourceId === hoveredNodeId || targetId === hoveredNodeId)) {
-        return settings.linkWidth + settings.constellationLinkWidth * hoverAlpha;
-      }
-
-      return settings.linkWidth;
-    },
-    [
-      hoveredNodeId,
-      hoverAlpha,
-      selectedNodeId,
-      selectedAlpha,
-      settings.linkWidth,
-      settings.constellationLinkWidth
-    ]
+    () => settings.linkWidth,
+    [settings.linkWidth]
   );
 
   // PREMIUM ENHANCEMENT: Custom link renderer for smoother, higher-quality lines
@@ -576,17 +550,11 @@ export function KnowledgeGraph({
 
       ctx.save();
 
-      // PREMIUM: Anti-aliasing and smooth line rendering
+      // Anti-aliasing and smooth line rendering
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // PREMIUM: Subtle glow for highlighted links
-      if (isSelected || isHovered) {
-        const glowAlpha = isSelected ? selectedAlpha : hoverAlpha;
-        ctx.shadowBlur = 8 * glowAlpha;
-        ctx.shadowColor = withAlpha(graphTheme.lineHighlight, 0.4 * glowAlpha);
-      }
-
+      // Draw the line with no glow - color changes directly
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
       ctx.lineTo(target.x, target.y);
@@ -594,16 +562,46 @@ export function KnowledgeGraph({
       ctx.lineWidth = width;
       ctx.stroke();
 
+      if (settings.showArrows) {
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 0) {
+          const unitX = dx / len;
+          const unitY = dy / len;
+          const targetDegree = nodeDegrees.get(targetId) || 0;
+          const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
+          const scale = typeof globalScale === 'number' && globalScale > 0 ? Math.min(1.2, 1 / globalScale) : 1;
+          const arrowLength = 6 * scale;
+          const arrowWidth = 3.5 * scale;
+          const arrowTipX = target.x - unitX * (targetSize + 3);
+          const arrowTipY = target.y - unitY * (targetSize + 3);
+          const baseX = arrowTipX - unitX * arrowLength;
+          const baseY = arrowTipY - unitY * arrowLength;
+          const orthoX = -unitY;
+          const orthoY = unitX;
+
+          ctx.beginPath();
+          ctx.moveTo(arrowTipX, arrowTipY);
+          ctx.lineTo(baseX + orthoX * arrowWidth, baseY + orthoY * arrowWidth);
+          ctx.lineTo(baseX - orthoX * arrowWidth, baseY - orthoY * arrowWidth);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+
       ctx.restore();
     },
     [
       selectedNodeId,
       hoveredNodeId,
-      selectedAlpha,
-      hoverAlpha,
       getLinkWidth,
       getLinkColor,
-      graphTheme.lineHighlight
+      settings.showArrows,
+      settings.nodeSizeBase,
+      settings.nodeSizeMultiplier,
+      nodeDegrees
     ]
   );
 
@@ -624,9 +622,6 @@ export function KnowledgeGraph({
         nodeLabel={(node: any) => `${node.name || node.id} (${node.entity_type})`}
         linkColor={getLinkColor as any}
         linkWidth={getLinkWidth as any}
-        linkDirectionalArrowLength={settings.showArrows ? 6 : 0}
-        linkDirectionalArrowRelPos={1}
-        linkDirectionalArrowColor={getLinkColor as any}
         linkCanvasObjectMode={() => 'replace'}
         linkCanvasObject={linkCanvasObject}
         backgroundColor="rgba(0,0,0,0)"

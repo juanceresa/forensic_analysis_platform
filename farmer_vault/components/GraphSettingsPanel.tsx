@@ -171,12 +171,6 @@ export function GraphSettingsPanel({
                       onChange={(v) => onUpdateSetting('linkWidth', v)}
                       range={SETTINGS_RANGES.linkWidth}
                     />
-                    <SettingsSlider
-                      label={SETTING_LABELS.constellationLinkWidth}
-                      value={settings.constellationLinkWidth}
-                      onChange={(v) => onUpdateSetting('constellationLinkWidth', v)}
-                      range={SETTINGS_RANGES.constellationLinkWidth}
-                    />
 
                     {/* Show Arrows Toggle */}
                     <div className="flex items-center justify-between pt-1">

@@ -13,8 +13,7 @@ export interface GraphSettings {
   // Display Settings
   nodeSizeBase: number;          // Base node radius in pixels
   nodeSizeMultiplier: number;    // Scale factor for degree-based sizing
-  linkWidth: number;             // Standard link thickness
-  constellationLinkWidth: number; // Highlighted constellation link thickness
+  linkWidth: number;             // Link thickness
   showArrows: boolean;           // Show directional arrows on links
 
   // Force Simulation Settings
@@ -31,7 +30,6 @@ export const DEFAULT_SETTINGS: GraphSettings = {
   nodeSizeBase: 5.5,
   nodeSizeMultiplier: 2,
   linkWidth: 2,
-  constellationLinkWidth: 1.5,
   showArrows: false,
 
   // Forces
@@ -60,7 +58,6 @@ export const SETTINGS_RANGES: Record<keyof GraphSettings, SettingRange> = {
   nodeSizeBase: { min: 2, max: 12, step: 0.5 },
   nodeSizeMultiplier: { min: 0.5, max: 5, step: 0.5 },
   linkWidth: { min: 0.2, max: 4, step: 0.1 },
-  constellationLinkWidth: { min: 0.5, max: 4, step: 0.5 },
   showArrows: { min: 0, max: 1, step: 1 }, // Boolean toggle (not used by sliders)
 
   // Forces
@@ -76,7 +73,6 @@ export const SETTING_LABELS: Record<keyof GraphSettings, string> = {
   nodeSizeBase: 'Node Size',
   nodeSizeMultiplier: 'Node Scale',
   linkWidth: 'Link Width',
-  constellationLinkWidth: 'Highlight Width',
   showArrows: 'Show Arrows',
   centerForce: 'Center Force',
   repelForce: 'Repel Force',
@@ -88,7 +84,7 @@ export const SETTING_DESCRIPTIONS: Record<keyof GraphSettings, string> = {
   nodeSizeBase: 'Base size of all nodes',
   nodeSizeMultiplier: 'Size scaling for connected nodes',
   linkWidth: 'Thickness of connection lines',
-  constellationLinkWidth: 'Thickness of highlighted connections',
+  showArrows: 'Show directional arrows on links',
   centerForce: 'Pull toward center',
   repelForce: 'Push nodes apart',
   linkForce: 'Target distance between connected nodes',
