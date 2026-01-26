@@ -50,6 +50,9 @@ python farmer_factory/cli.py process CASE-CERESA
 
 # Verbose output for debugging
 python farmer_factory/cli.py process CASE-CERESA --verbose
+
+# Skip graph_data.json validation (faster, use with caution)
+python farmer_factory/cli.py process CASE-CERESA --skip-validation
 ```
 
 **What happens:**
@@ -57,7 +60,7 @@ python farmer_factory/cli.py process CASE-CERESA --verbose
 2. Images preprocessed (deskew, denoise, triage)
 3. Entities/relations extracted (OCR + Vision + LLM)
 4. Knowledge graph built (auto-deduplication)
-5. Graph exported to `graph_data.json`
+5. Graph exported to `graph_data.json` and validated
 
 **Output:**
 ```
@@ -84,6 +87,14 @@ python farmer_factory/cli.py list-cases
 ```
 
 Shows all cases with status.
+
+### Validate Graph Export
+
+```bash
+python farmer_factory/cli.py validate CASE-CERESA
+```
+
+Runs schema validation against `cases/CASE-CERESA/output/graph_data.json`.
 
 ## Troubleshooting
 

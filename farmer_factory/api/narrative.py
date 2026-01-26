@@ -59,31 +59,31 @@ def generate_narrative_endpoint(
         SessionCostLimitExceeded: If session exceeds cost limit
         InsufficientGraphData: If entity not found
     """
-    # Validate request
-    clicked_node_id = request_data.get("clicked_node_id")
-    session_id = request_data.get("session_id")
-
-    if not clicked_node_id:
-        raise ValueError("Missing required parameter: clicked_node_id")
-    if not session_id:
-        raise ValueError("Missing required parameter: session_id")
-
-    logger.info(f"Narrative request: case={case_id}, entity={clicked_node_id}, session={session_id}")
-
-    # Load graph
-    graph_path = Path(f"cases/{case_id}/output/graph_data.json")
-    if not graph_path.exists():
-        raise FileNotFoundError(f"Graph data not found: {graph_path}")
-
-    # Note: Assuming KnowledgeGraph has a load method
-    # If not, you'll need to implement it or load differently
-    graph = KnowledgeGraph.load(graph_path)
-
-    # Initialize generator
-    generator = NarrativeGenerator(api_key=api_key, use_cache=True)
-
     # Generate narrative
     try:
+        # Validate request
+        clicked_node_id = request_data.get("clicked_node_id")
+        session_id = request_data.get("session_id")
+
+        if not clicked_node_id:
+            raise ValueError("Missing required parameter: clicked_node_id")
+        if not session_id:
+            raise ValueError("Missing required parameter: session_id")
+
+        logger.info(f"Narrative request: case={case_id}, entity={clicked_node_id}, session={session_id}")
+
+        # Load graph
+        graph_path = Path(f"cases/{case_id}/output/graph_data.json")
+        if not graph_path.exists():
+            raise FileNotFoundError(f"Graph data not found: {graph_path}")
+
+        # Note: Assuming KnowledgeGraph has a load method
+        # If not, you'll need to implement it or load differently
+        graph = KnowledgeGraph.load(graph_path)
+
+        # Initialize generator
+        generator = NarrativeGenerator(api_key=api_key, use_cache=True)
+
         result = generator.generate(
             clicked_node_id=clicked_node_id,
             graph=graph,
@@ -102,14 +102,42 @@ def generate_narrative_endpoint(
 
         return response
 
+    except ValueError as e:
+        logger.warning(f"Narrative request error: {e}")
+        return {
+            "error": str(e),
+            "type": "bad_request",
+            "status_code": 400
+        }
+
+    except FileNotFoundError as e:
+        logger.warning(f"Graph data not found: {e}")
+        return {
+            "error": str(e),
+            "type": "not_found",
+            "status_code": 404
+        }
+
     except SessionCostLimitExceeded as e:
         logger.warning(f"Session cost limit exceeded: {e}")
-        raise
+        return {
+            "error": str(e),
+            "type": "cost_limit",
+            "status_code": 402
+        }
 
     except InsufficientGraphData as e:
         logger.error(f"Insufficient graph data: {e}")
-        raise
+        return {
+            "error": str(e),
+            "type": "insufficient_graph_data",
+            "status_code": 422
+        }
 
     except Exception as e:
         logger.error(f"Narrative generation error: {e}", exc_info=True)
-        raise
+        return {
+            "error": "Narrative generation failed",
+            "type": "internal_error",
+            "status_code": 500
+        }

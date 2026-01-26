@@ -32,7 +32,13 @@ from .exceptions import ProcessingError
 logger = logging.getLogger(__name__)
 
 
-def process_case(case_id: str, base_dir: Path = None, single_file: str = None, force_typed: bool = False) -> Dict[str, Any]:
+def process_case(
+    case_id: str,
+    base_dir: Path = None,
+    single_file: str = None,
+    force_typed: bool = False,
+    skip_validation: bool = False
+) -> Dict[str, Any]:
     """
     Process all PDFs in case through complete pipeline.
 
@@ -48,6 +54,7 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
         base_dir: Base directory for cases (defaults to "cases")
         single_file: Optional filename to process only one PDF (for testing)
         force_typed: Force all documents to use TYPED path (skip triage, for testing OCR)
+        skip_validation: Skip validating exported graph_data.json
 
     Returns:
         Dictionary with processing statistics
@@ -210,17 +217,18 @@ def process_case(case_id: str, base_dir: Path = None, single_file: str = None, f
         raise ProcessingError(f"Failed to export graph: {e}")
 
     # 5b. Validate export output
-    try:
-        import json
-        from farmer_factory.structure.schema import GraphExport
+    if not skip_validation:
+        try:
+            import json
+            from farmer_factory.structure.schema import GraphExport
 
-        graph_file = output_dir / 'graph_data.json'
-        with open(graph_file, 'r', encoding='utf-8') as f:
-            export_data = json.load(f)
+            graph_file = output_dir / 'graph_data.json'
+            with open(graph_file, 'r', encoding='utf-8') as f:
+                export_data = json.load(f)
 
-        GraphExport.model_validate(export_data)
-    except Exception as e:
-        raise ProcessingError(f"Export validation failed: {e}")
+            GraphExport.model_validate(export_data)
+        except Exception as e:
+            raise ProcessingError(f"Export validation failed: {e}")
 
     # 6. Get summary statistics
     stats = builder.processing_stats

@@ -62,6 +62,7 @@ Context for recent updates in this session:
 - Graph export format is unified on `nodes` + `links`, with metadata carrying verification distribution, entity type summary, and date range.
 - Processing now persists extraction flags, validates extraction payloads, and validates exported `graph_data.json`.
 - Narrative prompts now include relation evidence/doc IDs, cache hashing ignores timestamps, and document IDs are normalized.
+- CLI validate now runs schema checks; `process` supports `--skip-validation`.
 
 ---
 

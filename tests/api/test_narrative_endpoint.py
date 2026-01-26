@@ -10,6 +10,7 @@ from farmer_factory.narrative.models import NarrativeResult
 def mock_graph():
     """Mock knowledge graph."""
     with patch('farmer_factory.api.narrative.KnowledgeGraph') as mock:
+        mock.load.return_value = Mock()
         yield mock
 
 
@@ -45,10 +46,11 @@ def test_generate_narrative_endpoint_success(mock_graph, mock_generator):
         "session_id": "sess_123"
     }
 
-    result = generate_narrative_endpoint(
-        case_id="TEST-CERESA",
-        request_data=request_data
-    )
+    with patch('pathlib.Path.exists', return_value=True):
+        result = generate_narrative_endpoint(
+            case_id="TEST-CERESA",
+            request_data=request_data
+        )
 
     assert result["focal_entity_name"] == "Villa Aurelia"
     assert result["model_used"] == "haiku"
@@ -60,11 +62,13 @@ def test_endpoint_handles_missing_params():
     """Test endpoint validates required parameters."""
     request_data = {}  # Missing clicked_node_id
 
-    with pytest.raises(ValueError, match="clicked_node_id"):
-        generate_narrative_endpoint(
-            case_id="TEST-CERESA",
-            request_data=request_data
-        )
+    result = generate_narrative_endpoint(
+        case_id="TEST-CERESA",
+        request_data=request_data
+    )
+
+    assert result["status_code"] == 400
+    assert result["type"] == "bad_request"
 
 
 def test_endpoint_handles_cost_limit_exceeded(mock_graph, mock_generator):
@@ -82,8 +86,11 @@ def test_endpoint_handles_cost_limit_exceeded(mock_graph, mock_generator):
         "session_id": "sess_123"
     }
 
-    with pytest.raises(SessionCostLimitExceeded):
-        generate_narrative_endpoint(
+    with patch('pathlib.Path.exists', return_value=True):
+        result = generate_narrative_endpoint(
             case_id="TEST-CERESA",
             request_data=request_data
         )
+
+    assert result["status_code"] == 402
+    assert result["type"] == "cost_limit"

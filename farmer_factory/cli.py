@@ -89,7 +89,8 @@ def create_case(case_id: str, name: str, family: str):
 @click.option('--verbose', is_flag=True, help='Verbose output')
 @click.option('--file', 'single_file', help='Process only this PDF file from intake/ directory')
 @click.option('--force-typed', is_flag=True, help='Force all documents to use OCR path (ignore triage)')
-def process(case_id: str, verbose: bool, single_file: str, force_typed: bool):
+@click.option('--skip-validation', is_flag=True, help='Skip graph_data.json validation')
+def process(case_id: str, verbose: bool, single_file: str, force_typed: bool, skip_validation: bool):
     """Process case documents through the pipeline."""
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -101,6 +102,8 @@ def process(case_id: str, verbose: bool, single_file: str, force_typed: bool):
 
     if force_typed:
         logger.info("Forcing TYPED path (skipping triage)")
+    if skip_validation:
+        logger.info("Skipping graph export validation")
 
     # Import here to avoid circular imports
     try:
@@ -110,7 +113,12 @@ def process(case_id: str, verbose: bool, single_file: str, force_typed: bool):
 
     try:
         # Run processing pipeline
-        stats = process_case(case_id, single_file=single_file, force_typed=force_typed)
+        stats = process_case(
+            case_id,
+            single_file=single_file,
+            force_typed=force_typed,
+            skip_validation=skip_validation
+        )
 
         # Print summary
         click.echo("\n" + "="*60)
@@ -172,10 +180,21 @@ def validate(case_id: str):
     if not graph_file.exists():
         raise click.ClickException(f"Graph data not found: {graph_file}")
 
-    # TODO: Implement validation
     click.echo(f"Validating {graph_file}...")
-    click.echo("\n⚠️  Validation not yet implemented")
-    click.echo("Coming in Phase 6 of ROADMAP.md")
+
+    try:
+        import json
+        from farmer_factory.structure.schema import GraphExport
+
+        with open(graph_file, 'r', encoding='utf-8') as f:
+            export_data = json.load(f)
+
+        GraphExport.model_validate(export_data)
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
+        raise click.ClickException(f"Validation failed: {e}")
+
+    click.echo("✓ Graph data is valid")
 
 
 @cli.command()
