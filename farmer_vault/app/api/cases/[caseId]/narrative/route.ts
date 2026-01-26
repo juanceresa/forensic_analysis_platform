@@ -84,7 +84,9 @@ async function callPythonNarrativeAPI(params: {
       '--session-id', params.sessionId,
       '--max-cost', String(params.maxCost),
       '--json',
-    ]);
+    ], {
+      cwd: join(process.cwd(), '..'), // Run from project root
+    });
 
     let stdout = '';
     let stderr = '';
