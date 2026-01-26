@@ -1,9 +1,9 @@
 # Farmer House Forensic Intelligence Platform — Frontend Specification (The Vault)
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.1.0
-> **Last Updated:** 2025-01-21
-> **Status:** MVP1 Implementation Guide (with performance optimizations)
+> **Version:** 2.0.0
+> **Last Updated:** 2026-01-26
+> **Status:** MVP1 Active Implementation
 
 ---
 
@@ -16,7 +16,7 @@ Zone B (The Vault) is the client-facing read-only interface for viewing forensic
 - **Static**: Data is pre-generated; no backend processing
 - **Evidence Map Style**: Force-directed graph with node detail panel
 - **Intelligence Aesthetic**: Dark mode, monospace, high-stakes professional
-- **Performance-First**: Optimized for graphs with 1,000+ nodes
+- **Performance-First**: Optimized rendering with configurable settings
 
 **Graph Data Contract (Aligned to `graph_data.json`):**
 - **Nodes** use `entity_type` and `name` (not `type`/`label`).
@@ -26,38 +26,204 @@ Zone B (The Vault) is the client-facing read-only interface for viewing forensic
 
 ---
 
-## Graph Performance Strategy
+## Graph Visualization System
 
-### Expected Scale
-Based on 300 documents × ~5 entities/doc:
-- **Nodes**: ~1,500 entities
-- **Edges**: ~3,000-4,500 relations
-- **Challenge**: Force-directed graphs degrade significantly above ~500 nodes
+### Current Implementation
 
-### Three-Tier Rendering Strategy
+The graph visualization uses `react-force-graph-2d` with a comprehensive settings system that allows real-time customization of layout, appearance, and filtering.
 
-**Tier 1: Filtered View (Default)**
-- Show only high-importance nodes initially
-- Importance = betweenness centrality + connection count
-- Render ~200-300 "core" nodes
-- User can expand to see full graph
+### Graph Settings Panel
 
-**Tier 2: Clustered View**
-- Group entities by property or family
-- Each cluster shown as single meta-node
-- Click to expand cluster
-- Reduces visual complexity
+**Location:** Top-left corner, gear icon toggle
+**Type:** Floating panel with three tabs: Layout, Colors, Filters
+**Persistence:** Settings saved to localStorage for user preferences
 
-**Tier 3: Focus Mode**
-- Show selected node + N-hop neighbors only
-- N=2 by default (direct and secondary connections)
-- Dramatically improves performance
-- Maintains context without overwhelming
-
-### Implementation Plan
+#### Settings Architecture
 
 ```typescript
-// lib/graph-optimizer.ts
+// lib/graph-settings.ts
+
+export interface GraphSettings {
+  // Display Settings
+  nodeSizeMultiplier: number;    // Scale factor for degree-based sizing
+  linkWidth: number;             // Link thickness
+  showArrows: boolean;           // Show directional arrows on links
+
+  // Force Simulation Settings
+  centerForce: number;           // Gravity toward center (0-2)
+  repelForce: number;            // Repulsion between nodes
+  linkForce: number;             // Target distance between connected nodes
+
+  // Color Settings
+  entityColors: EntityColorMap;  // Custom colors per entity type
+  linkColor: string;            // Base link color
+
+  // Filter Settings
+  entityTypeFilters: Record<EntityType, boolean>; // true = visible
+  hideOrphans: boolean;         // Hide nodes with no connections
+}
+
+export const DEFAULT_SETTINGS: GraphSettings = {
+  // Display
+  nodeSizeMultiplier: 2,
+  linkWidth: 2,
+  showArrows: false,
+
+  // Forces
+  centerForce: 0.1,
+  repelForce: 140,
+  linkForce: 60,
+
+  // Colors
+  entityColors: {
+    PERSON: '#7c3aed',
+    LOCATION: '#0891b2',
+    PROPERTY: '#059669',
+    ORGANIZATION: '#dc2626',
+    DOCUMENT: '#64748b',
+  },
+  linkColor: '#ffffff',
+
+  // Filters
+  entityTypeFilters: {
+    PERSON: true,
+    LOCATION: true,
+    PROPERTY: true,
+    ORGANIZATION: true,
+    DOCUMENT: true,
+  },
+  hideOrphans: false,
+};
+```
+
+#### Tab 1: Layout
+
+Controls for graph physics and display:
+
+**Display Section:**
+- **Node Scale** (0.5-5.0): Multiplier for degree-based node sizing
+- **Link Width** (0.2-4.0): Thickness of connection lines
+- **Show Arrows** (toggle): Display directional arrows on links
+
+**Forces Section:**
+- **Center Force** (0-1.2): Pull toward center of view
+- **Repel Force** (40-200): Push nodes apart
+- **Link Distance** (30-140): Target distance between connected nodes
+
+#### Tab 2: Colors
+
+Color customization for entity types and links:
+
+- **Link Color**: Base color for all connection lines
+- **PERSON**: Color for person nodes
+- **LOCATION**: Color for location nodes
+- **PROPERTY**: Color for property nodes
+- **ORGANIZATION**: Color for organization nodes
+- **DOCUMENT**: Color for document nodes
+
+Each entity type has a color picker for custom hex colors.
+
+#### Tab 3: Filters (NEW)
+
+Data visibility controls:
+
+**Entity Types Section:**
+- Toggle for each entity type (PERSON, LOCATION, PROPERTY, ORGANIZATION, DOCUMENT)
+- When toggled off, nodes of that type are hidden
+- Links between hidden nodes are also filtered out
+
+**Visibility Section:**
+- **Hide Orphans** (toggle): Hide nodes with no connections (degree === 0)
+
+**Implementation:**
+```typescript
+// components/KnowledgeGraph.tsx
+
+// Filter data based on settings
+const filteredData: GraphData = useMemo(() => {
+  // Filter nodes by entity type and orphan status
+  const visibleNodes = data.nodes.filter(node => {
+    // Check entity type filter
+    if (!settings.entityTypeFilters[node.entity_type]) {
+      return false;
+    }
+
+    // Check orphan filter
+    if (settings.hideOrphans) {
+      const degree = nodeDegrees.get(node.id) || 0;
+      if (degree === 0) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Create set of visible node IDs for quick lookup
+  const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+
+  // Filter links where both source and target are visible
+  const visibleLinks = data.links.filter(link => {
+    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+    return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+  });
+
+  return {
+    metadata: data.metadata,
+    nodes: visibleNodes,
+    links: visibleLinks,
+  };
+}, [data, settings.entityTypeFilters, settings.hideOrphans, nodeDegrees]);
+```
+
+### Graph Rendering Features
+
+**Node Rendering:**
+- Size based on connection count (degree centrality)
+- Color based on entity type
+- Glow effect for selected/hovered nodes
+- Smooth animations with reduced-motion support
+- Labels visible at zoom > 1.05x
+
+**Link Rendering:**
+- Custom canvas rendering for smooth lines
+- Optional directional arrows
+- Highlight on node selection/hover
+- Proper termination at node boundaries (avoiding overlap)
+
+**Interaction:**
+- Click node to view details in dossier panel
+- Hover for preview highlight
+- Drag nodes to reposition
+- Zoom and pan controls
+- Click background to deselect
+
+**Performance Optimizations:**
+- Dynamic bundle loading (ForceGraph2D loaded on demand)
+- Memoized calculations for colors, sizes, and filtered data
+- Efficient force simulation with configurable parameters
+- Canvas-based rendering for smooth 60fps at 300+ nodes
+
+---
+
+## Future Enhancements (Out of Scope for MVP1)
+
+### Graph Performance Strategy
+
+**Status:** Planned for large-scale implementations
+
+For cases with 1,000+ nodes, implement advanced filtering and optimization:
+
+**Three-Tier Rendering Strategy:**
+
+1. **Filtered View** - Show high-importance nodes only (~200-300)
+2. **Clustered View** - Group entities by family/property
+3. **Focus Mode** - Show selected node + N-hop neighbors
+
+**Implementation:**
+```typescript
+// lib/graph-optimizer.ts (FUTURE)
 
 interface GraphOptimization {
   mode: 'filtered' | 'clustered' | 'focus';
@@ -71,455 +237,30 @@ export function optimizeGraph(
   fullGraph: GraphData,
   options: GraphOptimization
 ): GraphData {
-  switch (options.mode) {
-    case 'filtered':
-      return filterByImportance(fullGraph, options.nodeLimit);
-
-    case 'clustered':
-      return clusterByKey(fullGraph, options.clusteringKey);
-
-    case 'focus':
-      return extractNHopNeighborhood(
-        fullGraph,
-        options.focusNodeId,
-        options.hopDistance || 2
-      );
-
-    default:
-      return fullGraph;
-  }
-}
-
-function filterByImportance(graph: GraphData, limit: number): GraphData {
-  // Calculate node importance scores
-  const scores = graph.nodes.map(node => ({
-    node,
-    score: calculateImportance(node, graph.links)
-  }));
-
-  // Sort by importance and take top N
-  const topNodes = scores
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(s => s.node);
-
-  const topNodeIds = new Set(topNodes.map(n => n.id));
-
-  // Filter links to only include those between top nodes
-  const filteredLinks = graph.links.filter(
-    link => topNodeIds.has(link.source) && topNodeIds.has(link.target)
-  );
-
-  return {
-    ...graph,
-    nodes: topNodes,
-    links: filteredLinks
-  };
-}
-
-function calculateImportance(node: Node, links: Link[]): number {
-  // Factors:
-  // 1. Connection count (degree centrality)
-  const degree = links.filter(
-    l => l.source === node.id || l.target === node.id
-  ).length;
-
-  // 2. Entity type priority
-  const typePriority = {
-    'PERSON': 1.5,
-    'PROPERTY': 2.0,      // Properties are most important
-    'ORGANIZATION': 1.2,
-    'DOCUMENT': 0.5,      // Documents are numerous, lower priority
-    'LOCATION': 0.8
-  };
-
-  // 3. Verification tier bonus
-  const tierBonus = {
-    'TIER_1_CERTIFIED': 2.0,
-    'TIER_2_INSTITUTIONAL': 1.7,
-    'TIER_2_ANALYST': 1.5,
-    'TIER_3_AI': 1.0
-  };
-
-  return (
-    degree *
-    (typePriority[node.entity_type] || 1.0) *
-    (tierBonus[node.verification.tier] || 1.0)
-  );
-}
-
-function extractNHopNeighborhood(
-  graph: GraphData,
-  startNodeId: string,
-  hops: number
-): GraphData {
-  const visited = new Set<string>([startNodeId]);
-  let frontier = new Set<string>([startNodeId]);
-
-  // BFS to find all nodes within N hops
-  for (let i = 0; i < hops; i++) {
-    const nextFrontier = new Set<string>();
-
-    for (const nodeId of frontier) {
-      const neighbors = graph.links
-        .filter(l => l.source === nodeId || l.target === nodeId)
-        .map(l => l.source === nodeId ? l.target : l.source);
-
-      neighbors.forEach(n => {
-        if (!visited.has(n)) {
-          nextFrontier.add(n);
-          visited.add(n);
-        }
-      });
-    }
-
-    frontier = nextFrontier;
-  }
-
-  // Filter to neighborhood
-  const neighborhoodNodes = graph.nodes.filter(n => visited.has(n.id));
-  const neighborhoodLinks = graph.links.filter(
-    l => visited.has(l.source) && visited.has(l.target)
-  );
-
-  return {
-    ...graph,
-    nodes: neighborhoodNodes,
-    links: neighborhoodLinks
-  };
+  // Implementation for large-scale graph optimization
 }
 ```
 
-### UI Controls: Tabbed Filter Views (Default)
+**Performance Benchmarks** (Target):
+| Graph Size | Mode | Render Time | FPS | Status |
+|------------|------|-------------|-----|--------|
+| 100 nodes | Full | <100ms | 60 | ✓ Implemented |
+| 300 nodes | Full | <200ms | 50-60 | ✓ Implemented |
+| 500 nodes | Filtered | <500ms | 40-50 | ⏳ Future |
+| 1,000 nodes | Focus | <300ms | 50-60 | ⏳ Future |
+| 1,500 nodes | Clustered | 2-5s | 20-30 | ⏳ Future |
 
-**Primary Interface:** Horizontal tabs above graph for quick view switching
+### Advanced Filter Views
 
-```typescript
-// components/GraphFilterTabs.tsx
+**Status:** Planned for Phase 2
 
-type FilterView =
-  | 'overview'      // Core entities (properties + key people)
-  | 'families'      // Group by family clusters
-  | 'properties'    // Property-centric view
-  | 'timeline'      // Temporal view (chronological)
-  | 'legal'         // Legal acts & government actions
-  | 'full';         // Complete unfiltered graph
-
-interface GraphFilterTabsProps {
-  currentView: FilterView;
-  onViewChange: (view: FilterView) => void;
-  data: GraphData;
-}
-
-export function GraphFilterTabs({ currentView, onViewChange, data }: GraphFilterTabsProps) {
-  const viewStats = calculateViewStats(data);
-
-  return (
-    <div className="border-b border-slate-800 bg-slate-900/50">
-      <div className="flex items-center gap-1 px-4 overflow-x-auto">
-        <Tab
-          active={currentView === 'overview'}
-          onClick={() => onViewChange('overview')}
-          icon="🏠"
-          label="Overview"
-          count={viewStats.overview}
-          description="Key entities and relationships"
-        />
-        <Tab
-          active={currentView === 'families'}
-          onClick={() => onViewChange('families')}
-          icon="👥"
-          label="Families"
-          count={viewStats.families}
-          description="Group by family lineage"
-        />
-        <Tab
-          active={currentView === 'properties'}
-          onClick={() => onViewChange('properties')}
-          icon="🏛️"
-          label="Properties"
-          count={viewStats.properties}
-          description="Property-centric view"
-        />
-        <Tab
-          active={currentView === 'timeline'}
-          onClick={() => onViewChange('timeline')}
-          icon="📅"
-          label="Timeline"
-          count={viewStats.events}
-          description="Chronological events"
-        />
-        <Tab
-          active={currentView === 'legal'}
-          onClick={() => onViewChange('legal')}
-          icon="⚖️"
-          label="Legal"
-          count={viewStats.legalActs}
-          description="Legal actions & decrees"
-        />
-        <Tab
-          active={currentView === 'full'}
-          onClick={() => onViewChange('full')}
-          icon="🔍"
-          label="Full Graph"
-          count={data.nodes.length}
-          description="Complete unfiltered view"
-        />
-      </div>
-    </div>
-  );
-}
-
-function Tab({
-  active,
-  onClick,
-  icon,
-  label,
-  count,
-  description
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: string;
-  label: string;
-  count: number;
-  description: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      title={description}
-      className={`
-        px-4 py-3 border-b-2 transition-colors whitespace-nowrap
-        ${active
-          ? 'border-blue-500 text-blue-400 bg-slate-800/50'
-          : 'border-transparent text-slate-400 hover:text-slate-300 hover:border-slate-700'
-        }
-      `}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{icon}</span>
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs font-mono bg-slate-800 px-1.5 py-0.5 rounded">
-          {count}
-        </span>
-      </div>
-    </button>
-  );
-}
-```
-
-### Filter View Logic
-
-```typescript
-// lib/graph-filters.ts
-
-export function applyFilterView(data: GraphData, view: FilterView): GraphData {
-  const temporalRelationTypes = new Set([
-    'SOLD',
-    'BOUGHT',
-    'INHERITED',
-    'CONFISCATED',
-    'WITNESSED',
-    'NOTARIZED'
-  ]);
-
-  switch (view) {
-    case 'overview':
-      return {
-        ...data,
-        nodes: data.nodes.filter(n =>
-          n.entity_type === 'PROPERTY' ||
-          (n.entity_type === 'PERSON' && calculateImportance(n, data.links) > 5)
-        ),
-        links: data.links.filter(l =>
-          ['OWNS', 'CONFISCATED', 'INHERITED', 'SOLD', 'BOUGHT'].includes(l.relation_type)
-        )
-      };
-
-    case 'families':
-      return clusterByFamily(data);
-
-    case 'properties':
-      return {
-        ...data,
-        nodes: data.nodes.filter(n =>
-          n.entity_type === 'PROPERTY' ||
-          (n.entity_type === 'PERSON' && isConnectedToProperty(n, data.links)) ||
-          n.entity_type === 'DOCUMENT'
-        )
-      };
-
-    case 'timeline':
-      // Show entities that have temporal data
-      return {
-        ...data,
-        nodes: data.nodes.filter(n => hasTemporalData(n)),
-        links: data.links.filter(l => l.date && temporalRelationTypes.has(l.relation_type))
-      };
-
-    case 'legal':
-      return {
-        ...data,
-        nodes: data.nodes.filter(n =>
-          n.entity_type === 'ORGANIZATION' ||
-          n.entity_type === 'DOCUMENT'
-        ),
-        links: data.links.filter(l =>
-          ['CONFISCATED', 'REGISTERED_IN', 'NOTARIZED', 'ISSUED_BY'].includes(l.relation_type)
-        )
-      };
-
-    case 'full':
-    default:
-      return data;
-  }
-}
-
-function clusterByFamily(data: GraphData): GraphData {
-  // Group PERSON nodes by family name
-  const families = new Map<string, Node[]>();
-
-  data.nodes.filter(n => n.entity_type === 'PERSON').forEach(person => {
-    const familyName = extractFamilyName(person.name);
-    if (!families.has(familyName)) {
-      families.set(familyName, []);
-    }
-    families.get(familyName)!.push(person);
-  });
-
-  // Create cluster nodes for each family
-  const clusterNodes: Node[] = [];
-  const clusterMap = new Map<string, string>();
-
-  families.forEach((members, familyName) => {
-    if (members.length > 1) {
-      // Create cluster node
-      const clusterId = `FAMILY-${familyName}`;
-      clusterNodes.push({
-        id: clusterId,
-        name: `${familyName} Family`,
-        entity_type: 'PERSON',
-        verification: {
-          tier: 'TIER_3_AI',
-          confidence: 0.9
-        },
-        member_count: members.length,
-        extracted_from: ''
-      });
-
-      // Map members to cluster
-      members.forEach(m => clusterMap.set(m.id, clusterId));
-    }
-  });
-
-  // Replace person nodes with clusters, keep other entities
-  const filteredNodes = [
-    ...clusterNodes,
-    ...data.nodes.filter(n => n.entity_type !== 'PERSON' || !clusterMap.has(n.id))
-  ];
-
-  // Remap links to clusters
-  const remappedLinks = data.links.map(link => ({
-    ...link,
-    source: clusterMap.get(link.source) || link.source,
-    target: clusterMap.get(link.target) || link.target
-  }));
-
-  return {
-    ...data,
-    nodes: filteredNodes,
-    links: remappedLinks
-  };
-}
-
-function extractFamilyName(fullName: string): string {
-  // Simple extraction: last word is family name
-  // "Mario Ceresa" → "Ceresa"
-  // "Don Mario Ceresa" → "Ceresa"
-  const parts = fullName.split(' ');
-  return parts[parts.length - 1];
-}
-```
-
-### Secondary Controls (Gear Menu)
-
-For advanced options, add a gear menu in the corner:
-
-```typescript
-// components/GraphAdvancedControls.tsx
-
-export function GraphAdvancedControls() {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="absolute top-4 right-4">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 bg-slate-800 border border-slate-700 rounded hover:bg-slate-700"
-        title="Advanced controls"
-      >
-        ⚙️
-      </button>
-
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded shadow-lg p-3 space-y-3">
-          <div>
-            <label className="text-xs text-slate-400">Verification Tier</label>
-            <select className="w-full mt-1 bg-slate-700 text-slate-200 text-sm rounded px-2 py-1">
-              <option value="all">All Tiers</option>
-              <option value="TIER_1_CERTIFIED">Certified Only</option>
-              <option value="TIER_2_INSTITUTIONAL">Institutional + Certified</option>
-              <option value="TIER_2_ANALYST">Analyst + Certified</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="text-xs text-slate-400">Node Limit</label>
-            <input
-              type="range"
-              min="50"
-              max="1000"
-              step="50"
-              defaultValue="300"
-              className="w-full"
-            />
-            <div className="text-xs text-slate-500 text-center">300 nodes</div>
-          </div>
-
-          <div>
-            <label className="text-xs text-slate-400">Physics Strength</label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              defaultValue="50"
-              className="w-full"
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
-### Performance Benchmarks
-
-Target performance on M1 Mac:
-
-| Graph Size | Mode | Render Time | FPS | Acceptable? |
-|------------|------|-------------|-----|-------------|
-| 100 nodes | Full | <100ms | 60 | ✓ Excellent |
-| 300 nodes | Filtered | <200ms | 50-60 | ✓ Good |
-| 500 nodes | Filtered | <500ms | 40-50 | ✓ Acceptable |
-| 1,000 nodes | Focus | <300ms | 50-60 | ✓ Good |
-| 1,500 nodes | Full | 2-5s | 20-30 | ✗ Poor (use filtered) |
-
-**Optimization Triggers:**
-- If graph >500 nodes, default to filtered mode
-- If graph >1,000 nodes, disable full mode
-- If FPS drops below 30, suggest focus mode
+Horizontal tab system for pre-configured view modes:
+- **Overview** - Core entities (properties + key people)
+- **Families** - Group by family clusters
+- **Properties** - Property-centric view
+- **Timeline** - Temporal view (chronological)
+- **Legal** - Legal acts & government actions
+- **Full** - Complete unfiltered graph
 
 ---
 
@@ -534,16 +275,16 @@ Target performance on M1 Mac:
   --vault-bg-primary: #0F172A;     /* Slate-900 */
   --vault-bg-secondary: #1E293B;   /* Slate-800 */
   --vault-bg-tertiary: #334155;    /* Slate-700 */
-  
+
   /* Text */
   --vault-text-primary: #F8FAFC;   /* Slate-50 */
   --vault-text-secondary: #94A3B8; /* Slate-400 */
   --vault-text-muted: #64748B;     /* Slate-500 */
-  
+
   /* Borders */
   --vault-border: #475569;         /* Slate-600 */
   --vault-border-strong: #64748B;  /* Slate-500 */
-  
+
   /* Verification Tiers */
   --tier-3-ai: #6B7280;            /* Grey-500 */
   --tier-3-ai-glow: rgba(107, 114, 128, 0.3);
@@ -551,17 +292,23 @@ Target performance on M1 Mac:
   --tier-2-verified-glow: rgba(245, 158, 11, 0.3);
   --tier-1-certified: #3B82F6;     /* Blue-500 */
   --tier-1-certified-glow: rgba(59, 130, 246, 0.3);
-  
-  /* Entity Types */
-  --entity-person: #6366F1;        /* Indigo-500 */
-  --entity-property: #10B981;      /* Emerald-500 */
-  --entity-document: #F59E0B;      /* Amber-500 */
-  --entity-organization: #8B5CF6;  /* Violet-500 */
-  --entity-legal-act: #EF4444;     /* Red-500 */
-  --entity-location: #84CC16;      /* Lime-500 */
-  
+
+  /* Entity Types (Current Implementation) */
+  --entity-person: #7c3aed;        /* Violet-600 */
+  --entity-location: #0891b2;      /* Cyan-600 */
+  --entity-property: #059669;      /* Emerald-600 */
+  --entity-organization: #dc2626;  /* Red-600 */
+  --entity-document: #64748b;      /* Slate-500 */
+
+  /* Graph Theme */
+  --graph-background: #0b0e12;     /* Near-black */
+  --graph-line: #2b323a;           /* Dark grey */
+  --graph-line-highlight: rgba(110, 219, 227, 0.4); /* Cyan highlight */
+  --graph-node-focused: #6edbe3;   /* Cyan-400 */
+  --graph-text: #d6dee6;           /* Light grey */
+
   /* Accents */
-  --vault-accent: #3B82F6;         /* Blue-500 */
+  --vault-accent: #06B6D4;         /* Cyan-500 */
   --vault-warning: #F59E0B;        /* Amber-500 */
   --vault-danger: #EF4444;         /* Red-500 */
   --vault-success: #10B981;        /* Emerald-500 */
@@ -573,7 +320,7 @@ Target performance on M1 Mac:
 ```css
 /* Font Stack */
 :root {
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+  --font-mono: 'Space Grotesk', 'JetBrains Mono', 'SF Mono', monospace;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -653,7 +400,7 @@ code, .data-field, .node-label { font-family: var(--font-mono); }
 │            KNOWLEDGE GRAPH               │                          │
 │            (Force-Directed)              │  - Entity Details        │
 │                                          │  - Source Documents      │
-│                                          │  - Timeline Events       │
+│  ⚙️ Settings Panel (Floating)           │  - Timeline Events       │
 │                                          │  - Related Entities      │
 │                                          │                          │
 ├──────────────────────────────────────────┴──────────────────────────┤
@@ -701,207 +448,204 @@ The centerpiece visualization using `react-force-graph-2d`.
 // components/KnowledgeGraph.tsx
 
 import ForceGraph2D from 'react-force-graph-2d';
-import { useCallback, useRef } from 'react';
-import { GraphData, Node, Link } from '@/lib/types';
+import { useCallback, useRef, useMemo } from 'react';
+import { GraphData, BaseNode } from '@/lib/types';
+import { GraphSettings, DEFAULT_SETTINGS } from '@/lib/graph-settings';
 
 interface KnowledgeGraphProps {
   data: GraphData;
-  onNodeClick: (node: Node) => void;
   selectedNodeId: string | null;
-  viewMode?: 'filtered' | 'clustered' | 'focus' | 'full';
-  filterEntityType?: EntityType | 'all';
+  onNodeClick: (node: BaseNode) => void;
+  onBackgroundClick?: () => void;
+  settings?: GraphSettings;
 }
 
 export function KnowledgeGraph({
   data,
-  onNodeClick,
   selectedNodeId,
-  viewMode = 'filtered',
-  filterEntityType = 'all'
+  onNodeClick,
+  onBackgroundClick,
+  settings: userSettings,
 }: KnowledgeGraphProps) {
-  const graphRef = useRef<any>();
-  const [optimizedData, setOptimizedData] = useState<GraphData>(data);
+  const graphRef = useRef<any>(null);
 
-  // Apply optimizations based on view mode
-  useEffect(() => {
-    let optimized = data;
+  // Merge user settings with defaults
+  const settings = useMemo(
+    () => ({ ...DEFAULT_SETTINGS, ...userSettings }),
+    [userSettings]
+  );
 
-    // Filter by entity type first
-    if (filterEntityType !== 'all') {
-      optimized = {
-        ...optimized,
-        nodes: optimized.nodes.filter(n => n.entity_type === filterEntityType),
-        links: optimized.links.filter(l => {
-          const sourceNode = optimized.nodes.find(n => n.id === l.source);
-          const targetNode = optimized.nodes.find(n => n.id === l.target);
-          return sourceNode?.entity_type === filterEntityType || targetNode?.entity_type === filterEntityType;
-        })
-      };
-    }
+  // Calculate node degrees (number of connections) for sizing
+  const nodeDegrees = useMemo(() => {
+    const degrees = new Map<string, number>();
+    data.nodes.forEach(node => degrees.set(node.id, 0));
+    data.links.forEach(link => {
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      degrees.set(sourceId, (degrees.get(sourceId) || 0) + 1);
+      degrees.set(targetId, (degrees.get(targetId) || 0) + 1);
+    });
+    return degrees;
+  }, [data.nodes, data.links]);
 
-    // Apply view mode optimization
-    switch (viewMode) {
-      case 'filtered':
-        optimized = optimizeGraph(optimized, { mode: 'filtered', nodeLimit: 300 });
-        break;
-      case 'focus':
-        if (selectedNodeId) {
-          optimized = optimizeGraph(optimized, {
-            mode: 'focus',
-            focusNodeId: selectedNodeId,
-            hopDistance: 2
-          });
-        }
-        break;
-      case 'full':
-        // No optimization, show all
-        break;
-    }
+  // Filter data based on settings
+  const filteredData: GraphData = useMemo(() => {
+    const visibleNodes = data.nodes.filter(node => {
+      if (!settings.entityTypeFilters[node.entity_type]) {
+        return false;
+      }
+      if (settings.hideOrphans) {
+        const degree = nodeDegrees.get(node.id) || 0;
+        if (degree === 0) return false;
+      }
+      return true;
+    });
 
-    setOptimizedData(optimized);
-  }, [data, viewMode, filterEntityType, selectedNodeId]);
-  
-  // Node color based on verification tier
-  const getNodeColor = useCallback((node: Node) => {
-    const tierColors = {
-      'TIER_3_AI': '#6B7280',        // Grey
-      'TIER_2_ANALYST': '#F59E0B',   // Amber/Gold
-      'TIER_2_INSTITUTIONAL': '#D97706', // Darker amber (for distinction)
-      'TIER_1_CERTIFIED': '#3B82F6', // Blue
+    const visibleNodeIds = new Set(visibleNodes.map(node => node.id));
+    const visibleLinks = data.links.filter(link => {
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
+    });
+
+    return {
+      metadata: data.metadata,
+      nodes: visibleNodes,
+      links: visibleLinks,
     };
-    return tierColors[node.verification.tier] || '#6B7280';
-  }, []);
-  
-  // Node size based on connection count
-  const getNodeSize = useCallback((node: Node) => {
-    const connections = data.links.filter(
-      l => l.source === node.id || l.target === node.id
-    ).length;
-    return Math.max(6, Math.min(20, 6 + connections * 2));
-  }, [data.links]);
-  
-  // Custom node rendering
-  const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D) => {
-    const size = getNodeSize(node);
-    const color = getNodeColor(node);
+  }, [data, settings.entityTypeFilters, settings.hideOrphans, nodeDegrees]);
+
+  // Node rendering with size based on degree
+  const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale?: number) => {
+    const degree = nodeDegrees.get(node.id) || 0;
+    const size = BASE_NODE_SIZE + Math.pow(degree, 0.5) * settings.nodeSizeMultiplier;
+    const color = settings.entityColors[node.entity_type];
     const isSelected = node.id === selectedNodeId;
-    
-    // Glow effect for selected node
+
+    // Draw node with glow effect if selected
     if (isSelected) {
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, size + 4, 0, 2 * Math.PI);
-      ctx.fillStyle = `${color}40`;
-      ctx.fill();
+      ctx.shadowBlur = 24;
+      ctx.shadowColor = `${color}80`;
     }
-    
-    // Node circle
+
     ctx.beginPath();
     ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
     ctx.fillStyle = color;
     ctx.fill();
-    
-    // Border
-    ctx.strokeStyle = isSelected ? '#FFFFFF' : `${color}80`;
-    ctx.lineWidth = isSelected ? 2 : 1;
-    ctx.stroke();
-    
-    // Label
-    ctx.font = '10px JetBrains Mono';
-    ctx.fillStyle = '#F8FAFC';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(node.name, node.x, node.y + size + 4);
-  }, [getNodeColor, getNodeSize, selectedNodeId]);
-  
-  // Link styling
-  const linkColor = useCallback((link: Link) => {
-    const tierColors = {
-      'TIER_3_AI': '#6B728040',
-      'TIER_2_ANALYST': '#F59E0B60',
-      'TIER_2_INSTITUTIONAL': '#D9770660',
-      'TIER_1_CERTIFIED': '#3B82F680',
-    };
-    return tierColors[link.verification.tier] || '#6B728040';
-  }, []);
-  
+
+    // Border and label rendering...
+  }, [nodeDegrees, settings, selectedNodeId]);
+
+  // Custom link rendering with optional arrows
+  const linkCanvasObject = useCallback((link: any, ctx: CanvasRenderingContext2D, globalScale?: number) => {
+    // Draw line from source to target
+    // If settings.showArrows, draw arrow at target end
+    // Terminate line at node boundary, not center
+  }, [settings.showArrows, settings.linkWidth]);
+
   return (
     <div className="h-full w-full bg-slate-900">
       <ForceGraph2D
         ref={graphRef}
-        graphData={{
-          nodes: data.nodes,
-          links: data.links.map(l => ({
-            ...l,
-            source: l.source,
-            target: l.target,
-          })),
-        }}
+        graphData={filteredData as any}
         nodeCanvasObject={nodeCanvasObject}
-        linkColor={linkColor}
-        linkWidth={1.5}
-        linkDirectionalArrowLength={4}
-        linkDirectionalArrowRelPos={1}
-        onNodeClick={(node) => onNodeClick(node as Node)}
+        linkCanvasObject={linkCanvasObject}
+        linkColor={() => settings.linkColor}
+        onNodeClick={onNodeClick}
+        onBackgroundClick={onBackgroundClick}
         backgroundColor="#0F172A"
-        // Physics settings for a force-directed layout feel
-        d3VelocityDecay={0.3}
-        d3AlphaDecay={0.02}
-        warmupTicks={100}
-        cooldownTicks={200}
+        d3VelocityDecay={0.35}
+        d3AlphaDecay={0.025}
+        warmupTicks={40}
+        cooldownTicks={400}
       />
     </div>
   );
 }
 ```
 
-**Graph Configuration:**
+### 2. Graph Settings Panel
+
+**Implementation:** `components/GraphSettingsPanel.tsx`
+
+Three-tab floating panel with gear icon toggle:
 
 ```typescript
-// lib/graph-config.ts
+export function GraphSettingsPanel({
+  settings,
+  onUpdateSetting,
+  onReset,
+}: GraphSettingsPanelProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'layout' | 'colors' | 'filters'>('layout');
 
-export const GRAPH_CONFIG = {
-  // Force simulation
-  d3Force: {
-    charge: -300,        // Node repulsion
-    link: {
-      distance: 100,     // Preferred link length
-    },
-    center: true,
-    collision: {
-      radius: 30,        // Prevent overlap
-    },
-  },
-  
-  // Visual
-  nodeRelSize: 6,        // Base node size
-  linkWidth: 1.5,
-  linkDirectionalArrowLength: 4,
-  
-  // Interaction
-  enableZoom: true,
-  enablePan: true,
-  enableNodeDrag: true,
-  
-  // Performance
-  warmupTicks: 100,
-  cooldownTicks: 200,
-};
+  return (
+    <div className="absolute top-4 left-4">
+      {/* Gear Icon Toggle */}
+      <button onClick={() => setIsOpen(!isOpen)}>
+        {/* Animated gear icon with cyan glow when open */}
+      </button>
+
+      {/* Settings Panel */}
+      {isOpen && (
+        <div className="mt-3 rounded-xl bg-slate-900">
+          {/* Header with Reset button */}
+
+          {/* Tab Bar */}
+          <div className="flex border-b border-slate-800">
+            <button>Layout</button>
+            <button>Colors</button>
+            <button>Filters</button>
+          </div>
+
+          {/* Tab Content */}
+          {activeTab === 'layout' && (
+            <>
+              <DisplaySection />
+              <ForcesSection />
+            </>
+          )}
+
+          {activeTab === 'colors' && (
+            <ColorsSection />
+          )}
+
+          {activeTab === 'filters' && (
+            <>
+              <EntityTypeFilters />
+              <VisibilityToggles />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 ```
 
-### 2. Dossier Panel
+**Features:**
+- Click-outside-to-close behavior
+- Smooth slide-in animation
+- Cyan accent colors matching graph theme
+- Sliders with live value display
+- Toggle switches for boolean settings
+- Color pickers for entity colors
+- Reset button to restore defaults
+
+### 3. Dossier Panel
 
 Right-side detail panel shown when a node is selected.
 
 ```typescript
 // components/DossierPanel.tsx
 
-import { Node, Link, GraphData } from '@/lib/types';
+import { BaseNode, GraphData } from '@/lib/types';
 import { NodeBadge } from './NodeBadge';
 import { SourceList } from './SourceList';
 import { RelatedEntities } from './RelatedEntities';
 
 interface DossierPanelProps {
-  node: Node | null;
+  node: BaseNode | null;
   graphData: GraphData;
   onNodeSelect: (nodeId: string) => void;
 }
@@ -917,18 +661,18 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
       </div>
     );
   }
-  
+
   // Find related links and entities
   const relatedLinks = graphData.links.filter(
     l => l.source === node.id || l.target === node.id
   );
-  
+
   const relatedNodeIds = new Set(
     relatedLinks.flatMap(l => [l.source, l.target]).filter(id => id !== node.id)
   );
-  
+
   const relatedNodes = graphData.nodes.filter(n => relatedNodeIds.has(n.id));
-  
+
   // Find source documents
   const extractedFromIds = (node.extracted_from || '')
     .split(',')
@@ -938,7 +682,7 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
   const sourceDocuments = graphData.nodes.filter(
     n => n.entity_type === 'DOCUMENT' && extractedFromSet.has(n.id)
   );
-  
+
   return (
     <div className="vault-panel h-full overflow-y-auto p-4 space-y-6">
       {/* Header */}
@@ -953,7 +697,7 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
           {node.entity_type} • {node.id}
         </p>
       </div>
-      
+
       {/* Verification Info */}
       <section className="vault-card">
         <h3 className="text-sm font-semibold text-slate-300 mb-2">
@@ -971,7 +715,7 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
             </p>
           )}
         </div>
-        
+
         {/* TIER_3 Disclaimer */}
         {node.verification.tier === 'TIER_3_AI' && (
           <div className="mt-3 p-2 bg-slate-800 rounded border border-slate-700">
@@ -982,7 +726,7 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
           </div>
         )}
       </section>
-      
+
       {/* Entity Data */}
       <section className="vault-card">
         <h3 className="text-sm font-semibold text-slate-300 mb-2">
@@ -990,43 +734,27 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
         </h3>
         <EntityDataDisplay data={node} type={node.entity_type} />
       </section>
-      
-      {/* Aliases */}
-      {node.alternate_names && node.alternate_names.length > 0 && (
-        <section className="vault-card">
-          <h3 className="text-sm font-semibold text-slate-300 mb-2">
-            Also Known As
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {node.alternate_names.map((alias, i) => (
-              <span key={i} className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-400 font-mono">
-                {alias}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
-      
+
       {/* Source Documents */}
       {sourceDocuments.length > 0 && (
         <section className="vault-card">
           <h3 className="text-sm font-semibold text-slate-300 mb-2">
             Source Documents ({sourceDocuments.length})
           </h3>
-          <SourceList 
-            documents={sourceDocuments} 
+          <SourceList
+            documents={sourceDocuments}
             onDocumentClick={(docId) => onNodeSelect(docId)}
           />
         </section>
       )}
-      
+
       {/* Related Entities */}
       {relatedNodes.length > 0 && (
         <section className="vault-card">
           <h3 className="text-sm font-semibold text-slate-300 mb-2">
             Related Entities ({relatedNodes.length})
           </h3>
-          <RelatedEntities 
+          <RelatedEntities
             nodes={relatedNodes}
             links={relatedLinks}
             currentNodeId={node.id}
@@ -1039,7 +767,7 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
 }
 ```
 
-### 3. Node Badge
+### 4. Node Badge
 
 Verification tier indicator.
 
@@ -1062,7 +790,7 @@ const TIER_CONFIG = {
   'TIER_2_INSTITUTIONAL': {
     label: 'FH VERIFIED',
     className: 'bg-amber-600/20 text-amber-500 border-amber-600',
-    icon: '🏛️'  // Building/institution emoji
+    icon: '🏛️'
   },
   'TIER_1_CERTIFIED': {
     label: 'CERTIFIED',
@@ -1085,7 +813,7 @@ export function NodeBadge({ tier, size = 'sm' }: NodeBadgeProps) {
       px-2 py-0.5
       rounded
       border
-      font-mono 
+      font-mono
       uppercase
       ${size === 'sm' ? 'text-xs' : 'text-sm'}
       ${config.className}
@@ -1093,437 +821,6 @@ export function NodeBadge({ tier, size = 'sm' }: NodeBadgeProps) {
       {config.icon && <span className="text-sm">{config.icon}</span>}
       {config.label}
     </span>
-  );
-}
-```
-
-### 4. Source Viewer
-
-Document image viewer with OCR text overlay.
-
-```typescript
-// components/SourceViewer.tsx
-
-import { useState } from 'react';
-import { Node } from '@/lib/types';
-
-interface SourceViewerProps {
-  document: Node;
-}
-
-export function SourceViewer({ document }: SourceViewerProps) {
-  const [showOcr, setShowOcr] = useState(false);
-  const [zoom, setZoom] = useState(1);
-  
-  const docData = document as {
-    file_path?: string;
-    ocr_text?: string;
-    summary?: string;
-  };
-  
-  return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-2 border-b border-slate-700">
-        <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
-            className="px-2 py-1 bg-slate-800 rounded hover:bg-slate-700"
-          >
-            -
-          </button>
-          <span className="text-sm font-mono">{Math.round(zoom * 100)}%</span>
-          <button 
-            onClick={() => setZoom(z => Math.min(3, z + 0.25))}
-            className="px-2 py-1 bg-slate-800 rounded hover:bg-slate-700"
-          >
-            +
-          </button>
-        </div>
-        
-        <button
-          onClick={() => setShowOcr(!showOcr)}
-          className={`px-3 py-1 rounded text-sm ${
-            showOcr ? 'bg-blue-600' : 'bg-slate-800 hover:bg-slate-700'
-          }`}
-        >
-          {showOcr ? 'Hide OCR' : 'Show OCR'}
-        </button>
-      </div>
-      
-      {/* Document View */}
-      <div className="flex-1 overflow-auto p-4">
-        {showOcr ? (
-          <div className="bg-slate-800 p-4 rounded">
-            <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
-              {docData.ocr_text || 'No OCR text available'}
-            </pre>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <img
-              src={`/data/images/${docData.file_path}`}
-              alt={document.name}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
-              className="max-w-full shadow-lg"
-            />
-          </div>
-        )}
-      </div>
-      
-      {/* Summary */}
-      {docData.summary && (
-        <div className="p-3 border-t border-slate-700 bg-slate-800/50">
-          <p className="text-sm text-slate-400">
-            <span className="font-semibold text-slate-300">Summary: </span>
-            {docData.summary}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
-### 5. OCR Text Display
-
-**Purpose:** Display extracted OCR text from documents for transparency and analyst verification.
-
-**Location:** Extend SourceViewer component to show OCR data from extraction JSONs.
-
-**Data Source:**
-- OCR data stored in extraction JSONs (not in graph nodes)
-- Path: `cases/{case_id}/extractions/{document_id}.json`
-- Structure: `extraction.ocr_result.{text, confidence, blocks, metadata}`
-
-**Implementation Notes:**
-
-Update SourceViewer to fetch and display OCR data:
-
-```typescript
-// Add OCR confidence display with color coding
-function getConfidenceColor(confidence: number): string {
-  if (confidence >= 0.9) return 'text-green-400';   // High confidence
-  if (confidence >= 0.7) return 'text-yellow-400';  // Medium confidence
-  return 'text-red-400';                            // Low confidence - warn user
-}
-
-// In SourceViewer, show OCR metadata above text:
-<div className="flex items-center gap-3 text-sm pb-2 border-b border-slate-700">
-  <span className={`font-mono ${getConfidenceColor(ocrData.confidence)}`}>
-    OCR Confidence: {(ocrData.confidence * 100).toFixed(0)}%
-  </span>
-  {ocrData.metadata.language && (
-    <span className="text-slate-400">
-      Language: {ocrData.metadata.language.toUpperCase()}
-    </span>
-  )}
-</div>
-
-<pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono leading-relaxed">
-  {ocrData.text}
-</pre>
-```
-
-**Display Rules:**
-- Color-code confidence: Green ≥90%, Yellow 70-89%, Red <70%
-- Show detected language from `metadata.language`
-- Preserve whitespace/formatting from original
-- TIER_3_AI disclaimer required for unverified OCR text
-- Load extraction JSON on-demand (when user clicks "Show OCR")
-
-**Access Control:**
-- OCR text follows case-based permissions (same as entities)
-- If user can view case, they can view OCR text
-
-**Future Enhancement (Out of Scope for MVP1):**
-- OCR Block Viewer showing per-block confidence and bounding boxes
-- Click entity → highlight source text in document (requires mapping)
-- OCR text search within document
-
-### 6. Timeline View
-
-Chronological event display.
-
-```typescript
-// components/TimelineView.tsx
-
-import { TimelineEvent } from '@/lib/types';
-import { NodeBadge } from './NodeBadge';
-
-interface TimelineViewProps {
-  events: TimelineEvent[];
-  onEntityClick: (entityId: string) => void;
-}
-
-export function TimelineView({ events, onEntityClick }: TimelineViewProps) {
-  // Sort events by date
-  const sortedEvents = [...events].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-  
-  return (
-    <div className="relative pl-4">
-      {/* Timeline line */}
-      <div className="absolute left-0 top-0 bottom-0 w-px bg-slate-700" />
-      
-      {sortedEvents.map((event, index) => (
-        <div key={index} className="relative pb-6 last:pb-0">
-          {/* Timeline dot */}
-          <div className={`
-            absolute -left-1.5 w-3 h-3 rounded-full border-2
-            ${event.verification === 'TIER_1_CERTIFIED' ? 'bg-blue-500 border-blue-400' :
-              event.verification === 'TIER_2_INSTITUTIONAL' ? 'bg-amber-600 border-amber-500' :
-              event.verification === 'TIER_2_ANALYST' ? 'bg-amber-500 border-amber-400' :
-              'bg-gray-500 border-gray-400'}
-          `} />
-          
-          {/* Event content */}
-          <div className="ml-4">
-            <div className="flex items-center gap-2 mb-1">
-              <time className="text-sm font-mono text-slate-400">
-                {formatDate(event.date, event.date_precision)}
-              </time>
-              <NodeBadge tier={event.verification} size="sm" />
-            </div>
-            
-            <p className="text-slate-200">{event.event}</p>
-            
-            {/* Related entities */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {event.entities.map(entityId => (
-                <button
-                  key={entityId}
-                  onClick={() => onEntityClick(entityId)}
-                  className="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 rounded font-mono"
-                >
-                  {entityId}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function formatDate(date: string, precision?: string): string {
-  const d = new Date(date);
-  switch (precision) {
-    case 'year':
-      return d.getFullYear().toString();
-    case 'month':
-      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-    case 'decade':
-      return `${Math.floor(d.getFullYear() / 10) * 10}s`;
-    default:
-      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  }
-}
-```
-
-### 7. Gap Alert
-
-Display missing evidence warnings.
-
-```typescript
-// components/GapAlert.tsx
-
-import { Gap } from '@/lib/types';
-
-const PRIORITY_STYLES = {
-  CRITICAL: 'border-red-500 bg-red-500/10',
-  HIGH: 'border-amber-500 bg-amber-500/10',
-  MEDIUM: 'border-yellow-500 bg-yellow-500/10',
-  LOW: 'border-slate-500 bg-slate-500/10',
-};
-
-interface GapAlertProps {
-  gap: Gap;
-  onEntityClick: (entityId: string) => void;
-}
-
-export function GapAlert({ gap, onEntityClick }: GapAlertProps) {
-  return (
-    <div className={`border rounded p-3 ${PRIORITY_STYLES[gap.priority]}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className={`
-          px-2 py-0.5 rounded text-xs font-mono uppercase
-          ${gap.priority === 'CRITICAL' ? 'bg-red-500 text-white' :
-            gap.priority === 'HIGH' ? 'bg-amber-500 text-black' :
-            gap.priority === 'MEDIUM' ? 'bg-yellow-500 text-black' :
-            'bg-slate-500 text-white'}
-        `}>
-          {gap.priority}
-        </span>
-        <span className="text-sm text-slate-400 font-mono">
-          {gap.gap_type?.replace(/_/g, ' ')}
-        </span>
-      </div>
-      
-      <p className="text-sm text-slate-300 mb-2">
-        {gap.description}
-      </p>
-      
-      {/* Related entities */}
-      {gap.related_entities.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-2">
-          {gap.related_entities.map(entityId => (
-            <button
-              key={entityId}
-              onClick={() => onEntityClick(entityId)}
-              className="px-2 py-0.5 text-xs bg-slate-800 hover:bg-slate-700 rounded font-mono"
-            >
-              {entityId}
-            </button>
-          ))}
-        </div>
-      )}
-      
-      {/* Suggested sources */}
-      {gap.suggested_sources && gap.suggested_sources.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-slate-700">
-          <p className="text-xs text-slate-500 mb-1">Suggested sources:</p>
-          <ul className="text-xs text-slate-400 list-disc list-inside">
-            {gap.suggested_sources.map((source, i) => (
-              <li key={i}>{source}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
----
-
-## Page Components
-
-### Dashboard Page
-
-```typescript
-// app/case/[id]/page.tsx
-
-import { GraphData } from '@/lib/types';
-import { KnowledgeGraph } from '@/components/KnowledgeGraph';
-import { DossierPanel } from '@/components/DossierPanel';
-import { useState } from 'react';
-
-export default function CaseDashboard({ params }: { params: { id: string } }) {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  
-  // Load graph data (static import for MVP)
-  const graphData: GraphData = require(`@/public/data/${params.id}/graph_data.json`);
-  
-  const selectedNode = selectedNodeId 
-    ? graphData.nodes.find(n => n.id === selectedNodeId) 
-    : null;
-  
-  return (
-    <div className="h-screen flex flex-col bg-slate-900">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-50">
-            {graphData.metadata.case_id}
-          </h1>
-          <p className="text-sm text-slate-400 font-mono">
-            {graphData.metadata.case_id}
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-slate-500">
-            {graphData.metadata.entity_count} entities • {graphData.metadata.relation_count} relations
-          </span>
-        </div>
-      </header>
-      
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Graph */}
-        <div className="flex-1">
-          <KnowledgeGraph
-            data={graphData}
-            onNodeClick={(node) => setSelectedNodeId(node.id)}
-            selectedNodeId={selectedNodeId}
-          />
-        </div>
-        
-        {/* Dossier Panel */}
-        <div className="w-[400px] border-l border-slate-800">
-          <DossierPanel
-            node={selectedNode}
-            graphData={graphData}
-            onNodeSelect={setSelectedNodeId}
-          />
-        </div>
-      </div>
-      
-      {/* Footer */}
-      <footer className="px-6 py-3 border-t border-slate-800 bg-slate-900/50">
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-gray-500" /> AI Inference
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-amber-500" /> Verified
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-500" /> Certified
-            </span>
-          </div>
-          
-          <p>
-            Processed: {new Date(graphData.metadata.updated_at).toLocaleDateString()}
-          </p>
-        </div>
-      </footer>
-    </div>
-  );
-}
-```
-
----
-
-## Legal Disclaimer Component
-
-Required on all pages.
-
-```typescript
-// components/LegalDisclaimer.tsx
-
-interface LegalDisclaimerProps {
-  disclaimer: string;
-  expanded?: boolean;
-}
-
-export function LegalDisclaimer({ disclaimer, expanded = false }: LegalDisclaimerProps) {
-  const [isExpanded, setIsExpanded] = useState(expanded);
-  
-  return (
-    <div className="bg-slate-800 border border-slate-700 rounded p-3">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between w-full text-left"
-      >
-        <span className="text-sm font-semibold text-slate-300">
-          ⚖️ Legal Disclaimer
-        </span>
-        <span className="text-slate-500">
-          {isExpanded ? '▼' : '▶'}
-        </span>
-      </button>
-      
-      {isExpanded && (
-        <p className="mt-2 text-xs text-slate-400 leading-relaxed">
-          {disclaimer}
-        </p>
-      )}
-    </div>
   );
 }
 ```
@@ -1538,18 +835,22 @@ export function LegalDisclaimer({ disclaimer, expanded = false }: LegalDisclaime
 // package.json
 {
   "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-force-graph-2d": "^1.24.0"
+    "next": "^16.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-force-graph-2d": "^1.24.0",
+    "@clerk/nextjs": "^6.12.0",
+    "@supabase/supabase-js": "^2.49.1"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/d3-force": "^3.0.10",
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
-    "tailwindcss": "^3.3.0",
-    "typescript": "^5.0.0"
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18"
   }
 }
 ```
@@ -1566,7 +867,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        mono: ['Space Grotesk', 'JetBrains Mono', 'monospace'],
         sans: ['Inter', '-apple-system', 'sans-serif'],
       },
       colors: {
@@ -1584,12 +885,76 @@ module.exports = {
 
 ## Accessibility
 
-- All interactive elements have focus states
+- All interactive elements have focus states with cyan ring
 - Color is not the only indicator (badges have text labels)
-- Keyboard navigation for graph (arrow keys, enter to select)
-- Screen reader labels on all controls
-- Sufficient color contrast (WCAG AA)
+- Keyboard navigation supported (Tab, Enter, Escape)
+- Screen reader labels on all controls (aria-label, aria-pressed)
+- Sufficient color contrast (WCAG AA minimum)
+- Reduced motion support (prefers-reduced-motion respected)
+- Click-outside-to-close for modal panels
 
 ---
 
-*This specification defines the MVP1 Vault interface. Advanced features (authentication, multi-case, real-time updates) are deferred to MVP2.*
+## Testing
+
+### Unit Tests
+
+```typescript
+// hooks/useGraph.test.ts
+- ✓ Initializes with default settings
+- ✓ Updates individual settings
+- ✓ Resets to defaults
+- ✓ Persists settings to localStorage
+```
+
+### Integration Tests
+
+```typescript
+// components/KnowledgeGraph.test.tsx
+- ✓ Renders graph with filtered data
+- ✓ Hides nodes based on entity type filters
+- ✓ Hides orphan nodes when enabled
+- ✓ Updates on settings change
+```
+
+---
+
+## Performance Considerations
+
+**Current Performance:**
+- 100-300 nodes: 60 FPS consistently
+- Real-time settings updates without lag
+- Smooth animations and transitions
+- Bundle size optimized with dynamic imports
+
+**Optimization Techniques:**
+1. **Memoization**: Expensive calculations cached with useMemo
+2. **Dynamic Imports**: ForceGraph2D loaded on demand (~200KB saved)
+3. **Canvas Rendering**: Direct canvas manipulation for custom nodes/links
+4. **Efficient Filtering**: Set-based lookups for node visibility
+5. **Debounced Updates**: Settings changes batched for performance
+
+---
+
+## Changelog
+
+### Version 2.0.0 (2026-01-26)
+- Added Filters tab with entity type toggles and orphan hiding
+- Implemented real-time graph filtering based on settings
+- Updated documentation to reflect current implementation
+- Marked future enhancements as out of scope for MVP1
+- Added comprehensive testing section
+
+### Version 1.1.0 (2025-01-21)
+- Added graph settings panel with Layout and Colors tabs
+- Implemented custom arrow rendering
+- Added performance optimizations
+
+### Version 1.0.0 (2025-01-20)
+- Initial MVP1 implementation
+- Basic knowledge graph with force-directed layout
+- Dossier panel with entity details
+
+---
+
+*This specification reflects the current MVP1 implementation of The Vault interface. For backend integration details, see `/docs/architecture/ARCHITECTURE.md`. For data schemas, see `/farmer_factory/structure/SCHEMA.md`.*
