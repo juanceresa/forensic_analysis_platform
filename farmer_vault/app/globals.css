@@ -25,46 +25,60 @@
 }
 
 @theme inline {
-  /* Verification tier colors - Cold Steel Intelligence */
-  --color-tier-1: #06B6D4;          /* Cyan - TIER_1_CERTIFIED */
-  --color-tier-2: #3B82F6;          /* Blue - TIER_2_ANALYST */
-  --color-tier-2-inst: #8B5CF6;     /* Purple - TIER_2_INSTITUTIONAL */
-  --color-tier-3: #64748B;          /* Slate - TIER_3_AI */
+  /* Verification tier colors - Forensic Intelligence */
+  --color-tier-ai: #f59e0b;         /* Amber - TIER_3_AI */
+  --color-tier-analyst: #3b82f6;    /* Blue - TIER_2_ANALYST */
+  --color-tier-certified: #10b981;  /* Green - TIER_1_CERTIFIED */
+  --color-tier-source: #a855f7;     /* Purple - TIER_4_SOURCE */
 
-  /* Accent colors */
-  --color-primary: #06B6D4;         /* Cyan - Primary accent */
-  --color-secondary: #3B82F6;       /* Blue - Secondary */
-  --color-tertiary: #8B5CF6;        /* Purple - Tertiary */
-  --color-danger: #DC2626;          /* Red - Critical/errors */
-  --color-success: #10B981;         /* Emerald - Success states */
+  /* Tier background colors (with opacity) */
+  --color-tier-ai-bg: rgb(245 158 11 / 0.1);
+  --color-tier-ai-border: rgb(245 158 11 / 0.2);
+  --color-tier-ai-text: #fbbf24;
+
+  --color-tier-analyst-bg: rgb(59 130 246 / 0.1);
+  --color-tier-analyst-border: rgb(59 130 246 / 0.2);
+  --color-tier-analyst-text: #60a5fa;
+
+  --color-tier-certified-bg: rgb(16 185 129 / 0.1);
+  --color-tier-certified-border: rgb(16 185 129 / 0.2);
+  --color-tier-certified-text: #34d399;
+
+  --color-tier-source-bg: rgb(168 85 247 / 0.1);
+  --color-tier-source-border: rgb(168 85 247 / 0.2);
+  --color-tier-source-text: #c084fc;
+
+  /* Interactive colors */
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
 
   /* Custom animations */
-  --animate-flicker: flicker 3s linear infinite;
-  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-typewriter: typewriter 2s steps(40) forwards;
-  --animate-glow: glow 2s ease-in-out infinite;
+  --animate-fade-in-up: fadeInUp 0.3s ease-out backwards;
+  --animate-fade-in-left: fadeInLeft 0.4s ease-out backwards;
 }
 
-@keyframes flicker {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.95; }
-}
-
-@keyframes typewriter {
-  0% { width: 0; }
-  100% { width: 100%; }
-}
-
-@keyframes glow {
-  0%, 100% {
-    text-shadow: 0 0 10px rgba(6, 182, 212, 0.5),
-                 0 0 20px rgba(6, 182, 212, 0.3),
-                 0 0 30px rgba(6, 182, 212, 0.1);
+/* Animation keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-  50% {
-    text-shadow: 0 0 15px rgba(6, 182, 212, 0.8),
-                 0 0 30px rgba(6, 182, 212, 0.5),
-                 0 0 45px rgba(6, 182, 212, 0.2);
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -77,6 +91,24 @@
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+/* Apply animations only when motion is preferred */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-fade-in-up {
+    animation: fadeInUp 0.3s ease-out backwards;
+  }
+
+  .animate-fade-in-left {
+    animation: fadeInLeft 0.4s ease-out backwards;
+  }
+
+  /* Staggered delay utilities */
+  .stagger-delay-1 { animation-delay: 0.05s; }
+  .stagger-delay-2 { animation-delay: 0.10s; }
+  .stagger-delay-3 { animation-delay: 0.15s; }
+  .stagger-delay-4 { animation-delay: 0.20s; }
+  .stagger-delay-5 { animation-delay: 0.25s; }
 }
 
 /* Premium hover scale utilities */
@@ -95,23 +127,6 @@ html {
 body {
   @apply bg-slate-950 text-slate-100;
   font-family: var(--font-body);
-  /* Holographic data grid */
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 1px,
-      rgba(6, 182, 212, 0.03) 1px,
-      rgba(6, 182, 212, 0.03) 2px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 1px,
-      rgba(6, 182, 212, 0.02) 1px,
-      rgba(6, 182, 212, 0.02) 2px
-    );
-  background-size: 40px 40px;
 }
 
 /* Graph theme hooks for class-based styling */
@@ -238,9 +253,12 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   text-wrap: balance;
+}
+
+/* Tabular numbers for data display */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
 
 code, .font-mono, pre {
