@@ -6,6 +6,8 @@ import { Header } from '@/components/Header';
 import { KnowledgeGraph } from '@/components/KnowledgeGraph';
 import { EntitySidebar } from '@/components/EntitySidebar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { GraphSettingsPanel } from '@/components/GraphSettingsPanel';
+import { useGraphSettings } from '@/hooks/useGraphSettings';
 
 type TabType = 'details' | 'narrative';
 
@@ -18,6 +20,7 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('details');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const { settings, updateSetting, resetSettings } = useGraphSettings();
 
   const selectedNode = initialData.nodes.find((n) => n.id === selectedNodeId) || null;
 
@@ -35,7 +38,7 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left: Graph (flexible width) */}
-          <div className="flex-1 min-w-0 relative z-0">
+          <div className="flex-1 min-w-0 relative">
             <KnowledgeGraph
               data={initialData}
               selectedNodeId={selectedNodeId}
@@ -44,6 +47,15 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
                 setSelectedNodeId(node.id);
                 setActiveTab('details'); // Reset to details on new selection
               }}
+              onBackgroundClick={() => {
+                setSelectedNodeId(null);
+              }}
+              settings={settings}
+            />
+            <GraphSettingsPanel
+              settings={settings}
+              onUpdateSetting={updateSetting}
+              onReset={resetSettings}
             />
           </div>
 
