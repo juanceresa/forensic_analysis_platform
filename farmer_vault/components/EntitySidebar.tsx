@@ -28,6 +28,14 @@ export function EntitySidebar({
 
   const hasSelection = Boolean(selectedNode);
 
+  // DEBUG: Log sidebar state
+  console.log('EntitySidebar render:', {
+    hasSelection,
+    selectedNodeId: selectedNode?.id,
+    activeTab,
+    willRenderDossier: activeTab === 'details',
+  });
+
   const handleGenerateNarrative = () => {
     if (selectedNode) {
       onTabChange('narrative');

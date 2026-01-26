@@ -35,6 +35,13 @@ export function DossierPanel({
     [node?.extracted_from]
   );
 
+  // DEBUG: Log dossier state
+  console.log('DossierPanel render:', {
+    hasNode: Boolean(node),
+    nodeId: node?.id,
+    nodeName: node?.name,
+  });
+
   if (!node) return EMPTY_STATE;
 
   return (
