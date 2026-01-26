@@ -78,10 +78,34 @@ def test_process_page_handwritten():
         end_x = np.random.randint(170, 190)
         image[y:y+thickness, start_x:end_x] = np.random.randint(40, 80)
 
-    pipeline = PreprocessingPipeline()
+    pipeline = PreprocessingPipeline(enable_triage=True)
     result = pipeline.process_page(image)
 
     # Check result
     assert result.path == DocumentPath.HANDWRITTEN
     assert result.image.shape == image.shape
     assert "skew_angle" in result.metadata
+
+
+def test_process_page_rgb_image():
+    """Test RGB images are converted to grayscale."""
+    from farmer_factory.prepare.pipeline import PreprocessingPipeline
+
+    pipeline = PreprocessingPipeline()
+
+    rgb_image = np.zeros((100, 100, 3), dtype=np.uint8)
+    rgb_image[:, :, 0] = 255
+
+    result = pipeline.process_page(rgb_image)
+
+    assert result.image.ndim == 2
+
+
+def test_process_page_empty_image():
+    """Test empty image raises a clear error."""
+    from farmer_factory.prepare.pipeline import PreprocessingPipeline
+
+    pipeline = PreprocessingPipeline()
+
+    with pytest.raises(ValueError, match="Empty image"):
+        pipeline.process_page(np.array([]))

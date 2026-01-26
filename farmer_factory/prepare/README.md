@@ -9,6 +9,17 @@ The `prepare` module implements a two-path preprocessing pipeline:
 - **TYPED Path**: For typewritten documents → Binary images for Google Cloud Vision OCR
 - **HANDWRITTEN Path**: For handwritten documents → Grayscale images for Claude Vision API
 
+Triage is currently disabled by default due to accuracy concerns. Use
+`PreprocessingPipeline(enable_triage=True)` to opt in.
+
+Handwritten extraction is still mocked (simulated output) in
+`farmer_factory/extract/vision.py`.
+
+Recent updates:
+- Preprocessing defaults to TYPED unless triage is enabled.
+- Empty images raise a clear error; RGB images are converted to grayscale.
+- Triage includes a near-blank detection branch (only when enabled).
+
 ## Complete Documentation
 
 See `PREPROCESSING.md` for detailed pipeline specification:
@@ -44,7 +55,7 @@ import cv2
 # Load image
 image = cv2.imread("document.png", cv2.IMREAD_GRAYSCALE)
 
-# Process through pipeline
+# Process through pipeline (triage disabled by default)
 pipeline = PreprocessingPipeline()
 result = pipeline.process_page(image)
 
@@ -68,7 +79,7 @@ Routes documents to appropriate processing path based on quality metrics:
 - **Contrast**: Dynamic range assessment
 - **Degradation**: Fading and damage detection
 
-**Decision tree:**
+**Decision tree (when enabled):**
 - High line variance (>0.3) → HANDWRITTEN
 - Low text density (<0.15) → HANDWRITTEN
 - Otherwise → TYPED

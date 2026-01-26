@@ -26,9 +26,9 @@ class PreprocessingPipeline:
     Orchestrates triage, deskew, denoise, enhance, and binarize stages.
     """
 
-    def __init__(self):
+    def __init__(self, enable_triage: bool = False):
         """Initialize preprocessing pipeline."""
-        pass
+        self.enable_triage = enable_triage
 
     def process_page(self, image: np.ndarray) -> ProcessedPage:
         """
@@ -42,12 +42,26 @@ class PreprocessingPipeline:
         """
         metadata: Dict[str, Any] = {}
 
-        # Stage 1: Triage - Determine processing path
-        triage_result = triage_document(image)
-        path = triage_result.path
-        metadata["triage_confidence"] = triage_result.confidence
-        metadata["triage_reason"] = triage_result.reason
-        metadata.update(triage_result.metrics)
+        if image is None or image.size == 0:
+            raise ValueError("Empty image provided for preprocessing")
+
+        if image.ndim == 3:
+            # Convert color images to grayscale
+            image = np.mean(image, axis=2).astype(np.uint8)
+        elif image.ndim != 2:
+            raise ValueError(f"Unsupported image shape for preprocessing: {image.shape}")
+
+        # Stage 1: Triage - Determine processing path (optional)
+        if self.enable_triage:
+            triage_result = triage_document(image)
+            path = triage_result.path
+            metadata["triage_confidence"] = triage_result.confidence
+            metadata["triage_reason"] = triage_result.reason
+            metadata.update(triage_result.metrics)
+        else:
+            path = DocumentPath.TYPED
+            metadata["triage_confidence"] = 0.0
+            metadata["triage_reason"] = "Triage disabled; defaulting to typed path"
 
         # Stage 2: Deskew - Detect and correct rotation
         skew_angle = detect_skew_angle(image)

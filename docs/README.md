@@ -56,6 +56,12 @@ Implementation-level documentation:
 ## Recent Changes
 
 Context for recent updates in this session:
+- Preprocessing now defaults to the TYPED path unless triage is explicitly enabled.
+  - Added an `enable_triage` flag to `PreprocessingPipeline` (default `False`).
+  - Added safety checks: empty images raise errors; RGB images convert to grayscale.
+  - Added a near-blank page check in triage to avoid misrouting blank pages as handwritten.
+  - Updated tests for the new default and added empty/RGB cases.
+  - Docs clarify triage is disabled by default.
 - Narrative API now loads `graph_data.json`, and relation counting/model selection uses unique edges.
 - Knowledge graph supports multiple relations between the same nodes (multi-edge) and cache invalidation hashes full graph state.
 - Extraction now passes document dates into relation temporal fallbacks and skips invalid relation types without dropping valid ones.
@@ -63,6 +69,8 @@ Context for recent updates in this session:
 - Processing now persists extraction flags, validates extraction payloads, and validates exported `graph_data.json`.
 - Narrative prompts now include relation evidence/doc IDs, cache hashing ignores timestamps, and document IDs are normalized.
 - CLI validate now runs schema checks; `process` supports `--skip-validation`.
+- Preprocessing triage is disabled by default; it can be enabled via `PreprocessingPipeline(enable_triage=True)`.
+- Handwritten Vision extraction is mocked right now (`farmer_factory/extract/vision.py`).
 
 ---
 

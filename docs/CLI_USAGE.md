@@ -57,8 +57,9 @@ python farmer_factory/cli.py process CASE-CERESA --skip-validation
 
 **What happens:**
 1. PDFs converted to images (300 DPI grayscale)
-2. Images preprocessed (deskew, denoise, triage)
+2. Images preprocessed (deskew, denoise, triage when enabled)
 3. Entities/relations extracted (OCR + Vision + LLM)
+   - Handwritten Vision extraction is mocked right now (simulated outputs)
 4. Knowledge graph built (auto-deduplication)
 5. Graph exported to `graph_data.json` and validated
 

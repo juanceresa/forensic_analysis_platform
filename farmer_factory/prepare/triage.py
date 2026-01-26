@@ -167,8 +167,11 @@ def triage_document(image: np.ndarray) -> TriageResult:
     # 1. High line variance (> 0.3) → HANDWRITTEN
     # 2. Low text density (< 0.15) → HANDWRITTEN (sparse writing)
     # 3. Otherwise → TYPED
-
-    if line_variance > 0.3:
+    if text_density < 0.01 and contrast < 0.05:
+        confidence = 0.6
+        reason = "Near-blank page detected (low text density and contrast)"
+        path = DocumentPath.TYPED
+    elif line_variance > 0.3:
         # High variance = handwritten
         confidence = min(line_variance, 0.95)
         reason = f"High line spacing variance ({line_variance:.2f}) indicates handwriting"
