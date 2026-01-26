@@ -1,26 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Typography - Forensic Intelligence Style */
+  --font-display: 'IBM Plex Mono', 'Courier Prime', monospace;
+  --font-body: 'Source Serif 4', 'Crimson Pro', Georgia, serif;
+  --font-mono: 'Fira Code', 'JetBrains Mono', monospace;
+  --font-ui: 'Inter Tight', 'DM Sans', sans-serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Verification tier colors */
+  --color-tier-1: #3B82F6;          /* Blue - TIER_1_CERTIFIED */
+  --color-tier-2: #F59E0B;          /* Amber - TIER_2_ANALYST */
+  --color-tier-2-inst: #D97706;     /* Dark Amber - TIER_2_INSTITUTIONAL */
+  --color-tier-3: #6B7280;          /* Gray - TIER_3_AI */
+
+  /* Custom animations */
+  --animate-flicker: flicker 3s linear infinite;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-typewriter: typewriter 2s steps(40) forwards;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.95; }
+}
+
+@keyframes typewriter {
+  0% { width: 0; }
+  100% { width: 100%; }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-slate-950 text-slate-100;
+  font-family: var(--font-body);
+  /* War room grid overlay */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 1px,
+    rgba(255,255,255,0.02) 1px,
+    rgba(255,255,255,0.02) 2px
+  );
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+code, .font-mono, pre {
+  font-family: var(--font-mono);
+}
+
+/* Accessibility - Focus indicators */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-amber-400 ring-0;
+}
+
+/* Evidence stamp utility */
+.evidence-stamp {
+  @apply inline-block px-3 py-1.5 border-2 font-mono text-[10px] font-black uppercase tracking-wider shadow-lg;
+}
+
+/* Redacted text effect */
+.redacted {
+  @apply bg-slate-800 text-transparent select-none;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #000 0px,
+    #000 2px,
+    transparent 2px,
+    transparent 4px
+  );
 }
