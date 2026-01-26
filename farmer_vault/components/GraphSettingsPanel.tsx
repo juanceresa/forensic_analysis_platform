@@ -177,6 +177,28 @@ export function GraphSettingsPanel({
                       onChange={(v) => onUpdateSetting('constellationLinkWidth', v)}
                       range={SETTINGS_RANGES.constellationLinkWidth}
                     />
+
+                    {/* Show Arrows Toggle */}
+                    <div className="flex items-center justify-between pt-1">
+                      <label htmlFor="show-arrows-toggle" className="text-xs text-slate-400">
+                        {SETTING_LABELS.showArrows}
+                      </label>
+                      <button
+                        id="show-arrows-toggle"
+                        role="switch"
+                        aria-checked={settings.showArrows}
+                        onClick={() => onUpdateSetting('showArrows', !settings.showArrows)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                          settings.showArrows ? 'bg-cyan-500' : 'bg-slate-700'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3 w-3 transform rounded-full bg-white shadow-sm transition-transform ${
+                            settings.showArrows ? 'translate-x-5' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </section>
 

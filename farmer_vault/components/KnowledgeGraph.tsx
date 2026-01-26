@@ -624,6 +624,9 @@ export function KnowledgeGraph({
         nodeLabel={(node: any) => `${node.name || node.id} (${node.entity_type})`}
         linkColor={getLinkColor as any}
         linkWidth={getLinkWidth as any}
+        linkDirectionalArrowLength={settings.showArrows ? 6 : 0}
+        linkDirectionalArrowRelPos={1}
+        linkDirectionalArrowColor={getLinkColor as any}
         linkCanvasObjectMode={() => 'replace'}
         linkCanvasObject={linkCanvasObject}
         backgroundColor="rgba(0,0,0,0)"

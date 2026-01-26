@@ -15,6 +15,7 @@ export interface GraphSettings {
   nodeSizeMultiplier: number;    // Scale factor for degree-based sizing
   linkWidth: number;             // Standard link thickness
   constellationLinkWidth: number; // Highlighted constellation link thickness
+  showArrows: boolean;           // Show directional arrows on links
 
   // Force Simulation Settings
   centerForce: number;           // Gravity toward center (0-2)
@@ -31,6 +32,7 @@ export const DEFAULT_SETTINGS: GraphSettings = {
   nodeSizeMultiplier: 2,
   linkWidth: 2,
   constellationLinkWidth: 1.5,
+  showArrows: false,
 
   // Forces
   centerForce: 0.1,
@@ -59,6 +61,7 @@ export const SETTINGS_RANGES: Record<keyof GraphSettings, SettingRange> = {
   nodeSizeMultiplier: { min: 0.5, max: 5, step: 0.5 },
   linkWidth: { min: 0.2, max: 4, step: 0.1 },
   constellationLinkWidth: { min: 0.5, max: 4, step: 0.5 },
+  showArrows: { min: 0, max: 1, step: 1 }, // Boolean toggle (not used by sliders)
 
   // Forces
   centerForce: { min: 0, max: 1.2, step: 0.05 },
@@ -74,6 +77,7 @@ export const SETTING_LABELS: Record<keyof GraphSettings, string> = {
   nodeSizeMultiplier: 'Node Scale',
   linkWidth: 'Link Width',
   constellationLinkWidth: 'Highlight Width',
+  showArrows: 'Show Arrows',
   centerForce: 'Center Force',
   repelForce: 'Repel Force',
   linkForce: 'Link Distance',
