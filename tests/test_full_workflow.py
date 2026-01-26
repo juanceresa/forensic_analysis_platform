@@ -116,6 +116,6 @@ def test_full_graph_workflow(tmp_path):
     assert edge["relation_type"] == "OWNS"
 
     # Validate summaries
-    assert data["verification_summary"]["TIER_3_AI"] == 3  # 2 entities + 1 relation
-    assert data["entity_type_summary"]["PERSON"] == 1
-    assert data["entity_type_summary"]["PROPERTY"] == 1
+    assert data["metadata"]["verification_distribution"]["TIER_3_AI"] == 2
+    assert data["metadata"]["entity_type_summary"]["PERSON"] == 1
+    assert data["metadata"]["entity_type_summary"]["PROPERTY"] == 1
