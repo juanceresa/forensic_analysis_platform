@@ -28,10 +28,11 @@ export const getGraphData = cache(async (caseId: string): Promise<GraphData> => 
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: { params: Promise<{ caseId: string }> }
 ) {
   try {
-    const data = await getGraphData(params.caseId);
+    const { caseId } = await params;
+    const data = await getGraphData(caseId);
     return NextResponse.json(data);
   } catch (error: any) {
     if (error.code === 'ENOENT') {
