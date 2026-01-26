@@ -20,6 +20,13 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
 
   const selectedNode = initialData.nodes.find((n) => n.id === selectedNodeId) || null;
 
+  // DEBUG: Log node selection
+  console.log('DashboardClient render:', {
+    selectedNodeId,
+    selectedNode: selectedNode ? selectedNode.id : 'null',
+    totalNodes: initialData.nodes.length,
+  });
+
   return (
     <ErrorBoundary>
       <div className="h-screen flex flex-col bg-slate-950">
@@ -32,6 +39,7 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
               data={initialData}
               selectedNodeId={selectedNodeId}
               onNodeClick={(node: BaseNode) => {
+                console.log('Node clicked:', node.id, node.name || node.id);
                 setSelectedNodeId(node.id);
                 setActiveTab('details'); // Reset to details on new selection
               }}
