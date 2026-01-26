@@ -101,6 +101,11 @@ export function KnowledgeGraph({
   // Custom node renderer with 3D tactile appearance
   const nodeCanvasObject = useMemo(
     () => (node: any, ctx: CanvasRenderingContext2D) => {
+      // Skip rendering if node position not yet calculated
+      if (typeof node.x !== 'number' || typeof node.y !== 'number') {
+        return;
+      }
+
       const nodeId = node.id;
       const isSelected = nodeId === selectedNodeId;
       const isInConstellation = constellationNodes.has(nodeId);
