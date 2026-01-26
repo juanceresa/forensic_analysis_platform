@@ -136,19 +136,19 @@ export function NarrativePanel({
         </p>
       </div>
 
-      {/* Metadata Tags */}
+      {/* Metadata Tags - Holographic Data Chips */}
       <div className="flex gap-2 flex-wrap text-xs font-mono">
-        <span className="px-2 py-1 bg-slate-800 border border-slate-700 rounded">
-          {narrative.constellation_size} entities
+        <span className="px-3 py-1.5 bg-gradient-to-br from-cyan-950/50 to-slate-900 border border-cyan-500/30 rounded shadow-[0_0_8px_rgba(6,182,212,0.15)] text-cyan-200 backdrop-blur-sm">
+          <span className="text-cyan-400 font-bold">{narrative.constellation_size}</span> entities
         </span>
-        <span className="px-2 py-1 bg-slate-800 border border-slate-700 rounded">
-          {narrative.total_documents} documents
+        <span className="px-3 py-1.5 bg-gradient-to-br from-blue-950/50 to-slate-900 border border-blue-500/30 rounded shadow-[0_0_8px_rgba(59,130,246,0.15)] text-blue-200 backdrop-blur-sm">
+          <span className="text-blue-400 font-bold">{narrative.total_documents}</span> documents
         </span>
-        <span className="px-2 py-1 bg-slate-800 border border-slate-700 rounded">
+        <span className="px-3 py-1.5 bg-gradient-to-br from-purple-950/50 to-slate-900 border border-purple-500/30 rounded shadow-[0_0_8px_rgba(139,92,246,0.15)] text-purple-200 backdrop-blur-sm">
           {narrative.model_used}
         </span>
         {narrative.from_cache && (
-          <span className="px-2 py-1 bg-emerald-900/50 border border-emerald-600 text-emerald-300 rounded">
+          <span className="px-3 py-1.5 bg-gradient-to-br from-emerald-950/50 to-slate-900 border border-emerald-500/40 rounded shadow-[0_0_10px_rgba(16,185,129,0.2)] text-emerald-300 backdrop-blur-sm animate-pulse">
             ✓ cached
           </span>
         )}
