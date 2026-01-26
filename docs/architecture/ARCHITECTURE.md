@@ -454,7 +454,7 @@ Based on 300 documents averaging 3 pages each (900 pages total):
 | Metric | MVP1 Warning | MVP1 Max |
 |--------|--------------|----------|
 | Total nodes | 1,000 | 2,000 |
-| Total edges | 2,500 | 5,000 |
+| Total links | 2,500 | 5,000 |
 | Nodes per entity type | 500 | 1,000 |
 | Orphan nodes (no connections) | <5% | <10% |
 | Average node degree | 3-8 | 2-15 |

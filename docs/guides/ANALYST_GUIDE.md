@@ -65,7 +65,7 @@ This guide covers verification procedures for promoting entities from **TIER_3_A
 1. **Click on a TIER_3_AI node (grey):**
    - Dossier panel opens on right
    - Shows entity details:
-     - Name/label
+    - Name
      - Type (PERSON, PROPERTY, etc.)
      - Confidence score
      - Source documents
@@ -98,7 +98,7 @@ This guide covers verification procedures for promoting entities from **TIER_3_A
 **When to verify:**
 - ✅ Entity clearly visible in source document
 - ✅ Entity type is correct
-- ✅ Name/label accurately transcribed
+- ✅ Name accurately transcribed
 - ✅ Context supports the relation (if applicable)
 - ✅ No conflicting information in other documents
 
@@ -486,7 +486,7 @@ Before clicking "Verify":
 - [ ] Opened source document
 - [ ] Entity visible in document
 - [ ] Entity type correct
-- [ ] Name/label accurate
+- [ ] Name accurate
 - [ ] Context supports extraction
 - [ ] Cross-referenced with other docs (if available)
 - [ ] Added detailed verification note

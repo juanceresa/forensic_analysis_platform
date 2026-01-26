@@ -18,6 +18,12 @@ Zone B (The Vault) is the client-facing read-only interface for viewing forensic
 - **Palantir Aesthetic**: Dark mode, monospace, high-stakes professional
 - **Performance-First**: Optimized for graphs with 1,000+ nodes
 
+**Graph Data Contract (Aligned to `graph_data.json`):**
+- **Nodes** use `entity_type` and `name` (not `type`/`label`).
+- **Links** use `relation_type` (not `label`) and are the primary driver for view filters.
+- **Provenance** lives on `extracted_from` (comma-delimited string of document IDs; split + trim).
+- **Verification tiers** are `TIER_1_CERTIFIED`, `TIER_2_INSTITUTIONAL`, `TIER_2_ANALYST`, `TIER_3_AI`.
+
 ---
 
 ## Graph Performance Strategy
@@ -122,11 +128,9 @@ function calculateImportance(node: Node, links: Link[]): number {
   const typePriority = {
     'PERSON': 1.5,
     'PROPERTY': 2.0,      // Properties are most important
-    'LEGAL_ACT': 1.3,
-    'DOCUMENT': 0.5,      // Documents are numerous, lower priority
     'ORGANIZATION': 1.2,
-    'LOCATION': 0.8,
-    'REGISTRY_ENTRY': 1.0
+    'DOCUMENT': 0.5,      // Documents are numerous, lower priority
+    'LOCATION': 0.8
   };
 
   // 3. Verification tier bonus
@@ -139,7 +143,7 @@ function calculateImportance(node: Node, links: Link[]): number {
 
   return (
     degree *
-    (typePriority[node.type] || 1.0) *
+    (typePriority[node.entity_type] || 1.0) *
     (tierBonus[node.verification.tier] || 1.0)
   );
 }
@@ -311,16 +315,25 @@ function Tab({
 // lib/graph-filters.ts
 
 export function applyFilterView(data: GraphData, view: FilterView): GraphData {
+  const temporalRelationTypes = new Set([
+    'SOLD',
+    'BOUGHT',
+    'INHERITED',
+    'CONFISCATED',
+    'WITNESSED',
+    'NOTARIZED'
+  ]);
+
   switch (view) {
     case 'overview':
       return {
         ...data,
         nodes: data.nodes.filter(n =>
-          n.type === 'PROPERTY' ||
-          (n.type === 'PERSON' && calculateImportance(n, data.links) > 5)
+          n.entity_type === 'PROPERTY' ||
+          (n.entity_type === 'PERSON' && calculateImportance(n, data.links) > 5)
         ),
         links: data.links.filter(l =>
-          ['OWNS', 'CONFISCATED', 'INHERITED'].includes(l.label)
+          ['OWNS', 'CONFISCATED', 'INHERITED', 'SOLD', 'BOUGHT'].includes(l.relation_type)
         )
       };
 
@@ -331,9 +344,9 @@ export function applyFilterView(data: GraphData, view: FilterView): GraphData {
       return {
         ...data,
         nodes: data.nodes.filter(n =>
-          n.type === 'PROPERTY' ||
-          (n.type === 'PERSON' && isConnectedToProperty(n, data.links)) ||
-          n.type === 'LEGAL_ACT'
+          n.entity_type === 'PROPERTY' ||
+          (n.entity_type === 'PERSON' && isConnectedToProperty(n, data.links)) ||
+          n.entity_type === 'DOCUMENT'
         )
       };
 
@@ -342,16 +355,18 @@ export function applyFilterView(data: GraphData, view: FilterView): GraphData {
       return {
         ...data,
         nodes: data.nodes.filter(n => hasTemporalData(n)),
-        links: data.links.filter(l => l.temporal)
+        links: data.links.filter(l => l.date && temporalRelationTypes.has(l.relation_type))
       };
 
     case 'legal':
       return {
         ...data,
         nodes: data.nodes.filter(n =>
-          n.type === 'LEGAL_ACT' ||
-          n.type === 'ORGANIZATION' ||
-          (n.type === 'DOCUMENT' && isLegalDocument(n))
+          n.entity_type === 'ORGANIZATION' ||
+          n.entity_type === 'DOCUMENT'
+        ),
+        links: data.links.filter(l =>
+          ['CONFISCATED', 'REGISTERED_IN', 'NOTARIZED', 'ISSUED_BY'].includes(l.relation_type)
         )
       };
 
@@ -365,8 +380,8 @@ function clusterByFamily(data: GraphData): GraphData {
   // Group PERSON nodes by family name
   const families = new Map<string, Node[]>();
 
-  data.nodes.filter(n => n.type === 'PERSON').forEach(person => {
-    const familyName = extractFamilyName(person.label);
+  data.nodes.filter(n => n.entity_type === 'PERSON').forEach(person => {
+    const familyName = extractFamilyName(person.name);
     if (!families.has(familyName)) {
       families.set(familyName, []);
     }
@@ -383,14 +398,14 @@ function clusterByFamily(data: GraphData): GraphData {
       const clusterId = `FAMILY-${familyName}`;
       clusterNodes.push({
         id: clusterId,
-        label: `${familyName} Family`,
-        type: 'PERSON',
+        name: `${familyName} Family`,
+        entity_type: 'PERSON',
         verification: {
           tier: 'TIER_3_AI',
           confidence: 0.9
         },
-        data: { member_count: members.length },
-        sources: []
+        member_count: members.length,
+        extracted_from: ''
       });
 
       // Map members to cluster
@@ -401,7 +416,7 @@ function clusterByFamily(data: GraphData): GraphData {
   // Replace person nodes with clusters, keep other entities
   const filteredNodes = [
     ...clusterNodes,
-    ...data.nodes.filter(n => n.type !== 'PERSON' || !clusterMap.has(n.id))
+    ...data.nodes.filter(n => n.entity_type !== 'PERSON' || !clusterMap.has(n.id))
   ];
 
   // Remap links to clusters
@@ -453,8 +468,9 @@ export function GraphAdvancedControls() {
             <label className="text-xs text-slate-400">Verification Tier</label>
             <select className="w-full mt-1 bg-slate-700 text-slate-200 text-sm rounded px-2 py-1">
               <option value="all">All Tiers</option>
-              <option value="TIER_1">Certified Only</option>
-              <option value="TIER_2">Verified + Certified</option>
+              <option value="TIER_1_CERTIFIED">Certified Only</option>
+              <option value="TIER_2_INSTITUTIONAL">Institutional + Certified</option>
+              <option value="TIER_2_ANALYST">Analyst + Certified</option>
             </select>
           </div>
 
@@ -714,11 +730,11 @@ export function KnowledgeGraph({
     if (filterEntityType !== 'all') {
       optimized = {
         ...optimized,
-        nodes: optimized.nodes.filter(n => n.type === filterEntityType),
+        nodes: optimized.nodes.filter(n => n.entity_type === filterEntityType),
         links: optimized.links.filter(l => {
           const sourceNode = optimized.nodes.find(n => n.id === l.source);
           const targetNode = optimized.nodes.find(n => n.id === l.target);
-          return sourceNode?.type === filterEntityType || targetNode?.type === filterEntityType;
+          return sourceNode?.entity_type === filterEntityType || targetNode?.entity_type === filterEntityType;
         })
       };
     }
@@ -794,7 +810,7 @@ export function KnowledgeGraph({
     ctx.fillStyle = '#F8FAFC';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(node.label, node.x, node.y + size + 4);
+    ctx.fillText(node.name, node.x, node.y + size + 4);
   }, [getNodeColor, getNodeSize, selectedNodeId]);
   
   // Link styling
@@ -914,8 +930,13 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
   const relatedNodes = graphData.nodes.filter(n => relatedNodeIds.has(n.id));
   
   // Find source documents
+  const extractedFromIds = (node.extracted_from || '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
+  const extractedFromSet = new Set(extractedFromIds);
   const sourceDocuments = graphData.nodes.filter(
-    n => n.type === 'DOCUMENT' && node.sources.includes(n.id)
+    n => n.entity_type === 'DOCUMENT' && extractedFromSet.has(n.id)
   );
   
   return (
@@ -924,12 +945,12 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
       <div className="space-y-2">
         <div className="flex items-start justify-between">
           <h2 className="text-xl font-semibold text-slate-50">
-            {node.label}
+            {node.name}
           </h2>
           <NodeBadge tier={node.verification.tier} />
         </div>
         <p className="text-sm text-slate-400 font-mono">
-          {node.type} • {node.id}
+          {node.entity_type} • {node.id}
         </p>
       </div>
       
@@ -967,17 +988,17 @@ export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProp
         <h3 className="text-sm font-semibold text-slate-300 mb-2">
           Details
         </h3>
-        <EntityDataDisplay data={node.data} type={node.type} />
+        <EntityDataDisplay data={node} type={node.entity_type} />
       </section>
       
       {/* Aliases */}
-      {node.aliases && node.aliases.length > 0 && (
+      {node.alternate_names && node.alternate_names.length > 0 && (
         <section className="vault-card">
           <h3 className="text-sm font-semibold text-slate-300 mb-2">
             Also Known As
           </h3>
           <div className="flex flex-wrap gap-2">
-            {node.aliases.map((alias, i) => (
+            {node.alternate_names.map((alias, i) => (
               <span key={i} className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-400 font-mono">
                 {alias}
               </span>
@@ -1094,9 +1115,8 @@ export function SourceViewer({ document }: SourceViewerProps) {
   const [showOcr, setShowOcr] = useState(false);
   const [zoom, setZoom] = useState(1);
   
-  const docData = document.data as {
+  const docData = document as {
     file_path?: string;
-    thumbnail_path?: string;
     ocr_text?: string;
     summary?: string;
   };
@@ -1142,8 +1162,8 @@ export function SourceViewer({ document }: SourceViewerProps) {
         ) : (
           <div className="flex justify-center">
             <img
-              src={`/data/images/${docData.thumbnail_path || docData.file_path}`}
-              alt={document.label}
+              src={`/data/images/${docData.file_path}`}
+              alt={document.name}
               style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
               className="max-w-full shadow-lg"
             />
@@ -1407,16 +1427,16 @@ export default function CaseDashboard({ params }: { params: { id: string } }) {
       <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
         <div>
           <h1 className="text-xl font-semibold text-slate-50">
-            {graphData.case_metadata.title}
+            {graphData.metadata.case_id}
           </h1>
           <p className="text-sm text-slate-400 font-mono">
-            {graphData.case_metadata.id} • {graphData.case_metadata.status}
+            {graphData.metadata.case_id}
           </p>
         </div>
         
         <div className="flex items-center gap-4">
           <span className="text-sm text-slate-500">
-            {graphData.nodes.length} entities • {graphData.links.length} relations
+            {graphData.metadata.entity_count} entities • {graphData.metadata.relation_count} relations
           </span>
         </div>
       </header>
@@ -1458,7 +1478,7 @@ export default function CaseDashboard({ params }: { params: { id: string } }) {
           </div>
           
           <p>
-            Processed: {new Date(graphData.audit_trail.processing_date).toLocaleDateString()}
+            Processed: {new Date(graphData.metadata.updated_at).toLocaleDateString()}
           </p>
         </div>
       </footer>

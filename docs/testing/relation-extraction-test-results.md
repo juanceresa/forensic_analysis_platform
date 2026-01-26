@@ -19,7 +19,7 @@ Test ran successfully with **mock extraction** (API key not configured with bill
 ✅ Two-pass extraction logic works (entities first, then relations)
 ✅ Relation extraction correctly skipped when only 1 entity found
 ✅ Pipeline tracks relation_count in metadata
-✅ Graph exports with edges array (empty in this case)
+✅ Graph exports with links array (empty in this case)
 ✅ No crashes or errors in the integration
 ✅ Extraction flags system works (no flags set since extraction succeeded)
 
@@ -40,7 +40,7 @@ Test ran successfully with **mock extraction** (API key not configured with bill
     "factory_version": "1.0.0"
   },
   "nodes": [...],
-  "edges": []
+  "links": []
 }
 ```
 
