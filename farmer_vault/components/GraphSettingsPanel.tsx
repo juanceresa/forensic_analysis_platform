@@ -51,7 +51,7 @@ export function GraphSettingsPanel({
         onClick={() => setIsOpen(!isOpen)}
         className={`
           flex items-center justify-center w-11 h-11 rounded-xl
-          bg-slate-900/80 backdrop-blur-md transition-all duration-300
+          bg-slate-900 transition-all duration-300
           ${
             isOpen
               ? 'shadow-[0_0_24px_rgba(6,182,212,0.4),0_0_6px_rgba(6,182,212,0.3)_inset] scale-105'
@@ -89,7 +89,7 @@ export function GraphSettingsPanel({
       {/* Settings Panel with slide-in animation */}
       {isOpen && (
         <div
-          className="mt-3 rounded-xl bg-slate-900/75 backdrop-blur-xl
+          className="mt-3 rounded-xl bg-slate-900
             animate-slide-in motion-reduce:animate-none flex flex-col"
           role="region"
           aria-label="Graph settings panel"
@@ -102,15 +102,15 @@ export function GraphSettingsPanel({
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0">
-            <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">
+          <div className="flex items-center justify-between gap-4 p-4 border-b border-slate-800 shrink-0">
+            <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide shrink-0">
               Graph Settings
             </h3>
             <button
               onClick={onReset}
-              className="px-3 py-1 text-xs text-slate-400 hover:text-amber-400
+              className="px-2 py-1 text-xs text-slate-400 hover:text-amber-400
                 border border-slate-700 hover:border-amber-500/50 rounded transition-colors transition-shadow duration-200
-                hover:shadow-[0_0_8px_rgba(251,191,36,0.3)]"
+                hover:shadow-[0_0_8px_rgba(251,191,36,0.3)] shrink-0 ml-auto"
               aria-label="Reset all settings to defaults"
             >
               Reset
@@ -153,12 +153,6 @@ export function GraphSettingsPanel({
                     Display
                   </h4>
                   <div className="space-y-3">
-                    <SettingsSlider
-                      label={SETTING_LABELS.nodeSizeBase}
-                      value={settings.nodeSizeBase}
-                      onChange={(v) => onUpdateSetting('nodeSizeBase', v)}
-                      range={SETTINGS_RANGES.nodeSizeBase}
-                    />
                     <SettingsSlider
                       label={SETTING_LABELS.nodeSizeMultiplier}
                       value={settings.nodeSizeMultiplier}
@@ -229,6 +223,19 @@ export function GraphSettingsPanel({
                   Entity Colors
                 </h4>
                 <div className="space-y-3">
+                  <div className="graph-color-group flex items-center justify-between">
+                    <label htmlFor="link-color" className="text-xs text-slate-400">
+                      {SETTING_LABELS.linkColor}
+                    </label>
+                    <input
+                      type="color"
+                      value={settings.linkColor}
+                      id="link-color"
+                      onChange={(e) => onUpdateSetting('linkColor', e.target.value)}
+                      className="h-7 w-12 bg-transparent border border-slate-700 rounded cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+                      aria-label="Link color"
+                    />
+                  </div>
                   {Object.entries(settings.entityColors).map(([key, value]) => {
                     const inputId = `color-${key.toLowerCase()}`;
                     return (

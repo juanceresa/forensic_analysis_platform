@@ -6,7 +6,7 @@
   --graph-controls-width: 240px;
   --graph-background: #0b0e12;
   --graph-text: #d6dee6;
-  --graph-line: rgba(138, 151, 165, 0.22);
+  --graph-line: #ffffff;
   --graph-line-highlight: rgba(110, 219, 227, 0.32);
   --graph-node: #b4bfcc;
   --graph-node-unresolved: rgba(180, 191, 204, 0.45);

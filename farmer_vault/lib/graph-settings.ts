@@ -11,7 +11,6 @@ export type EntityColorMap = Record<EntityType, string>;
 
 export interface GraphSettings {
   // Display Settings
-  nodeSizeBase: number;          // Base node radius in pixels
   nodeSizeMultiplier: number;    // Scale factor for degree-based sizing
   linkWidth: number;             // Link thickness
   showArrows: boolean;           // Show directional arrows on links
@@ -23,11 +22,11 @@ export interface GraphSettings {
 
   // Color Settings
   entityColors: EntityColorMap;
+  linkColor: string;            // Base link color
 }
 
 export const DEFAULT_SETTINGS: GraphSettings = {
   // Display
-  nodeSizeBase: 5.5,
   nodeSizeMultiplier: 2,
   linkWidth: 2,
   showArrows: false,
@@ -45,6 +44,7 @@ export const DEFAULT_SETTINGS: GraphSettings = {
     ORGANIZATION: '#dc2626',
     DOCUMENT: '#64748b',
   },
+  linkColor: '#ffffff',
 };
 
 export interface SettingRange {
@@ -55,7 +55,6 @@ export interface SettingRange {
 
 export const SETTINGS_RANGES: Record<keyof GraphSettings, SettingRange> = {
   // Display
-  nodeSizeBase: { min: 2, max: 12, step: 0.5 },
   nodeSizeMultiplier: { min: 0.5, max: 5, step: 0.5 },
   linkWidth: { min: 0.2, max: 4, step: 0.1 },
   showArrows: { min: 0, max: 1, step: 1 }, // Boolean toggle (not used by sliders)
@@ -67,10 +66,10 @@ export const SETTINGS_RANGES: Record<keyof GraphSettings, SettingRange> = {
 
   // Colors (not used by sliders)
   entityColors: { min: 0, max: 0, step: 0 },
+  linkColor: { min: 0, max: 0, step: 0 },
 };
 
 export const SETTING_LABELS: Record<keyof GraphSettings, string> = {
-  nodeSizeBase: 'Node Size',
   nodeSizeMultiplier: 'Node Scale',
   linkWidth: 'Link Width',
   showArrows: 'Show Arrows',
@@ -78,10 +77,10 @@ export const SETTING_LABELS: Record<keyof GraphSettings, string> = {
   repelForce: 'Repel Force',
   linkForce: 'Link Distance',
   entityColors: 'Entity Colors',
+  linkColor: 'Link Color',
 };
 
 export const SETTING_DESCRIPTIONS: Record<keyof GraphSettings, string> = {
-  nodeSizeBase: 'Base size of all nodes',
   nodeSizeMultiplier: 'Size scaling for connected nodes',
   linkWidth: 'Thickness of connection lines',
   showArrows: 'Show directional arrows on links',
@@ -89,4 +88,5 @@ export const SETTING_DESCRIPTIONS: Record<keyof GraphSettings, string> = {
   repelForce: 'Push nodes apart',
   linkForce: 'Target distance between connected nodes',
   entityColors: 'Custom colors for entity types',
+  linkColor: 'Base color for connection lines',
 };

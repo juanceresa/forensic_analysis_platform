@@ -36,6 +36,7 @@ export function KnowledgeGraph({
   onBackgroundClick,
   settings: userSettings,
 }: KnowledgeGraphProps) {
+  const BASE_NODE_SIZE = 5.5;
   const defaultGraphTheme = useMemo(
     () => ({
       background: '#0b0e12',
@@ -118,9 +119,16 @@ export function KnowledgeGraph({
       return;
     }
 
-    const styles = getComputedStyle(containerRef.current);
-    const readVar = (name: string, fallback: string) =>
-      styles.getPropertyValue(name).trim() || fallback;
+    const containerStyles = getComputedStyle(containerRef.current);
+    const rootStyles = getComputedStyle(document.documentElement);
+    const readVar = (name: string, fallback: string) => {
+      const fromContainer = containerStyles.getPropertyValue(name).trim();
+      if (fromContainer) {
+        return fromContainer;
+      }
+      const fromRoot = rootStyles.getPropertyValue(name).trim();
+      return fromRoot || fallback;
+    };
 
     setGraphTheme({
       background: readVar('--graph-background', defaultGraphTheme.background),
@@ -209,7 +217,6 @@ export function KnowledgeGraph({
   const activeNodeSet = selectedNodeSet ?? hoveredNodeSet;
   const activeAlpha = selectedNodeId ? selectedAlpha : hoverAlpha;
   const hasActiveHighlight = Boolean(activeNodeSet);
-  const baseHighlightAlpha = 0.28;
 
   // PERFORMANCE: Memoize callback to prevent re-renders
   const handleNodeClick = useCallback(
@@ -274,7 +281,6 @@ export function KnowledgeGraph({
       settings.centerForce === DEFAULT_SETTINGS.centerForce &&
       settings.repelForce === DEFAULT_SETTINGS.repelForce &&
       settings.linkForce === DEFAULT_SETTINGS.linkForce &&
-      settings.nodeSizeBase === DEFAULT_SETTINGS.nodeSizeBase &&
       settings.nodeSizeMultiplier === DEFAULT_SETTINGS.nodeSizeMultiplier &&
       settings.linkWidth === DEFAULT_SETTINGS.linkWidth &&
       settings.constellationLinkWidth === DEFAULT_SETTINGS.constellationLinkWidth;
@@ -376,7 +382,7 @@ export function KnowledgeGraph({
       // Calculate size based on number of connections (hub nodes are larger)
       const degree = nodeDegrees.get(nodeId) || 0;
       // Dynamic sizing: all nodes clearly visible at any zoom level
-      const size = settings.nodeSizeBase + Math.pow(degree, 0.5) * settings.nodeSizeMultiplier;
+      const size = BASE_NODE_SIZE + Math.pow(degree, 0.5) * settings.nodeSizeMultiplier;
 
       ctx.save();
 
@@ -489,7 +495,6 @@ export function KnowledgeGraph({
       hasActiveHighlight,
       activeAlpha,
       nodeDegrees,
-      settings.nodeSizeBase,
       settings.nodeSizeMultiplier,
       settings.entityColors,
       graphTheme.nodeFocus,
@@ -513,13 +518,14 @@ export function KnowledgeGraph({
         return graphTheme.lineHighlight;
       }
 
-      return graphTheme.line;
+      return settings.linkColor || graphTheme.line || '#ffffff';
     },
     [
       hoveredNodeId,
       selectedNodeId,
       graphTheme.lineHighlight,
-      graphTheme.line
+      graphTheme.line,
+      settings.linkColor
     ]
   );
 
@@ -554,46 +560,56 @@ export function KnowledgeGraph({
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // Draw arrow if enabled
-      if (settings.showArrows) {
-        const dx = target.x - source.x;
-        const dy = target.y - source.y;
-        const len = Math.hypot(dx, dy);
-        if (len > 0) {
-          const unitX = dx / len;
-          const unitY = dy / len;
-          const targetDegree = nodeDegrees.get(targetId) || 0;
-          const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
-          const scale = typeof globalScale === 'number' && globalScale > 0 ? Math.min(1.2, 1 / globalScale) : 1;
-
-          // Arrow size scales with link width
-          const arrowLength = width * 3 * scale;
-          const arrowWidth = width * 1.75 * scale;
-
-          const arrowTipX = target.x - unitX * (targetSize + 3);
-          const arrowTipY = target.y - unitY * (targetSize + 3);
-          const baseX = arrowTipX - unitX * arrowLength;
-          const baseY = arrowTipY - unitY * arrowLength;
-          const orthoX = -unitY;
-          const orthoY = unitX;
-
-          ctx.beginPath();
-          ctx.moveTo(arrowTipX, arrowTipY);
-          ctx.lineTo(baseX + orthoX * arrowWidth, baseY + orthoY * arrowWidth);
-          ctx.lineTo(baseX - orthoX * arrowWidth, baseY - orthoY * arrowWidth);
-          ctx.closePath();
-          ctx.fillStyle = color;
-          ctx.fill();
-        }
+      const sourceDegree = nodeDegrees.get(sourceId) || 0;
+      const targetDegree = nodeDegrees.get(targetId) || 0;
+      const sourceSize = BASE_NODE_SIZE + Math.pow(sourceDegree, 0.5) * settings.nodeSizeMultiplier;
+      const targetSize = BASE_NODE_SIZE + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const len = Math.hypot(dx, dy);
+      if (len === 0) {
+        ctx.restore();
+        return;
       }
+      const unitX = dx / len;
+      const unitY = dy / len;
+      const scale = typeof globalScale === 'number' && globalScale > 0
+        ? Math.min(1.4, Math.max(0.6, 1 / globalScale))
+        : 1;
+      const arrowLength = 8 * scale;
+      const arrowWidth = 4 * scale;
 
-      // Draw the line
+      const lineStartX = source.x + unitX * (sourceSize + 1);
+      const lineStartY = source.y + unitY * (sourceSize + 1);
+
+      const arrowTipX = target.x - unitX * (targetSize + 2);
+      const arrowTipY = target.y - unitY * (targetSize + 2);
+      const baseX = arrowTipX - unitX * arrowLength;
+      const baseY = arrowTipY - unitY * arrowLength;
+
+      const lineEndX = settings.showArrows ? baseX : target.x - unitX * (targetSize + 1);
+      const lineEndY = settings.showArrows ? baseY : target.y - unitY * (targetSize + 1);
+
       ctx.beginPath();
-      ctx.moveTo(source.x, source.y);
-      ctx.lineTo(target.x, target.y);
+      ctx.moveTo(lineStartX, lineStartY);
+      ctx.lineTo(lineEndX, lineEndY);
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.stroke();
+
+      // Draw arrow after the line so it stays visible
+      if (settings.showArrows) {
+        const orthoX = -unitY;
+        const orthoY = unitX;
+
+        ctx.beginPath();
+        ctx.moveTo(arrowTipX, arrowTipY);
+        ctx.lineTo(baseX + orthoX * arrowWidth, baseY + orthoY * arrowWidth);
+        ctx.lineTo(baseX - orthoX * arrowWidth, baseY - orthoY * arrowWidth);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
 
       ctx.restore();
     },
@@ -603,7 +619,6 @@ export function KnowledgeGraph({
       getLinkWidth,
       getLinkColor,
       settings.showArrows,
-      settings.nodeSizeBase,
       settings.nodeSizeMultiplier,
       nodeDegrees
     ]

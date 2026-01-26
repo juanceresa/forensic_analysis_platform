@@ -10,7 +10,7 @@ const STORAGE_KEY = 'graph-settings';
  *
  * @example
  * const { settings, updateSetting, resetSettings } = useGraphSettings();
- * updateSetting('nodeSizeBase', 5);
+ * updateSetting('nodeSizeMultiplier', 2);
  * resetSettings();
  */
 export function useGraphSettings() {
