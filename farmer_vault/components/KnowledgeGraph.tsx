@@ -203,8 +203,10 @@ export function KnowledgeGraph({
         onNodeClick={handleNodeClick as any}
         nodeCanvasObjectMode={() => 'after'}
         nodeCanvasObject={nodeCanvasObject}
-        warmupTicks={100}
-        cooldownTicks={0}
+        warmupTicks={0}
+        cooldownTicks={Infinity}
+        d3AlphaDecay={0.02}
+        d3VelocityDecay={0.3}
       />
     </div>
   );
