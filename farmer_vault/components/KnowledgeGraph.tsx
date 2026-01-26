@@ -111,6 +111,15 @@ export function KnowledgeGraph({
     [onNodeClick]
   );
 
+  // Configure force simulation for better spacing
+  useLayoutEffect(() => {
+    if (graphRef.current) {
+      graphRef.current
+        .d3Force('charge')?.strength(-120) // Strong repulsion between nodes
+        .d3Force('link')?.distance(30); // Minimum distance between connected nodes
+    }
+  }, []);
+
   // Custom node renderer - simple flat circles with size based on connections
   const nodeCanvasObject = useMemo(
     () => (node: any, ctx: CanvasRenderingContext2D) => {
@@ -127,8 +136,8 @@ export function KnowledgeGraph({
 
       // Calculate size based on number of connections (hub nodes are larger)
       const degree = nodeDegrees.get(nodeId) || 0;
-      // Dramatic scaling: leaf nodes clearly visible (2.5-4.5px), large hubs (15-20px+)
-      const size = 2.5 + Math.pow(degree, 0.65) * 2;
+      // Balanced scaling: small nodes visible, hubs prominent but not overlapping
+      const size = 3 + Math.pow(degree, 0.55) * 1.8;
 
       ctx.save();
 
