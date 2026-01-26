@@ -569,9 +569,9 @@ export function KnowledgeGraph({
         const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
         const scale = typeof globalScale === 'number' && globalScale > 0 ? Math.min(1.2, 1 / globalScale) : 1;
 
-        // Arrow size scales with link width - made larger
-        const arrowLength = width * 4 * scale;
-        const arrowWidth = width * 2.5 * scale;
+        // Arrow size scales with link width
+        const arrowLength = width * 3 * scale;
+        const arrowWidth = width * 1.75 * scale;
 
         // Position arrow tip right at node edge
         const arrowTipX = target.x - unitX * targetSize;
