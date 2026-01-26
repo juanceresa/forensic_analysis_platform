@@ -1,22 +1,23 @@
 import type { BaseNode, VerificationTier, EntityType } from './types';
 
 export function getNodeColor(node: BaseNode): string {
-  const tierColors: Record<VerificationTier, string> = {
-    TIER_1_CERTIFIED: '#06B6D4',     // Cyan - Certified
-    TIER_2_ANALYST: '#3B82F6',       // Blue - Analyst Verified
-    TIER_2_INSTITUTIONAL: '#8B5CF6', // Purple - Institutional
-    TIER_3_AI: '#64748B',            // Slate - AI Generated
+  const entityColors: Record<EntityType, string> = {
+    PERSON: '#7c3aed',       // Purple/Violet
+    LOCATION: '#0891b2',     // Cyan
+    PROPERTY: '#059669',     // Green
+    ORGANIZATION: '#dc2626', // Red
+    DOCUMENT: '#64748b',     // Slate/Gray
   };
-  return tierColors[node.verification.tier];
+  return entityColors[node.entity_type] || '#64748b';
 }
 
 export function getNodeSize(node: BaseNode): number {
   const sizeMap: Record<EntityType, number> = {
-    PROPERTY: 8,
-    PERSON: 6,
-    ORGANIZATION: 6,
-    LOCATION: 5,
-    DOCUMENT: 4,
+    PROPERTY: 6,
+    PERSON: 5,
+    ORGANIZATION: 5,
+    LOCATION: 4,
+    DOCUMENT: 3,
   };
-  return sizeMap[node.entity_type] || 5;
+  return sizeMap[node.entity_type] || 4;
 }

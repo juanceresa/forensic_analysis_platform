@@ -190,7 +190,7 @@ export function KnowledgeGraph({
   // Custom link color - highlight constellation links
   const getLinkColor = useCallback(
     (link: any) => {
-      if (!selectedNodeId) return '#475569';
+      if (!selectedNodeId) return '#1a1a1a';
 
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
@@ -199,7 +199,7 @@ export function KnowledgeGraph({
         return '#06B6D4'; // Cyan for constellation links
       }
 
-      return '#475569'; // Default slate
+      return '#1a1a1a'; // Very dark gray for non-constellation
     },
     [selectedNodeId, constellationNodes]
   );
@@ -207,7 +207,7 @@ export function KnowledgeGraph({
   // Custom link width - make constellation links thicker
   const getLinkWidth = useCallback(
     (link: any) => {
-      if (!selectedNodeId) return 1;
+      if (!selectedNodeId) return 0.5;
 
       const sourceId = typeof link.source === 'string' ? link.source : link.source?.id;
       const targetId = typeof link.target === 'string' ? link.target : link.target?.id;
@@ -216,7 +216,7 @@ export function KnowledgeGraph({
         return 2; // Thicker for constellation
       }
 
-      return 1; // Default
+      return 0.5; // Thin default
     },
     [selectedNodeId, constellationNodes]
   );
@@ -238,7 +238,7 @@ export function KnowledgeGraph({
         nodeLabel={(node: any) => `${node.name || node.id} (${node.entity_type})`}
         linkColor={getLinkColor as any}
         linkWidth={getLinkWidth as any}
-        backgroundColor="#020617"
+        backgroundColor="#000000"
         onNodeClick={handleNodeClick as any}
         nodeCanvasObjectMode={() => 'replace'}
         nodeCanvasObject={nodeCanvasObject}
