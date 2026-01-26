@@ -554,60 +554,43 @@ export function KnowledgeGraph({
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      // Calculate arrow dimensions and positioning if arrows are enabled
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      const len = Math.hypot(dx, dy);
+      // Draw arrow if enabled
+      if (settings.showArrows) {
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const len = Math.hypot(dx, dy);
+        if (len > 0) {
+          const unitX = dx / len;
+          const unitY = dy / len;
+          const targetDegree = nodeDegrees.get(targetId) || 0;
+          const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
+          const scale = typeof globalScale === 'number' && globalScale > 0 ? Math.min(1.2, 1 / globalScale) : 1;
 
-      let linkEndX = target.x;
-      let linkEndY = target.y;
+          // Arrow size scales with link width
+          const arrowLength = width * 3 * scale;
+          const arrowWidth = width * 1.75 * scale;
 
-      if (settings.showArrows && len > 0) {
-        const unitX = dx / len;
-        const unitY = dy / len;
-        const targetDegree = nodeDegrees.get(targetId) || 0;
-        const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
-        const scale = typeof globalScale === 'number' && globalScale > 0 ? Math.min(1.2, 1 / globalScale) : 1;
+          const arrowTipX = target.x - unitX * (targetSize + 3);
+          const arrowTipY = target.y - unitY * (targetSize + 3);
+          const baseX = arrowTipX - unitX * arrowLength;
+          const baseY = arrowTipY - unitY * arrowLength;
+          const orthoX = -unitY;
+          const orthoY = unitX;
 
-        // Arrow size scales with link width
-        const arrowLength = width * 3 * scale;
-        const arrowWidth = width * 1.75 * scale;
-
-        // Position arrow tip right at node edge
-        const arrowTipX = target.x - unitX * targetSize;
-        const arrowTipY = target.y - unitY * targetSize;
-
-        // Stop link before arrow
-        linkEndX = arrowTipX - unitX * arrowLength;
-        linkEndY = arrowTipY - unitY * arrowLength;
-
-        const baseX = arrowTipX - unitX * arrowLength;
-        const baseY = arrowTipY - unitY * arrowLength;
-        const orthoX = -unitY;
-        const orthoY = unitX;
-
-        // Draw arrow
-        ctx.beginPath();
-        ctx.moveTo(arrowTipX, arrowTipY);
-        ctx.lineTo(baseX + orthoX * arrowWidth, baseY + orthoY * arrowWidth);
-        ctx.lineTo(baseX - orthoX * arrowWidth, baseY - orthoY * arrowWidth);
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
-      } else if (len > 0) {
-        // No arrows - stop link at node edge
-        const unitX = dx / len;
-        const unitY = dy / len;
-        const targetDegree = nodeDegrees.get(targetId) || 0;
-        const targetSize = settings.nodeSizeBase + Math.pow(targetDegree, 0.5) * settings.nodeSizeMultiplier;
-        linkEndX = target.x - unitX * targetSize;
-        linkEndY = target.y - unitY * targetSize;
+          ctx.beginPath();
+          ctx.moveTo(arrowTipX, arrowTipY);
+          ctx.lineTo(baseX + orthoX * arrowWidth, baseY + orthoY * arrowWidth);
+          ctx.lineTo(baseX - orthoX * arrowWidth, baseY - orthoY * arrowWidth);
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
       }
 
-      // Draw the line - stops at arrow base or node edge
+      // Draw the line
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
-      ctx.lineTo(linkEndX, linkEndY);
+      ctx.lineTo(target.x, target.y);
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.stroke();
