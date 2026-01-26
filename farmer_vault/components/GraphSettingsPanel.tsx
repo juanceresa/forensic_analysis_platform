@@ -45,7 +45,7 @@ export function GraphSettingsPanel({
   }, [isOpen]);
 
   return (
-    <div ref={panelRef} className="graph-controls absolute top-4 left-4 font-mono" style={{ zIndex: 1000 }}>
+    <div ref={panelRef} className="vault-graph-controls absolute top-4 left-4 font-mono" style={{ zIndex: 1000, pointerEvents: 'auto' }}>
       {/* Gear Icon Toggle */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -90,17 +90,19 @@ export function GraphSettingsPanel({
       {isOpen && (
         <div
           className="mt-3 rounded-xl bg-slate-900/98 border border-cyan-500/25 backdrop-blur-xl
-            animate-slide-in motion-reduce:animate-none overflow-hidden"
+            animate-slide-in motion-reduce:animate-none flex flex-col"
           role="region"
           aria-label="Graph settings panel"
           style={{
             animation: 'slideIn 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
             width: 'var(--graph-controls-width)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(110, 219, 227, 0.12) inset, 0 0 32px rgba(6, 182, 212, 0.2)'
+            maxHeight: 'calc(100vh - 120px)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(110, 219, 227, 0.12) inset, 0 0 32px rgba(6, 182, 212, 0.2)',
+            pointerEvents: 'auto'
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-800">
+          <div className="flex items-center justify-between p-4 border-b border-slate-800 shrink-0">
             <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wide">
               Graph Settings
             </h3>
@@ -116,7 +118,7 @@ export function GraphSettingsPanel({
           </div>
 
           {/* Tab Bar */}
-          <div className="flex border-b border-slate-800">
+          <div className="flex border-b border-slate-800 shrink-0">
             <button
               onClick={() => setActiveTab('layout')}
               className={`flex-1 px-4 py-2 text-xs uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
@@ -141,8 +143,8 @@ export function GraphSettingsPanel({
             </button>
           </div>
 
-          {/* Settings Sections */}
-          <div className="p-4 space-y-6">
+          {/* Settings Sections - Scrollable */}
+          <div className="p-4 space-y-6 overflow-y-auto overflow-x-hidden" style={{ pointerEvents: 'auto' }}>
             {activeTab === 'layout' ? (
               <>
                 {/* Display Section */}
