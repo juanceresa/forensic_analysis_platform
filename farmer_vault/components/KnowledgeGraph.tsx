@@ -77,8 +77,6 @@ export function KnowledgeGraph({
         linkColor={() => '#475569'}
         backgroundColor="#020617"
         onNodeClick={handleNodeClick as any}
-        nodeCanvasObjectMode={() => 'after'}
-        nodeCanvasObject={nodeCanvasObject}
         warmupTicks={100}
         cooldownTicks={0}
       />
