@@ -136,8 +136,8 @@ export function KnowledgeGraph({
 
       // Calculate size based on number of connections (hub nodes are larger)
       const degree = nodeDegrees.get(nodeId) || 0;
-      // Balanced scaling: small nodes visible, hubs prominent but not overlapping
-      const size = 3 + Math.pow(degree, 0.55) * 1.8;
+      // Obsidian-style sizing: all nodes clearly visible at any zoom level
+      const size = 4.5 + Math.pow(degree, 0.5) * 2;
 
       ctx.save();
 
