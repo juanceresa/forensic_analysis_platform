@@ -353,6 +353,38 @@ farmer_vault/
 
 ---
 
+## Phase 8A: Frontend MVP Demo ✅ COMPLETE (2026-01-25)
+
+**Deliverables:**
+- ✅ Next.js 14 app with App Router (16.1.4 with Turbopack)
+- ✅ Force-directed graph visualization (react-force-graph-2d)
+- ✅ Tabbed sidebar (Details/Narrative)
+- ✅ Narrative generation integration (Python subprocess API)
+- ✅ Dark theme with verification tier colors
+- ✅ Error boundary for production resilience
+- ✅ Comprehensive test suite (12 passing tests)
+
+**Implementation:** See `docs/plans/2026-01-25-frontend-mvp-implementation-plan.md`
+
+**Key Features:**
+- Server/client component split for optimal performance
+- React.cache() for request deduplication
+- SWR for client-side caching
+- Dynamic imports (~200KB bundle reduction)
+- ARIA-compliant accessibility (WCAG AA)
+- Typewriter effect for narratives
+- Pulsing glow on selected graph nodes
+- Session-level narrative caching
+
+**Limitations:**
+- Local development only (no authentication yet)
+- Single case (TEST-CERESA hardcoded)
+- File-based graph data (no Supabase integration yet)
+
+**Next Steps:** Phase 8B for authentication and database integration
+
+---
+
 ## Phase 7: Export & CLI
 
 ### Dependencies
