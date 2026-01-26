@@ -116,14 +116,32 @@ class NarrativeGenerator:
 
         # Step 6: Generate narrative
         hub_entity = graph.get_entity(hub_id)
-        narrative_text, cost = self._generate_narrative(
-            focal_entity_id=hub_id,
-            focal_entity_name=hub_entity.get("name", "Unknown"),
-            focal_entity_type=hub_entity.get("entity_type", "UNKNOWN"),
-            constellation=constellation,
-            graph=graph,
-            model=model
-        )
+        try:
+            narrative_text, cost = self._generate_narrative(
+                focal_entity_id=hub_id,
+                focal_entity_name=hub_entity.get("name", "Unknown"),
+                focal_entity_type=hub_entity.get("entity_type", "UNKNOWN"),
+                constellation=constellation,
+                graph=graph,
+                model=model
+            )
+        except Exception as e:
+            error_message = str(e).lower()
+            if model == "sonnet" and "not_found" in error_message:
+                logger.warning(
+                    "Sonnet model unavailable, retrying narrative generation with Haiku."
+                )
+                model = "haiku"
+                narrative_text, cost = self._generate_narrative(
+                    focal_entity_id=hub_id,
+                    focal_entity_name=hub_entity.get("name", "Unknown"),
+                    focal_entity_type=hub_entity.get("entity_type", "UNKNOWN"),
+                    constellation=constellation,
+                    graph=graph,
+                    model=model
+                )
+            else:
+                raise
 
         # Update session cost
         self.session_costs[session_id] = self.session_costs.get(session_id, 0.0) + cost
@@ -185,7 +203,7 @@ class NarrativeGenerator:
         prompt = self.prompts.build_narrative_prompt(graph_context)
 
         # Call LLM
-        model_name = "claude-3-haiku-20240307" if model == "haiku" else "claude-3-5-sonnet-20241022"
+        model_name = "claude-3-haiku-latest" if model == "haiku" else "claude-3-5-sonnet-latest"
 
         narrative = self.api_client.call_with_retry(
             prompt=prompt,
