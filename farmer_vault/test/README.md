@@ -2,8 +2,9 @@
 
 ## Current Coverage
 
-### ✅ Hooks
-- `useGraph.test.ts` - SWR integration, fetch handling, caching
+### ✅ Hooks (12 tests)
+- `useGraph.test.ts` (4 tests) - SWR integration, fetch handling, caching, focus behavior
+- `useNarrative.test.ts` (8 tests) - Generation, caching, error handling (400/402/422/500), network errors, clearNarrative
 
 ### 🚧 API Routes (Integration Tests)
 API route tests are complex due to Node.js module mocking in Vitest.
