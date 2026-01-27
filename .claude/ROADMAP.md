@@ -1,8 +1,8 @@
 # Farmer House Forensic Intelligence Platform — Implementation Roadmap
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.2.1
-> **Last Updated:** 2026-01-24
+> **Version:** 1.5.0
+> **Last Updated:** 2026-01-27
 > **Status:** MVP1 Planning (with dependencies and acceptance criteria)
 
 ---
@@ -41,9 +41,13 @@ This document provides the implementation roadmap for MVP1. It breaks down work 
   - Use Vision API only for documents where OCR struggles (<60% confidence)
 - TIER_2_INSTITUTIONAL verification (Farmer House partnership not active yet)
 - TIER_1_CERTIFIED promotion (external legal process)
-- PDF dossier generation
 - Multi-case support (single family for MVP1)
 - Case management web UI (CLI-based for MVP1)
+- Client intake portal (use external tools: Typeform, Google Drive)
+- Case tracking dashboard (use Notion/Airtable for MVP1)
+
+### Architectural Decisions
+- **No self-service tier**: The platform intentionally does not support client document uploads. All document processing happens locally on our infrastructure. This avoids SaaS privacy regulations (GDPR, data retention, breach notification). Clients only access read-only deliverables through the Vault. This is a deliberate compliance/liability decision, not a future feature.
 
 ---
 
@@ -426,7 +430,303 @@ farmer_vault/
 /case/[caseId]/graph         → Knowledge Graph
 ```
 
+**Next Steps:** Phase 8A.2 for Forensic Dossier PDF export
+
+---
+
+## Phase 8A.2: Forensic Dossier Export (LaTeX)
+
+### Status: ✅ COMPLETE (2026-01-27)
+
+### Overview
+Professional PDF dossier generation using LaTeX templates. This is the primary client deliverable — a polished, legal-ready document that justifies the consulting fee.
+
+**Design Document:** `docs/plans/2026-01-27-latex-dossier-module-design.md`
+
+### Dependencies
+- **Prerequisite:** Phase 8A.1 complete (document-first data model)
+- **External:** LaTeX distribution (MacTeX on macOS, TeX Live on Linux)
+- **Data:** KnowledgeGraph + extractions/*.json
+
+### Key Design Decisions
+- **Dual narrative spine:** Family-centric AND Property-centric (both equally important)
+- **Modular sections:** Include/exclude per case needs
+- **English only (MVP):** Spanish support as future enhancement
+- **Text-only (MVP):** No embedded images, maps optional via geolocation module
+- **Hybrid executive summary:** Template extracts facts, LLM polishes prose
+- **Verification handling:** Global disclaimer + per-section indicators
+
+### Dossier Structure
+```
+1. FRONT MATTER
+   - Executive Summary (2-paragraph, LLM-polished)
+   - Disclaimer & Methodology
+   - Table of Contents
+
+2. COMPLETE TIMELINE
+   - Chronological list of all events (family + property)
+   - Dates, event type, summary, source document
+
+3. THE FAMILY
+   - Family origins and lineage
+   - Key figures (who owned, who inherits)
+   - Family tree (text-based for MVP)
+
+4. THE PROPERTY
+   - Property description and location
+   - Historical context
+   - Map placeholder (optional — from geolocation module)
+
+5. OWNERSHIP HISTORY (narrative spine)
+   - Acquisition: How the family came to own it
+   - Ownership period: Key events during tenure
+   - Confiscation/Loss: The taking (with evidence)
+
+6. EVIDENCE INVENTORY
+   - Document-by-document summary
+   - What each document proves
+   - Verification status per document
+
+7. APPENDIX
+   - Full citations
+   - Methodology notes
+   - Glossary (Spanish legal terms)
+```
+
+### Data Flow
+```
+KnowledgeGraph (graph_data.json)
+        +
+extractions/*.json (for evidence quotes)
+        ↓
+    DossierPreparer → DossierData (Pydantic)
+        ↓
+    DossierRenderer (Jinja2 → .tex)
+        ↓
+    DossierCompiler (pdflatex → PDF)
+        ↓
+    {case_id}_dossier.pdf
+```
+
+### Tasks
+
+| Task | File | Dependencies | Acceptance Criteria |
+|------|------|--------------|---------------------|
+| 8A.2.1 | `dossier/models.py` | Pydantic | DossierData and all section sub-models defined |
+| 8A.2.2 | `dossier/templates/*.tex.j2` | Jinja2 | All 7 section templates created |
+| 8A.2.3 | `dossier/renderer.py` | Jinja2, templates | Renders DossierData to .tex with LaTeX escaping |
+| 8A.2.4 | `dossier/compiler.py` | pdflatex | Compiles .tex to PDF, handles errors |
+| 8A.2.5 | `dossier/preparer.py` | KnowledgeGraph, extractions | Assembles DossierData from case artifacts |
+| 8A.2.6 | `dossier/styles/civictable.sty` | LaTeX | Custom style (fonts, colors, headers) |
+| 8A.2.7 | `cli.py generate-dossier` | All above | CLI command generates PDF |
+| 8A.2.8 | Test with TEST-CERESA | Full pipeline | End-to-end PDF generation works |
+
+### Module Structure
+```
+farmer_factory/dossier/
+├── __init__.py           # Public API: generate_dossier()
+├── models.py             # DossierData and section sub-models
+├── preparer.py           # Assembles DossierData from case artifacts
+├── renderer.py           # Jinja2 → LaTeX rendering
+├── compiler.py           # pdflatex compilation
+├── templates/
+│   ├── main.tex.j2              # Document skeleton
+│   ├── sections/
+│   │   ├── front_matter.tex.j2
+│   │   ├── timeline.tex.j2
+│   │   ├── family.tex.j2
+│   │   ├── property.tex.j2
+│   │   ├── ownership.tex.j2
+│   │   ├── documents.tex.j2
+│   │   └── appendix.tex.j2
+│   └── partials/
+│       ├── verification_badge.tex.j2
+│       ├── citation.tex.j2
+│       └── event_row.tex.j2
+└── styles/
+    └── civictable.sty
+```
+
+### Technical Approach
+
+**Template Engine:** Jinja2 with custom delimiters (avoid LaTeX conflicts)
+```python
+env = Environment(
+    block_start_string='<%',
+    block_end_string='%>',
+    variable_start_string='<<',
+    variable_end_string='>>',
+)
+```
+
+**Compilation:**
+```bash
+pdflatex -interaction=nonstopmode dossier.tex
+pdflatex -interaction=nonstopmode dossier.tex  # Run twice for TOC
+```
+
+### Acceptance Criteria
+- ✅ CLI command `generate-dossier CASE-ID --property-id X --family-member-id Y` generates PDF
+- ✅ PDF renders correctly with all 7 sections
+- ✅ Timeline displays all events chronologically
+- ✅ Family tree shows lineage correctly
+- ✅ Ownership history tells coherent narrative
+- ✅ Verification tiers display with appropriate styling
+- ✅ No legal conclusions in any generated text
+- ✅ Methodology disclaimer present and prominent
+- ✅ Professional appearance suitable for legal proceedings
+
+### Implementation Details
+- **Template Engine:** Jinja2 with custom delimiters (`<%`, `%>`, `<<`, `>>`) to avoid LaTeX conflicts
+- **LaTeX Style:** Custom `civictable.sty` with Palatino fonts and professional formatting
+- **Data Contract:** Pydantic models (DossierData, FamilyData, PropertyData, etc.)
+- **Compilation:** Two-pass pdflatex for TOC generation
+- **Architecture Fix:** Added DOCUMENT entity creation in `builder.py`
+- **Architecture Fix:** Updated `PROMPTS.md` to use specific family relation types (CHILD_OF, SPOUSE_OF, HEIR_OF)
+- **Frontend Fix:** Added DOCUMENT entity support to GraphView, EntityBrowser, EntityDetail
+
+### Files Created
+```
+farmer_factory/dossier/
+├── __init__.py
+├── models.py
+├── preparer.py
+├── renderer.py
+├── compiler.py
+├── templates/
+│   ├── main.tex.j2
+│   ├── sections/*.tex.j2 (7 sections)
+│   └── partials/*.tex.j2 (3 partials)
+└── styles/
+    └── civictable.sty
+```
+
+### CLI Commands Added
+- `list-entities CASE-ID [--type TYPE]` - List entities in a case
+- `generate-dossier CASE-ID [--property-id X] [--person-id Y] [--dry-run]` - Generate PDF dossier
+
+**Next Steps:** Phase 8A.3 for Geolocation Module
+
+---
+
+## Phase 8A.3: Property Geolocation Module
+
+### Status: 🔲 PLANNED (Future Enhancement)
+
+### Overview
+Separate module for generating map images showing exact property boundaries and location. Integrates with dossier as optional enhancement.
+
+**Design Document:** `docs/plans/2026-01-27-latex-dossier-module-design.md` (Future Enhancements section)
+
+### Dependencies
+- **Prerequisite:** Phase 8A.2 complete (dossier can function without maps)
+- **External:** Mapping API (Mapbox, Google Static Maps, or OpenStreetMap)
+- **Data:** PropertyData with address, cadastral_info, area fields
+
+### Why Separate Module
+- Keeps dossier module focused on document generation
+- Geolocation is optional — dossier degrades gracefully without it
+- Different technical concerns (API calls, map rendering, caching)
+- Can be developed/tested independently
+
+### Planned Capabilities
+1. **Geocoding** — Convert historical Cuban addresses to coordinates
+2. **Boundary rendering** — Paint exact property area/boundaries on map
+3. **Static map generation** — Output PNG/PDF images for dossier embedding
+4. **Backend logging** — Track all geolocation requests and results
+
+### Technical Considerations
+- Historical Cuban addresses may not exist in modern geocoding APIs
+- May need cadastral records or historical maps as reference
+- Possible APIs: Mapbox Static Images, Google Static Maps, OpenStreetMap
+- Property boundaries derived from `area`, `cadastral_info`, `registry_number` fields
+
+### Module Structure
+```
+farmer_factory/geolocation/
+├── __init__.py
+├── models.py           # GeolocationResult, PropertyBounds
+├── geocoder.py         # Address → coordinates
+├── renderer.py         # Coordinates → map image
+├── cache.py            # Cache geocoding results
+└── logging.py          # Backend request/result logging
+```
+
+### Data Flow
+```
+PropertyData (address, cadastral_info, area)
+        ↓
+    geocoder.py → coordinates
+        ↓
+    renderer.py → map image (PNG)
+        ↓
+    Saved to cases/{case_id}/output/maps/
+        ↓
+    Referenced in DossierData.property.map_image_path
+```
+
+### Dossier Integration
+Templates include conditional map display:
+```latex
+<% if d.property.map_image_path %>
+\includegraphics[width=\textwidth]{<< d.property.map_image_path >>}
+<% else %>
+\textit{Map not available. See property description above.}
+<% endif %>
+```
+
+### Tasks
+
+| Task | File | Dependencies | Acceptance Criteria |
+|------|------|--------------|---------------------|
+| 8A.3.1 | `geolocation/models.py` | Pydantic | GeolocationResult, PropertyBounds models |
+| 8A.3.2 | `geolocation/geocoder.py` | Mapping API | Converts Cuban addresses to coordinates |
+| 8A.3.3 | `geolocation/renderer.py` | Static Maps API | Generates PNG with property boundary |
+| 8A.3.4 | `geolocation/cache.py` | Redis/file | Caches geocoding results |
+| 8A.3.5 | `geolocation/logging.py` | Logging | Tracks all requests and results |
+| 8A.3.6 | `cli.py generate-map` | All above | CLI command generates property map |
+| 8A.3.7 | Dossier integration | Phase 8A.2 | Maps appear in PDF when available |
+
+### Acceptance Criteria
+- ✅ CLI command `generate-map CASE-ID --property-id X` generates PNG
+- ✅ Map shows property location accurately
+- ✅ Property boundaries rendered when data available
+- ✅ All geocoding requests logged for audit
+- ✅ Dossier includes map when available, graceful fallback when not
+- ✅ Caching prevents redundant API calls
+
 **Next Steps:** Phase 8B for authentication and database integration
+
+---
+
+## Phase 8B: Client Intake & Case Tracking (Future)
+
+### Status: 🔲 DEFERRED (Post-MVP)
+
+### Overview
+Operational tooling for managing client intake and case lifecycle. Not in MVP — use external tools (Typeform, Google Drive, Notion) initially.
+
+### When to Build
+- After 10+ cases processed manually
+- When external tools become friction
+- When patterns emerge for what's actually needed
+
+### Potential Scope
+- Intake form (family info, known properties, document inventory)
+- Client communication templates
+- Case status tracking
+- Document submission workflow (still local processing, not upload)
+- Invoice/payment tracking integration
+
+### Tools for MVP1 (No Code)
+| Function | Tool | Notes |
+|----------|------|-------|
+| Initial inquiry | Calendly | Schedule discovery calls |
+| Intake form | Typeform/Google Forms | Collect family info |
+| Document submission | Google Drive shared folder | Client uploads scans |
+| Case tracking | Notion database | Status, notes, deadlines |
+| Communication | Email + Loom | Updates and walkthroughs |
+| Invoicing | Stripe/PayPal | Manual for now |
 
 ---
 
@@ -597,6 +897,35 @@ farmer_factory/
 ├── export/
 │   ├── json_exporter.py      [ ]
 │   └── audit_log.py          [ ]
+├── dossier/                  [✓] # PDF dossier generation module (Phase 8A.2)
+│   ├── __init__.py           [✓]
+│   ├── models.py             [✓] # DossierData and section sub-models
+│   ├── preparer.py           [✓] # Assembles DossierData from case artifacts
+│   ├── renderer.py           [✓] # Jinja2 → LaTeX rendering
+│   ├── compiler.py           [✓] # pdflatex compilation
+│   ├── templates/
+│   │   ├── main.tex.j2       [✓]
+│   │   ├── sections/
+│   │   │   ├── front_matter.tex.j2   [✓]
+│   │   │   ├── timeline.tex.j2       [✓]
+│   │   │   ├── family.tex.j2         [✓]
+│   │   │   ├── property.tex.j2       [✓]
+│   │   │   ├── ownership.tex.j2      [✓]
+│   │   │   ├── documents.tex.j2      [✓]
+│   │   │   └── appendix.tex.j2       [✓]
+│   │   └── partials/
+│   │       ├── verification_badge.tex.j2 [✓]
+│   │       ├── citation.tex.j2       [✓]
+│   │       └── event_row.tex.j2      [✓]
+│   └── styles/
+│       └── civictable.sty    [✓]
+├── geolocation/              [ ] # NEW - Property mapping module (future)
+│   ├── __init__.py           [ ]
+│   ├── models.py             [ ] # GeolocationResult, PropertyBounds
+│   ├── geocoder.py           [ ] # Address → coordinates
+│   ├── renderer.py           [ ] # Coordinates → map image
+│   ├── cache.py              [ ] # Cache geocoding results
+│   └── logging.py            [ ] # Backend request/result logging
 └── utils/                    [ ] # NEW
     ├── retry.py              [ ] # NEW - Retry with backoff
     ├── cost_tracker.py       [ ] # NEW - API cost logging
@@ -619,7 +948,8 @@ farmer_vault/
 │   │       └── [id]/
 │   │           ├── graph/route.ts [ ] # NEW - Fetch graph from Supabase
 │   │           ├── verify-entity/route.ts [ ] # NEW - Analyst verification
-│   │           └── narrative.ts  [✓] # NEW - Narrative generation API route
+│   │           ├── narrative.ts  [✓] # NEW - Narrative generation API route
+│   │           └── dossier/route.ts [ ] # NEW - PDF dossier download
 │   └── case/[id]/page.tsx    [ ]
 ├── components/
 │   ├── KnowledgeGraph.tsx    [ ]
@@ -693,6 +1023,11 @@ MVP1 complete when:
 - ✅ Can invite family members to view case
 - ✅ **ADMIN_GUIDE.md operational procedures followed**
 - ✅ **ANALYST_GUIDE.md verification procedures followed**
+- ✅ **Forensic Dossier PDF export works** (generate-dossier command)
+- ✅ **Dossier includes all 7 sections** (front matter, timeline, family, property, ownership, evidence, appendix)
+- ✅ **Executive summary is LLM-polished** (hybrid template + Claude)
+- ✅ **PDF downloadable from Vault** (authenticated endpoint)
+- 🔲 **Property geolocation maps** (optional enhancement, Phase 8A.3)
 
 ---
 
