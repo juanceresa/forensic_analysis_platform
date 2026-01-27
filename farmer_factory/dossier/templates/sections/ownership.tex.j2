@@ -1,0 +1,60 @@
+% Ownership Section: Ownership history narrative
+
+This section presents the chronological history of property ownership, from acquisition through any transfers or confiscation.
+
+<% if d.ownership_history %>
+
+<% for period in d.ownership_history %>
+% ============================================================================
+% << period.period_type >>
+% ============================================================================
+\subsection{<< period.period_type | replace('_', ' ') | title | latex_escape >>}
+
+<% if period.start_date or period.end_date %>
+\textbf{Period:} << period.start_date or 'Unknown' | latex_escape >> -- << period.end_date or 'Present' | latex_escape >>
+<% endif %>
+
+<% if period.owner_names %>
+\textbf{Owner(s):} << period.owner_names | join(', ') | latex_escape >>
+<% endif %>
+
+\vspace{0.3cm}
+
+<% if period.narrative %>
+<< period.narrative | latex_escape >>
+<% else %>
+\textit{No narrative available for this period.}
+<% endif %>
+
+<% if period.evidence %>
+\subsubsection*{Supporting Evidence}
+
+\begin{evidencelist}
+<% for cite in period.evidence %>
+\item \textbf{<< cite.doc_id | latex_escape >>}<% if cite.doc_title %> --- << cite.doc_title | latex_escape >><% endif %><% if cite.page %> (p. << cite.page >>)<% endif %>
+
+<% if cite.quote %>
+\begin{quote}
+\small\textit{``<< cite.quote | latex_escape >>''}
+\end{quote}
+<% endif %>
+
+\textcolor{civicgray}{\small Verification: << cite.verification_tier.value | latex_escape >>}
+
+<% endfor %>
+\end{evidencelist}
+<% endif %>
+
+<% if not loop.last %>
+\vspace{0.5cm}
+\hrule
+\vspace{0.5cm}
+<% endif %>
+
+<% endfor %>
+
+<% else %>
+
+\textit{No ownership history has been reconstructed from the available documents.}
+
+<% endif %>

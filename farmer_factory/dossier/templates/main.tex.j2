@@ -1,0 +1,68 @@
+% Civic Table Forensic Dossier
+% Generated: << d.generated_at.strftime('%Y-%m-%d %H:%M:%S') >>
+% Case: << d.case_id | latex_escape >>
+
+\documentclass[11pt,letterpaper]{article}
+\usepackage{civictable}
+
+% Document metadata
+\title{<< d.case_title | latex_escape >>}
+\author{Civic Table LLC}
+\date{Generated: << d.generated_at.strftime('%B %d, %Y') >>}
+
+\begin{document}
+
+% ============================================================================
+% FRONT MATTER
+% ============================================================================
+<% include 'sections/front_matter.tex.j2' %>
+
+\tableofcontents
+\newpage
+
+% ============================================================================
+% TIMELINE
+% ============================================================================
+\section{Complete Timeline}
+<% include 'sections/timeline.tex.j2' %>
+
+\newpage
+
+% ============================================================================
+% THE FAMILY
+% ============================================================================
+\section{The Family}
+<% include 'sections/family.tex.j2' %>
+
+\newpage
+
+% ============================================================================
+% THE PROPERTY
+% ============================================================================
+\section{The Property}
+<% include 'sections/property.tex.j2' %>
+
+\newpage
+
+% ============================================================================
+% OWNERSHIP HISTORY
+% ============================================================================
+\section{Ownership History}
+<% include 'sections/ownership.tex.j2' %>
+
+\newpage
+
+% ============================================================================
+% EVIDENCE INVENTORY
+% ============================================================================
+\section{Evidence Inventory}
+<% include 'sections/documents.tex.j2' %>
+
+\newpage
+
+% ============================================================================
+% APPENDIX
+% ============================================================================
+<% include 'sections/appendix.tex.j2' %>
+
+\end{document}

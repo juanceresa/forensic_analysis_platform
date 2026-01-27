@@ -1,0 +1,83 @@
+% Family Section: Family tree and lineage
+
+% ============================================================================
+% PRIMARY CLAIMANT
+% ============================================================================
+\subsection{Primary Claimant}
+
+\begin{tabular}{ll}
+\textbf{Name:} & << d.family.primary_claimant.name | latex_escape >> \\
+<% if d.family.primary_claimant.birth_date %>
+\textbf{Birth Date:} & << d.family.primary_claimant.birth_date | latex_escape >> \\
+<% endif %>
+<% if d.family.primary_claimant.death_date %>
+\textbf{Death Date:} & << d.family.primary_claimant.death_date | latex_escape >> \\
+<% endif %>
+<% if d.family.primary_claimant.roles %>
+\textbf{Roles:} & << d.family.primary_claimant.roles | join(', ') | latex_escape >> \\
+<% endif %>
+\textbf{Verification:} & << d.family.primary_claimant.verification_tier.value | latex_escape >> \\
+\end{tabular}
+
+% ============================================================================
+% LINEAGE SUMMARY
+% ============================================================================
+<% if d.family.lineage_summary %>
+\subsection{Lineage Summary}
+
+<< d.family.lineage_summary | latex_escape >>
+
+<% endif %>
+
+% ============================================================================
+% FAMILY MEMBERS
+% ============================================================================
+<% if d.family.members %>
+\subsection{Family Members}
+
+The following individuals have been identified in connection with this case:
+
+\begin{longtable}{L{4cm} L{3cm} L{3cm} L{3cm} L{2cm}}
+\toprule
+\textbf{Name} & \textbf{Relation} & \textbf{Birth} & \textbf{Death} & \textbf{Roles} \\
+\midrule
+\endhead
+
+\bottomrule
+\endlastfoot
+
+<% for member in d.family.members %>
+<< member.name | latex_escape >> &
+<< member.relation_to_claimant or '---' | latex_escape >> &
+<< member.birth_date or '---' | latex_escape >> &
+<< member.death_date or '---' | latex_escape >> &
+<< member.roles | join(', ') | latex_escape if member.roles else '---' >> \\
+<% endfor %>
+
+\end{longtable}
+
+<% else %>
+
+\textit{No additional family members identified in the documentation.}
+
+<% endif %>
+
+% ============================================================================
+% FAMILY TREE (TEXT-BASED)
+% ============================================================================
+<% if d.family.members | length > 1 %>
+\subsection{Family Structure}
+
+\begin{itemize}[leftmargin=*]
+<% set claimant = d.family.primary_claimant %>
+\item \textbf{<< claimant.name | latex_escape >>} (Primary)
+    <% for member in d.family.members %>
+    <% if member.entity_id != claimant.entity_id %>
+    \begin{itemize}
+    \item << member.name | latex_escape >><% if member.relation_to_claimant %> --- << member.relation_to_claimant | latex_escape >><% endif %>
+    \end{itemize}
+    <% endif %>
+    <% endfor %>
+\end{itemize}
+
+<% endif %>

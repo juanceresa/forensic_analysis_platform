@@ -1,0 +1,62 @@
+% Front Matter: Title, Executive Summary, Disclaimer
+
+\maketitle
+
+\begin{center}
+\large\textit{Forensic Intelligence Dossier}
+\end{center}
+
+\vspace{1cm}
+
+% ============================================================================
+% EXECUTIVE SUMMARY
+% ============================================================================
+\subsection*{Executive Summary}
+
+<< d.executive_summary | latex_escape >>
+
+\vspace{0.5cm}
+
+% Quick stats
+\begin{center}
+\begin{tabular}{lcl}
+\textbf{Documents Analyzed} & : & << d.documents | length >> \\
+\textbf{Entities Identified} & : & << d.timeline | length >> events, << d.family.members | length >> family members \\
+\textbf{Date Range} & : & <% if d.timeline %><< d.timeline[0].date or 'Unknown' >> -- << d.timeline[-1].date or 'Present' >><% else %>N/A<% endif %> \\
+\textbf{Generated} & : & << d.generated_at.strftime('%B %d, %Y') >> \\
+\end{tabular}
+\end{center}
+
+\vspace{1cm}
+
+% ============================================================================
+% VERIFICATION STATUS
+% ============================================================================
+\subsection*{Verification Status}
+
+\begin{center}
+\begin{tabular}{lrl}
+\toprule
+\textbf{Verification Tier} & \textbf{Count} & \textbf{Description} \\
+\midrule
+<% for tier, count in d.verification_stats.tier_distribution.items() %>
+<< tier | latex_escape >> & << count >> & <% if 'TIER_3' in tier %>AI-extracted, unverified<% elif 'TIER_2_ANALYST' in tier %>Analyst verified<% elif 'TIER_2_INSTITUTIONAL' in tier %>Institutional records<% elif 'TIER_1' in tier %>Certified<% else %>Unknown<% endif %> \\
+<% endfor %>
+\midrule
+\textbf{Total} & << d.verification_stats.total_data_points >> & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+<% if d.verification_stats.overall_confidence > 0 %>
+\begin{center}
+\textit{Overall confidence: << "%.1f" | format(d.verification_stats.overall_confidence * 100) >>\%}
+\end{center}
+<% endif %>
+
+\vspace{1cm}
+
+% ============================================================================
+% DISCLAIMER
+% ============================================================================
+\disclaimerbox{<< d.disclaimer_text | latex_escape >>}
