@@ -148,8 +148,12 @@ class KnowledgeGraph:
             direction: "in", "out", or "both"
 
         Returns:
-            List of relation dicts
+            List of relation dicts (empty if entity not found)
         """
+        # Return empty list if entity doesn't exist
+        if not self.graph.has_node(entity_id):
+            return []
+
         relations = []
 
         if direction in ("out", "both"):

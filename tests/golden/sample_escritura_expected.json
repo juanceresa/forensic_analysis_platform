@@ -1,0 +1,148 @@
+{
+  "document_id": "sample_escritura",
+  "document_date": "1958-03-15",
+  "expected_entities": {
+    "persons": [
+      {
+        "name": "Mario Ceresa Lopez",
+        "alternate_names": ["Don Mario Ceresa Lopez", "Sr. Ceresa"],
+        "nationality": "Cuban",
+        "profession": "hacendado",
+        "residence": "Calle Quinta 234, Miramar, La Habana",
+        "marital_status": "casado",
+        "roles": ["owner", "seller"]
+      },
+      {
+        "name": "Maria Elena Fernandez de Queral",
+        "alternate_names": ["Dona Maria Elena Fernandez de Queral"],
+        "nationality": "Cuban",
+        "residence": "Avenida 23 No. 567, Vedado, La Habana",
+        "marital_status": "viuda",
+        "roles": ["buyer"]
+      },
+      {
+        "name": "Jose Manuel Rodriguez Garcia",
+        "alternate_names": ["Dr. Jose Manuel Rodriguez Garcia"],
+        "profession": "Notario",
+        "residence": "La Habana",
+        "roles": ["notary"]
+      },
+      {
+        "name": "Francisco Alvarez Mendez",
+        "alternate_names": ["Don Francisco Alvarez Mendez"],
+        "profession": "Notario",
+        "roles": ["notary"]
+      },
+      {
+        "name": "Pedro Sanchez",
+        "alternate_names": ["Don Pedro Sanchez"],
+        "notes": "Deceased - mentioned as 'herederos de'",
+        "roles": ["neighbor"]
+      }
+    ],
+    "properties": [
+      {
+        "name": "Central Santa Maria",
+        "property_type": "finca",
+        "location": "Florida, Camaguey, Cuba",
+        "area": 500,
+        "area_unit": "caballerias",
+        "registry_number": "5678",
+        "folio_number": "45-123",
+        "borders": {
+          "north": "Central Agramonte",
+          "south": "Rio Caonao",
+          "east": "Finca herederos de Pedro Sanchez",
+          "west": "Camino publico"
+        },
+        "structures": ["casa de vivienda", "batey", "almacenes de azucar", "maquinaria para molienda"]
+      }
+    ],
+    "locations": [
+      {
+        "name": "La Habana",
+        "location_type": "city",
+        "country": "Cuba"
+      },
+      {
+        "name": "Florida",
+        "location_type": "municipality",
+        "parent": "Camaguey"
+      },
+      {
+        "name": "Camaguey",
+        "location_type": "province",
+        "country": "Cuba"
+      },
+      {
+        "name": "Miramar",
+        "location_type": "neighborhood",
+        "parent": "La Habana"
+      },
+      {
+        "name": "Vedado",
+        "location_type": "neighborhood",
+        "parent": "La Habana"
+      }
+    ],
+    "organizations": [
+      {
+        "name": "Ilustre Colegio de La Habana",
+        "org_type": "professional association",
+        "location": "La Habana"
+      },
+      {
+        "name": "Registro de la Propiedad de Camaguey",
+        "org_type": "government registry",
+        "location": "Camaguey"
+      }
+    ]
+  },
+  "expected_relations": [
+    {
+      "type": "OWNS",
+      "source": "Mario Ceresa Lopez",
+      "target": "Central Santa Maria",
+      "date": "1945-01-12",
+      "evidence": "Acquired via notarial deed on January 12, 1945"
+    },
+    {
+      "type": "LOCATED_IN",
+      "source": "Central Santa Maria",
+      "target": "Florida"
+    },
+    {
+      "type": "LOCATED_IN",
+      "source": "Florida",
+      "target": "Camaguey"
+    },
+    {
+      "type": "NOTARIZED_BY",
+      "source": "sample_escritura",
+      "target": "Jose Manuel Rodriguez Garcia"
+    },
+    {
+      "type": "BORDERS_NORTH",
+      "source": "Central Santa Maria",
+      "target": "Central Agramonte"
+    },
+    {
+      "type": "BORDERS_SOUTH",
+      "source": "Central Santa Maria",
+      "target": "Rio Caonao"
+    }
+  ],
+  "quality_notes": {
+    "document_type": "Escritura Publica (Notarial Deed)",
+    "key_facts": [
+      "Property acquisition date: January 12, 1945",
+      "Document date: March 15, 1958",
+      "Property size: 500 caballerias",
+      "Registry reference: Tomo 45, Folio 123, Finca 5678"
+    ],
+    "ambiguities": [
+      "Transaction type unclear - could be sale, mortgage, or certification",
+      "Maria Elena Fernandez role uncertain without full document context"
+    ]
+  }
+}
