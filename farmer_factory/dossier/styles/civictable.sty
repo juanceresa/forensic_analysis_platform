@@ -1,0 +1,194 @@
+% civictable.sty - Custom LaTeX style for Civic Table forensic dossiers
+% Version: 1.0.0
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{civictable}[2026/01/27 Civic Table Dossier Style]
+
+% ============================================================================
+% PACKAGES
+% ============================================================================
+
+% Page layout
+\RequirePackage[
+    letterpaper,
+    top=1in,
+    bottom=1in,
+    left=1.25in,
+    right=1.25in
+]{geometry}
+
+% Typography
+\RequirePackage{fontspec}  % XeLaTeX font selection
+\RequirePackage{microtype}  % Improved typography
+
+% Tables
+\RequirePackage{longtable}  % Multi-page tables
+\RequirePackage{booktabs}   % Professional table rules
+\RequirePackage{array}      % Extended column definitions
+
+% Colors
+\RequirePackage{xcolor}
+
+% Links and references
+\RequirePackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=civicblue,
+    urlcolor=civicblue,
+    citecolor=civicblue
+}
+
+% Headers and footers
+\RequirePackage{fancyhdr}
+
+% Graphics (for optional maps)
+\RequirePackage{graphicx}
+
+% List customization
+\RequirePackage{enumitem}
+
+% ============================================================================
+% COLORS
+% ============================================================================
+
+\definecolor{civicblue}{RGB}{30, 64, 124}      % Primary brand color
+\definecolor{civicgray}{RGB}{80, 80, 80}       % Body text
+\definecolor{civiclight}{RGB}{240, 240, 240}   % Background accents
+\definecolor{tier3}{RGB}{180, 80, 80}          % AI-extracted (caution)
+\definecolor{tier2}{RGB}{180, 150, 50}         % Analyst verified
+\definecolor{tier1}{RGB}{50, 150, 80}          % Certified
+
+% ============================================================================
+% FONTS
+% ============================================================================
+
+% Use system fonts - fallback to defaults if not available
+\setmainfont{Palatino}[
+    BoldFont = Palatino Bold,
+    ItalicFont = Palatino Italic,
+]
+\setsansfont{Helvetica Neue}[
+    BoldFont = Helvetica Neue Bold,
+]
+\setmonofont{Menlo}
+
+% ============================================================================
+% HEADERS AND FOOTERS
+% ============================================================================
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{civicgray}\leftmark}
+\fancyhead[R]{\small\color{civicgray}Civic Table Forensic Dossier}
+\fancyfoot[C]{\small\color{civicgray}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ============================================================================
+% SECTION STYLING
+% ============================================================================
+
+\RequirePackage{titlesec}
+
+\titleformat{\section}
+    {\Large\bfseries\color{civicblue}}
+    {\thesection.}
+    {0.5em}
+    {}
+    [\titlerule]
+
+\titleformat{\subsection}
+    {\large\bfseries\color{civicblue}}
+    {\thesubsection}
+    {0.5em}
+    {}
+
+\titleformat{\subsubsection}
+    {\normalsize\bfseries}
+    {\thesubsubsection}
+    {0.5em}
+    {}
+
+% ============================================================================
+% CUSTOM COMMANDS
+% ============================================================================
+
+% Verification tier badges
+\newcommand{\tierbadge}[1]{%
+    \ifx#1\tierAI
+        \textcolor{tier3}{\textbf{[AI]}}%
+    \else\ifx#1\tierAnalyst
+        \textcolor{tier2}{\textbf{[Analyst]}}%
+    \else\ifx#1\tierCertified
+        \textcolor{tier1}{\textbf{[Certified]}}%
+    \else
+        \textbf{[#1]}%
+    \fi\fi\fi
+}
+
+\newcommand{\tierAI}{TIER\_3\_AI}
+\newcommand{\tierAnalyst}{TIER\_2\_ANALYST}
+\newcommand{\tierInst}{TIER\_2\_INSTITUTIONAL}
+\newcommand{\tierCertified}{TIER\_1\_CERTIFIED}
+
+% Disclaimer box
+\newcommand{\disclaimerbox}[1]{%
+    \begin{center}
+    \fbox{%
+        \parbox{0.9\textwidth}{%
+            \small\color{civicgray}
+            #1
+        }%
+    }
+    \end{center}
+}
+
+% Evidence citation
+\newcommand{\evidencecite}[2]{%
+    \textsuperscript{\textcolor{civicblue}{[#1]}}%
+    \ifx&#2&\else\marginpar{\tiny\color{civicgray}#2}\fi
+}
+
+% Timeline event row (for use in longtable)
+\newcommand{\timelineevent}[4]{%
+    #1 & #2 & #3 & #4 \\
+}
+
+% Section verification summary
+\newcommand{\verificationsummary}[2]{%
+    \begin{flushright}
+    \small\color{civicgray}
+    Sources: #1 documents | #2
+    \end{flushright}
+}
+
+% ============================================================================
+% ENVIRONMENTS
+% ============================================================================
+
+% Ownership period environment
+\newenvironment{ownershipperiod}[2]{%
+    \subsection{#1}
+    \textit{#2}
+    \begin{itemize}[leftmargin=*]
+}{%
+    \end{itemize}
+}
+
+% Evidence list
+\newenvironment{evidencelist}{%
+    \begin{enumerate}[label={[\arabic*]}, leftmargin=*]
+}{%
+    \end{enumerate}
+}
+
+% ============================================================================
+% TABLE SETTINGS
+% ============================================================================
+
+% Default column types for tables
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+
+\endinput

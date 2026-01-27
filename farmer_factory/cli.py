@@ -387,5 +387,97 @@ def list_cases():
             click.echo(f"  {case_dir.name}: (no metadata)")
 
 
+@cli.command('generate-dossier')
+@click.argument('case_id')
+@click.option('--property-id', required=True, help='Entity ID of the focal property')
+@click.option('--family-member-id', required=True, help='Entity ID of primary claimant')
+@click.option('--output', 'output_dir', type=click.Path(), help='Output directory (default: cases/{case_id}/output)')
+@click.option('--engine', default='xelatex', type=click.Choice(['xelatex', 'pdflatex']), help='LaTeX engine')
+@click.option('--dry-run', is_flag=True, help='Generate .tex only, skip PDF compilation')
+def generate_dossier(case_id: str, property_id: str, family_member_id: str, output_dir: str, engine: str, dry_run: bool):
+    """Generate PDF dossier for a case.
+
+    Requires a processed case with graph_data.json.
+    Use --dry-run to generate LaTeX without compiling (useful if LaTeX not installed).
+
+    Example:
+        python cli.py generate-dossier TEST-CERESA \\
+            --property-id "property_abc123" \\
+            --family-member-id "person_xyz789"
+    """
+    from farmer_factory.dossier import generate_dossier as gen_dossier
+    from farmer_factory.dossier.compiler import check_latex_available
+
+    logger.info(f"Generating dossier for case: {case_id}")
+    logger.info(f"  Property: {property_id}")
+    logger.info(f"  Claimant: {family_member_id}")
+
+    # Check LaTeX availability
+    if not dry_run:
+        available, msg = check_latex_available(engine)
+        if not available:
+            click.echo(f"\n⚠ {msg}")
+            click.echo("\nUse --dry-run to generate .tex file without PDF compilation.")
+            if not click.confirm("Continue with --dry-run?"):
+                raise click.Abort()
+            dry_run = True
+
+    try:
+        output_path = Path(output_dir) if output_dir else None
+        result_path = gen_dossier(
+            case_id=case_id,
+            focal_property_id=property_id,
+            focal_family_member_id=family_member_id,
+            output_dir=output_path,
+            engine=engine,
+            dry_run=dry_run,
+        )
+
+        if dry_run:
+            click.echo(f"\n✓ LaTeX generated: {result_path}")
+            click.echo(f"\nTo compile manually:")
+            click.echo(f"  cd {result_path.parent}")
+            click.echo(f"  {engine} {result_path.name}")
+        else:
+            click.echo(f"\n✓ Dossier generated: {result_path}")
+
+    except Exception as e:
+        logger.error(f"Dossier generation failed: {e}")
+        raise click.ClickException(str(e))
+
+
+@cli.command('list-entities')
+@click.argument('case_id')
+@click.option('--type', 'entity_type', type=click.Choice(['PERSON', 'PROPERTY', 'DOCUMENT', 'ORGANIZATION', 'LOCATION']), help='Filter by entity type')
+def list_entities(case_id: str, entity_type: str):
+    """List entities in a case graph for dossier generation.
+
+    Use this to find entity IDs for --property-id and --family-member-id options.
+    """
+    from farmer_factory.structure.graph import KnowledgeGraph
+
+    graph_path = Path(f"cases/{case_id}/output/graph_data.json")
+    if not graph_path.exists():
+        raise click.ClickException(f"Graph not found: {graph_path}")
+
+    graph = KnowledgeGraph.load(graph_path)
+
+    click.echo(f"\nEntities in {case_id}:")
+    click.echo("-" * 60)
+
+    for node_id in sorted(graph.graph.nodes()):
+        entity = graph.get_entity(node_id)
+        if not entity:
+            continue
+
+        etype = entity.get("entity_type", "UNKNOWN")
+        if entity_type and etype != entity_type:
+            continue
+
+        name = entity.get("name", entity.get("title", "Unnamed"))
+        click.echo(f"  [{etype}] {name}")
+        click.echo(f"    ID: {node_id}")
+
+
 if __name__ == '__main__':
     cli()

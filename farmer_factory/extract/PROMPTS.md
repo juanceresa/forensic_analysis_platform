@@ -383,7 +383,12 @@ RELATION TYPES:
 - REGISTERED_IN: Property registered in a Registry
 - LOCATED_IN: Property/Person located in a Location
 - EMPLOYED_BY: Person employed by Organization
-- RELATED_TO: Family relationship between Persons
+
+FAMILY RELATIONS (use specific types when clear, RELATED_TO when ambiguous):
+- CHILD_OF: Person is child of another Person (from "hijo de", "hija de")
+- SPOUSE_OF: Person is spouse of another Person (from "casado con", "esposa de", "esposo de")
+- HEIR_OF: Person is heir of another Person (from "heredero de")
+- RELATED_TO: Generic family relation when specific type is unclear
 
 TEMPORAL INFORMATION:
 - Extract start_date and end_date where applicable
@@ -434,16 +439,23 @@ Respond with a JSON object:
 
 ```python
 class RelationType(str, Enum):
+    # Property
     OWNS = "OWNS"
     SOLD = "SOLD"
     BOUGHT = "BOUGHT"
     INHERITED = "INHERITED"
     CONFISCATED = "CONFISCATED"
+    # Document
     WITNESSED = "WITNESSED"
     NOTARIZED = "NOTARIZED"
     REGISTERED_IN = "REGISTERED_IN"
+    # Geographic
     LOCATED_IN = "LOCATED_IN"
     EMPLOYED_BY = "EMPLOYED_BY"
+    # Family
+    CHILD_OF = "CHILD_OF"
+    SPOUSE_OF = "SPOUSE_OF"
+    HEIR_OF = "HEIR_OF"
     RELATED_TO = "RELATED_TO"
 
 class TemporalInfo(BaseModel):

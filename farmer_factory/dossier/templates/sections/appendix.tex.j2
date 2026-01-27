@@ -1,0 +1,96 @@
+% Appendix Section: Methodology, citations, glossary
+
+\appendix
+
+\section{Methodology}
+
+\subsection{Document Processing}
+
+This dossier was prepared using the following methodology:
+
+\begin{enumerate}
+\item \textbf{Document Intake:} Original documents were scanned at 300 DPI resolution.
+\item \textbf{Optical Character Recognition:} Text was extracted using Google Cloud Vision API.
+\item \textbf{Entity Extraction:} People, properties, organizations, and locations were identified using AI-assisted extraction (Claude API).
+\item \textbf{Relationship Mapping:} Connections between entities were inferred from document context.
+\item \textbf{Verification:} All AI-extracted data is marked as TIER\_3\_AI pending human verification.
+\end{enumerate}
+
+\subsection{Verification Tiers}
+
+\begin{description}
+\item[TIER\_3\_AI] Automatically extracted by artificial intelligence. Not yet verified by a human analyst. May contain errors or misinterpretations.
+
+\item[TIER\_2\_ANALYST] Verified by a trained analyst. The analyst has reviewed the source document and confirmed the extracted information is accurate.
+
+\item[TIER\_2\_INSTITUTIONAL] Verified against institutional records (e.g., property registries, vital records offices).
+
+\item[TIER\_1\_CERTIFIED] Certified by a licensed professional (attorney, notary). Suitable for legal proceedings.
+\end{description}
+
+\subsection{Limitations}
+
+\begin{itemize}
+\item OCR accuracy varies with document quality. Handwritten documents may have lower accuracy.
+\item AI extraction may miss entities or relationships not explicitly stated in the text.
+\item Historical documents may use outdated terminology or conventions.
+\item Translation from Spanish was performed automatically and may contain errors.
+\item This dossier presents \textbf{forensic facts}, not legal conclusions.
+\end{itemize}
+
+% ============================================================================
+% GLOSSARY
+% ============================================================================
+\section{Glossary of Terms}
+
+\begin{description}
+\item[Caballería] Cuban unit of land measurement, approximately 13.4 hectares or 33.2 acres.
+
+\item[Escritura] Notarized deed or legal document.
+
+\item[Finca] Farm or rural property.
+
+\item[Folio] Page number in a registry book.
+
+\item[Inscripción] Registry entry.
+
+\item[Notaría] Notary office.
+
+\item[Protocolo] Notarial protocol (bound collection of notarized documents).
+
+\item[Registro de la Propiedad] Property Registry.
+
+\item[Tomo] Volume in a registry.
+
+\item[Urbanización] Residential development or subdivision.
+\end{description}
+
+% ============================================================================
+% ABOUT CIVIC TABLE
+% ============================================================================
+\section{About Civic Table}
+
+Civic Table LLC provides forensic intelligence services for historical property documentation. Our methodology was developed at the Farmer House Democratic Repair Lab at Huston-Tillotson University.
+
+We produce forensic facts derived from historical documents. We do not provide legal advice or make determinations about property ownership claims.
+
+\vspace{1cm}
+
+\begin{center}
+\textbf{Civic Table LLC}\\
+Forensic Intelligence for Historical Property Restitution\\
+\url{https://civictable.com}
+\end{center}
+
+% ============================================================================
+% GENERATION INFO
+% ============================================================================
+\vspace{2cm}
+\begin{center}
+\small\color{civicgray}
+---\\
+Dossier generated: << d.generated_at.strftime('%Y-%m-%d %H:%M:%S UTC') >>\\
+Case ID: << d.case_id | latex_escape >>\\
+Factory Version: 1.0.0\\
+---
+\end{center}

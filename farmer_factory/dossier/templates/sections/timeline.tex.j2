@@ -1,0 +1,49 @@
+% Timeline Section: Chronological list of all events
+
+This timeline presents all documented events in chronological order, covering both family history and property transactions.
+
+<% if d.timeline %>
+
+\begin{longtable}{L{2.5cm} L{3cm} L{7cm} L{2.5cm}}
+\toprule
+\textbf{Date} & \textbf{Event Type} & \textbf{Summary} & \textbf{Source} \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{4}{r}{\textit{Continued on next page...}} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+<% for event in d.timeline %>
+<< event.date or 'Unknown' | latex_escape >> &
+<< event.event_type | latex_escape >> &
+<< event.summary | latex_escape >><% if event.entities_involved %> \textit{(<< event.entities_involved | join(', ') | latex_escape >>)}<% endif %> &
+<% if event.source_doc_id %><< event.source_doc_id | latex_escape | truncate(15) >><% else %>---<% endif %> \\
+<% if not loop.last %>
+\addlinespace
+<% endif %>
+<% endfor %>
+
+\end{longtable}
+
+<% else %>
+
+\textit{No timeline events have been extracted from the documents.}
+
+<% endif %>
+
+% Section verification summary
+<% set timeline_tiers = {} %>
+<% for event in d.timeline %>
+<% set tier = event.verification_tier.value if event.verification_tier else 'UNKNOWN' %>
+<% if tier in timeline_tiers %>
+<% set _ = timeline_tiers.update({tier: timeline_tiers[tier] + 1}) %>
+<% else %>
+<% set _ = timeline_tiers.update({tier: 1}) %>
+<% endif %>
+<% endfor %>
+
+\verificationsummary{<< d.timeline | length >>}{<% for tier, count in timeline_tiers.items() %><< count >> << tier | latex_escape >><% if not loop.last %>, <% endif %><% endfor %>}

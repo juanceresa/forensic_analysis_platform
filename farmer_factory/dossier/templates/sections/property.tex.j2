@@ -1,0 +1,58 @@
+% Property Section: Property description and location
+
+% ============================================================================
+% PROPERTY DETAILS
+% ============================================================================
+\subsection{Property Information}
+
+\begin{tabular}{ll}
+<% if d.property.name %>
+\textbf{Name:} & << d.property.name | latex_escape >> \\
+<% endif %>
+<% if d.property.property_type %>
+\textbf{Type:} & << d.property.property_type | latex_escape >> \\
+<% endif %>
+<% if d.property.address %>
+\textbf{Address:} & << d.property.address | latex_escape >> \\
+<% endif %>
+<% if d.property.location_description %>
+\textbf{Location:} & << d.property.location_description | latex_escape >> \\
+<% endif %>
+<% if d.property.area %>
+\textbf{Area:} & << d.property.area >> << d.property.area_unit or 'units' | latex_escape >> \\
+<% endif %>
+<% if d.property.registry_info %>
+\textbf{Registry:} & << d.property.registry_info | latex_escape >> \\
+<% endif %>
+\textbf{Verification:} & << d.property.verification_tier.value | latex_escape >> \\
+\end{tabular}
+
+% ============================================================================
+% PROPERTY DESCRIPTION
+% ============================================================================
+<% if d.property.description %>
+\subsection{Historical Context}
+
+<< d.property.description | latex_escape >>
+
+<% endif %>
+
+% ============================================================================
+% MAP (OPTIONAL)
+% ============================================================================
+<% if d.property.map_image_path %>
+\subsection{Property Location}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.8\textwidth]{<< d.property.map_image_path >>}
+\caption{Property location: << d.property.address or d.property.location_description | latex_escape >>}
+\end{figure}
+
+<% else %>
+
+\subsection{Property Location}
+
+\textit{Map not available. Property located at: << d.property.location_description or d.property.address or 'Location unknown' | latex_escape >>}
+
+<% endif %>

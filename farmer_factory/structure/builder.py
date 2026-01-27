@@ -1,9 +1,11 @@
 """Graph builder for constructing knowledge graph from extraction results."""
 
+from datetime import datetime
 from typing import List, Dict, Any, TYPE_CHECKING
 import logging
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.structure.resolver import DedupeEntityResolver
+from farmer_factory.structure.schema import Document, Verification, VerificationTier
 
 if TYPE_CHECKING:
     from farmer_factory.extract import ExtractionResult
@@ -36,15 +38,19 @@ class GraphBuilder:
         Add entities and relations from extraction result.
 
         Process:
-        1. Resolve and add entities (with deduplication)
-        2. Add relations (after entities exist)
-        3. Update processing stats
+        1. Create DOCUMENT entity for the source document
+        2. Resolve and add entities (with deduplication)
+        3. Add relations (after entities exist)
+        4. Update processing stats
 
         Args:
             extraction: ExtractionResult from extract module
         """
         # Track document processing
         self.processing_stats["documents_processed"] += 1
+
+        # Create DOCUMENT entity for this source document
+        self._create_document_entity(extraction)
 
         # Track ID remappings when entities are merged
         id_remapping: Dict[str, str] = {}
@@ -107,6 +113,92 @@ class GraphBuilder:
             except ValueError as e:
                 logger.warning(f"Failed to add relation {relation.id}: {e}")
                 # Skip invalid relations, continue processing
+
+    def _create_document_entity(self, extraction: "ExtractionResult") -> None:
+        """
+        Create a DOCUMENT entity for the source document.
+
+        Args:
+            extraction: ExtractionResult containing document metadata
+        """
+        # Extract document info from processing metadata
+        metadata = extraction.processing_metadata or {}
+        ocr_metadata = metadata.get("ocr_metadata", {})
+
+        # Get document ID from the first entity's extracted_from field, or construct from metadata
+        doc_id = None
+        if extraction.entities:
+            doc_id = extraction.entities[0].extracted_from
+
+        if not doc_id:
+            # Fallback: try to construct from metadata
+            doc_id = metadata.get("document_id", f"doc_{self.processing_stats['documents_processed']}")
+
+        # Check if document already exists (avoid duplicates for multi-page docs)
+        if self.graph.get_entity(doc_id):
+            logger.debug(f"Document entity already exists: {doc_id}")
+            return
+
+        # Determine document type from ID pattern or metadata
+        doc_type = self._infer_document_type(doc_id)
+
+        # Extract date from OCR metadata if available
+        doc_date = metadata.get("llm_metadata", {}).get("document_date")
+
+        # Calculate confidence from extraction
+        confidence_scores = extraction.confidence_scores or {}
+        confidence = confidence_scores.get("combined_confidence", 0.8)
+
+        # Create DOCUMENT entity
+        doc_entity = Document(
+            id=doc_id,
+            verification=Verification(
+                tier=VerificationTier.TIER_3_AI,
+                confidence=confidence,
+                notes="Document entity auto-created from extraction"
+            ),
+            extracted_from=doc_id,
+            title=self._extract_title_from_id(doc_id),
+            document_type=doc_type,
+            date=doc_date,
+            file_path=doc_id,  # Use doc_id as file reference
+            page_count=1,
+            ocr_text=extraction.ocr_result.text if extraction.ocr_result else None,
+        )
+
+        self.graph.add_entity(doc_entity)
+        self.processing_stats["entities_extracted"] += 1
+        logger.info(f"Created DOCUMENT entity: {doc_id}")
+
+    def _infer_document_type(self, doc_id: str) -> str:
+        """Infer document type from document ID patterns."""
+        doc_id_lower = doc_id.lower()
+
+        if "will" in doc_id_lower or "testament" in doc_id_lower:
+            return "Will/Testament"
+        elif "deed" in doc_id_lower or "escritura" in doc_id_lower:
+            return "Deed"
+        elif "credit" in doc_id_lower or "loan" in doc_id_lower:
+            return "Financial Document"
+        elif "transfer" in doc_id_lower or "trans" in doc_id_lower:
+            return "Property Transfer"
+        elif "hacienda" in doc_id_lower or "finca" in doc_id_lower:
+            return "Property Document"
+        elif "millage" in doc_id_lower or "survey" in doc_id_lower:
+            return "Survey Document"
+        else:
+            return "Historical Document"
+
+    def _extract_title_from_id(self, doc_id: str) -> str:
+        """Extract a readable title from document ID."""
+        # Remove page suffix if present
+        title = doc_id.replace("_page_0", "").replace("_page_1", "")
+        # Replace underscores with spaces
+        title = title.replace("_", " ")
+        # Remove file extensions
+        for ext in [".pdf", ".jpg", ".png", ".1pdf", ".2pdf", ".3pdf"]:
+            title = title.replace(ext, "")
+        return title.strip()
 
     def build_from_document_batch(
         self,

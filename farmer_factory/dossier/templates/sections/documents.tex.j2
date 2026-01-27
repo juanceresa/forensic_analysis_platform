@@ -1,0 +1,79 @@
+% Documents Section: Evidence inventory
+
+This section catalogs all documents analyzed for this dossier, indicating what each document proves and its verification status.
+
+<% if d.documents %>
+
+\begin{longtable}{L{3cm} L{2.5cm} L{2cm} L{5cm} L{2.5cm}}
+\toprule
+\textbf{Document ID} & \textbf{Type} & \textbf{Date} & \textbf{What It Proves} & \textbf{Verification} \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{5}{r}{\textit{Continued on next page...}} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+<% for doc in d.documents %>
+<< doc.doc_id | latex_escape | truncate(20) >> &
+<< doc.document_type | latex_escape >> &
+<< doc.date or '---' | latex_escape >> &
+<< doc.what_it_proves | latex_escape >> &
+<< doc.verification_tier.value | replace('TIER_', 'T') | latex_escape >><% if doc.verification_confidence %> (<< "%.0f" | format(doc.verification_confidence * 100) >>\%)<% endif %> \\
+<% if not loop.last %>\addlinespace<% endif %>
+<% endfor %>
+
+\end{longtable}
+
+% ============================================================================
+% DOCUMENT DETAILS
+% ============================================================================
+\subsection{Document Details}
+
+<% for doc in d.documents %>
+\subsubsection*{<< doc.doc_id | latex_escape >>}
+
+\begin{tabular}{ll}
+<% if doc.title %>
+\textbf{Title:} & << doc.title | latex_escape >> \\
+<% endif %>
+\textbf{Type:} & << doc.document_type | latex_escape >> \\
+<% if doc.date %>
+\textbf{Date:} & << doc.date | latex_escape >> \\
+<% endif %>
+\textbf{Pages:} & << doc.page_count >> \\
+\textbf{Verification:} & << doc.verification_tier.value | latex_escape >> \\
+<% if doc.verification_confidence %>
+\textbf{Confidence:} & << "%.1f" | format(doc.verification_confidence * 100) >>\% \\
+<% endif %>
+\end{tabular}
+
+<% if doc.key_entities %>
+\textbf{Entities mentioned:} << doc.key_entities | join(', ') | latex_escape >>
+<% endif %>
+
+<% if doc.what_it_proves %>
+
+\textbf{Significance:} << doc.what_it_proves | latex_escape >>
+<% endif %>
+
+<% if not loop.last %>
+\vspace{0.3cm}
+<% endif %>
+
+<% endfor %>
+
+<% else %>
+
+\textit{No documents have been catalogued for this case.}
+
+<% endif %>
+
+% Summary
+\vspace{0.5cm}
+\begin{center}
+\textbf{Total Documents:} << d.documents | length >>
+\end{center}
