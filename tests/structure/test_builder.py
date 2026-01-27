@@ -64,13 +64,13 @@ def test_add_extraction_single_entity():
 
     builder.add_extraction(extraction)
 
-    # Verify entity was added
-    assert graph.graph.number_of_nodes() == 1
+    # Verify entity was added (person + auto-created DOCUMENT)
+    assert graph.graph.number_of_nodes() == 2
     assert graph.get_entity("p1") is not None
 
-    # Verify stats
+    # Verify stats (entities_extracted includes the auto-created DOCUMENT)
     assert builder.processing_stats["documents_processed"] == 1
-    assert builder.processing_stats["entities_extracted"] == 1
+    assert builder.processing_stats["entities_extracted"] == 2  # 1 person + 1 DOCUMENT
     assert builder.processing_stats["entities_merged"] == 0
     assert builder.processing_stats["relations_added"] == 0
 
@@ -139,12 +139,12 @@ def test_add_extraction_with_relation():
 
     builder.add_extraction(extraction)
 
-    # Verify entities and relation were added
-    assert graph.graph.number_of_nodes() == 2
+    # Verify entities and relation were added (person + property + auto-created DOCUMENT)
+    assert graph.graph.number_of_nodes() == 3
     assert graph.graph.number_of_edges() == 1
 
-    # Verify stats
-    assert builder.processing_stats["entities_extracted"] == 2
+    # Verify stats (entities_extracted includes the auto-created DOCUMENT)
+    assert builder.processing_stats["entities_extracted"] == 3  # 2 entities + 1 DOCUMENT
     assert builder.processing_stats["relations_added"] == 1
 
 
@@ -237,11 +237,11 @@ def test_add_extraction_with_merge():
 
     builder.add_extraction(extraction2)
 
-    # Should still have 1 node (merged)
-    assert graph.graph.number_of_nodes() == 1
+    # Should have 2 nodes (1 person merged + 2 DOCUMENT entities from 2 extractions)
+    assert graph.graph.number_of_nodes() == 3
 
-    # Verify stats
-    assert builder.processing_stats["entities_extracted"] == 2
+    # Verify stats (entities_extracted includes 2 auto-created DOCUMENT entities)
+    assert builder.processing_stats["entities_extracted"] == 4  # 2 persons + 2 DOCUMENTs
     assert builder.processing_stats["entities_merged"] == 1
 
     # Verify merge
@@ -336,8 +336,8 @@ def test_add_extraction_with_merge_and_relations():
 
     builder.add_extraction(extraction1)
 
-    # Verify first extraction
-    assert graph.graph.number_of_nodes() == 2
+    # Verify first extraction (person + property + auto-created DOCUMENT)
+    assert graph.graph.number_of_nodes() == 3
     assert graph.graph.number_of_edges() == 1
 
     # Second extraction: similar person + new property + relation
@@ -396,14 +396,14 @@ def test_add_extraction_with_merge_and_relations():
 
     builder.add_extraction(extraction2)
 
-    # Verify merge happened: should have 3 nodes (1 person merged, 2 properties)
-    assert graph.graph.number_of_nodes() == 3
+    # Verify merge: 1 merged person + 2 properties + 2 DOCUMENT entities = 5 nodes
+    assert graph.graph.number_of_nodes() == 5
 
     # CRITICAL: Should have 2 relations, not 1 (the second relation should be added successfully)
     assert graph.graph.number_of_edges() == 2
 
-    # Verify stats
-    assert builder.processing_stats["entities_extracted"] == 4
+    # Verify stats (entities_extracted includes 2 auto-created DOCUMENT entities)
+    assert builder.processing_stats["entities_extracted"] == 6  # 4 entities + 2 DOCUMENTs
     assert builder.processing_stats["entities_merged"] == 1
     assert builder.processing_stats["relations_added"] == 2  # Both relations should be added
 
@@ -452,7 +452,7 @@ def test_build_from_document_batch():
 
     builder.build_from_document_batch(extractions)
 
-    # Verify all entities added
-    assert graph.graph.number_of_nodes() == 3
+    # Verify all entities added (3 persons + 3 auto-created DOCUMENT entities)
+    assert graph.graph.number_of_nodes() == 6
     assert builder.processing_stats["documents_processed"] == 3
-    assert builder.processing_stats["entities_extracted"] == 3
+    assert builder.processing_stats["entities_extracted"] == 6  # 3 persons + 3 DOCUMENTs

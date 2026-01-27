@@ -103,3 +103,56 @@ def test_save_extraction_json_includes_flags(tmp_path):
 
     data = output_path.read_text()
     assert "RELATION_EXTRACTION_FAILED" in data
+
+
+def test_save_ocr_text_empty(tmp_path):
+    """Test save_ocr_text handles None and empty OCR results."""
+    from farmer_factory.processing.helpers import save_ocr_text
+
+    output_path = tmp_path / "ocr" / "test.txt"
+
+    # Test with None
+    save_ocr_text(None, output_path)
+    assert not output_path.exists()
+
+
+def test_save_ocr_text_creates_directory(tmp_path):
+    """Test save_ocr_text creates parent directories."""
+    from farmer_factory.processing.helpers import save_ocr_text
+    from farmer_factory.extract.ocr import OCRResult
+
+    # Create a mock OCR result
+    ocr_result = OCRResult(
+        text="Test OCR content",
+        confidence=0.95,
+        page_confidence=[0.95],
+        blocks=[],
+        metadata={}
+    )
+
+    output_path = tmp_path / "nested" / "dir" / "ocr.txt"
+    save_ocr_text(ocr_result, output_path)
+
+    assert output_path.exists()
+    assert output_path.read_text() == "Test OCR content"
+
+
+def test_setup_logging_creates_file(tmp_path):
+    """Test setup_logging creates log file and configures handlers."""
+    from farmer_factory.processing.helpers import setup_logging
+    import logging
+
+    log_file = tmp_path / "logs" / "test.log"
+    setup_logging(log_file)
+
+    # Verify log file was created (directory gets created)
+    assert log_file.parent.exists()
+
+    # Log something to verify it works
+    test_logger = logging.getLogger("test_setup_logging")
+    test_logger.info("Test log message")
+
+    # Verify handlers were added
+    root_logger = logging.getLogger()
+    assert len(root_logger.handlers) >= 2  # file + console
+

@@ -123,7 +123,7 @@ kg.add_relation(owns_relation)
 
 # Query
 entity = kg.get_entity("person_123")
-relations = kg.get_relations("person_123", direction="outgoing")
+relations = kg.get_relations("person_123", direction="out")
 ```
 
 **Notes:**
@@ -248,12 +248,15 @@ stats = builder.processing_stats
 ```
 
 **What it does:**
-1. Receives entities from extraction pipeline
-2. For each entity, checks for duplicates using trained dedupe model
-3. If match found → merge with existing entity
-4. If no match → add as new entity
-5. Adds relations with entity ID matching
-6. Tracks statistics
+1. Creates a DOCUMENT entity for each extraction (auto-generated)
+2. Receives entities from extraction pipeline
+3. For each entity, checks for duplicates using trained dedupe model
+4. If match found → merge with existing entity
+5. If no match → add as new entity
+6. Adds relations with entity ID matching
+7. Tracks statistics
+
+> **Note:** Entity counts in `processing_stats["entities_extracted"]` include auto-created DOCUMENT entities.
 
 **Benefits:**
 - Automatic deduplication during processing
@@ -345,8 +348,20 @@ person1 = Person(
     extracted_from="doc_001"
 )
 
-# 3. Add through builder (automatic deduplication)
-builder.add_entity(person1)
+# 3. Add through builder via extraction (automatic deduplication)
+# Note: Use add_extraction() with ExtractionResult, not add_entity() directly
+from farmer_factory.extract import ExtractionResult
+from farmer_factory.prepare import DocumentPath
+
+extraction = ExtractionResult(
+    entities=[person1],
+    relations=[],
+    ocr_result=None,
+    confidence_scores={"overall": 0.92},
+    path=DocumentPath.TYPED,
+    processing_metadata={}
+)
+builder.add_extraction(extraction)
 
 # Later, same person from different document
 person2 = Person(
@@ -359,7 +374,15 @@ person2 = Person(
     extracted_from="doc_005"
 )
 
-builder.add_entity(person2)
+extraction2 = ExtractionResult(
+    entities=[person2],
+    relations=[],
+    ocr_result=None,
+    confidence_scores={"overall": 0.88},
+    path=DocumentPath.TYPED,
+    processing_metadata={}
+)
+builder.add_extraction(extraction2)
 # → Dedupe detects match → Merges into person1
 # → person1 now has: mother, father, profession, extracted_from=["doc_001", "doc_005"]
 

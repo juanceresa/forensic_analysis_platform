@@ -418,7 +418,7 @@ def clean(case_id: str, confirm: bool):
         raise click.ClickException(f"Case not found: {case_id}")
 
     intake_dir = case_dir / "intake"
-    if not intake_dir.exists() or not list(intake_dir.glob("*.pdf")):
+    if not intake_dir.exists() or not any(intake_dir.glob("*.pdf")):
         raise click.ClickException(f"No PDFs found in {intake_dir}/")
 
     # Show what will be deleted
@@ -473,7 +473,7 @@ def list_cases():
         if metadata_file.exists():
             import json
 
-            with open(metadata_file) as f:
+            with open(metadata_file, encoding='utf-8') as f:
                 metadata = json.load(f)
             click.echo(
                 f"  {metadata['id']}: {metadata['name']} ({metadata.get('status', 'UNKNOWN')})"
