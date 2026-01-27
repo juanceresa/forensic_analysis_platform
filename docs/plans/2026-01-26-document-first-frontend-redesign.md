@@ -1,8 +1,8 @@
 # Document-First Frontend Redesign
 
-> **Version:** 1.0.0
+> **Version:** 1.1.0
 > **Date:** 2026-01-26
-> **Status:** Design Complete - Ready for Implementation
+> **Status:** ✅ IMPLEMENTED (2026-01-26)
 
 ---
 
@@ -16,6 +16,40 @@ This design repositions Civic Table from a graph-centric visualization tool to a
 - Enterprise dashboard with workflow stages and verification tracking
 - Browser-based navigation for simplicity and shareability
 - Forensic/military aesthetic for professional credibility
+
+---
+
+## Implementation Notes (2026-01-26)
+
+**Implemented:**
+- ✅ Dashboard page with metrics grid, verification bar, workflow checklist
+- ✅ Entity browser with type-based grouping (PERSON, PROPERTY, ORGANIZATION, LOCATION)
+- ✅ Timeline/narrative view with decade-based document grouping
+- ✅ Graph page with KnowledgeGraph integration
+- ✅ API routes: `/dashboard`, `/entities`, `/timeline`, `/graph`
+- ✅ Contextual Cuban history titles for timeline periods
+- ✅ AI disclaimer banners for TIER_3_AI data
+- ✅ Tests passing (12 tests)
+
+**Deferred to Phase 2:**
+- Documents list page (skeleton exists)
+- Document viewer page
+- Entity detail page refinements
+- Advanced filtering and search
+- Sidebar collapse/expand
+
+**Files Created/Modified:**
+- `app/api/cases/[caseId]/dashboard/route.ts`
+- `app/api/cases/[caseId]/entities/route.ts`
+- `app/api/cases/[caseId]/timeline/route.ts`
+- `app/api/cases/[caseId]/graph/route.ts`
+- `components/Entities/EntityBrowser.tsx`
+- `components/Narrative/TimelinePeriod.tsx`
+- `components/Graph/GraphView.tsx`
+- `app/case/[caseId]/page.tsx` (dashboard)
+- `app/case/[caseId]/entities/page.tsx`
+- `app/case/[caseId]/narrative/page.tsx`
+- `app/case/[caseId]/graph/page.tsx`
 
 ---
 

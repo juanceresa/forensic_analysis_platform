@@ -1,28 +1,254 @@
 # Farmer House Forensic Intelligence Platform — Frontend Specification (The Vault)
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 2.0.0
+> **Version:** 3.0.0
 > **Last Updated:** 2026-01-26
-> **Status:** MVP1 Active Implementation
+> **Status:** MVP1 Active Implementation (Document-First Architecture)
 
 ---
 
 ## Overview
 
-Zone B (The Vault) is the client-facing read-only interface for viewing forensic dossiers. It renders the `graph_data.json` output from Zone A (The Factory) as an interactive knowledge graph with document viewer.
+Zone B (The Vault) is the client-facing read-only interface for viewing forensic dossiers. It implements a **document-first navigation architecture** that presents case data through multiple complementary views: Documents, Entities, Narrative Timeline, and Knowledge Graph.
 
 **Core Principles:**
 - **Read-Only**: No uploads, edits, or deletions
-- **Static**: Data is pre-generated; no backend processing
-- **Evidence Map Style**: Force-directed graph with node detail panel
+- **Document-First**: Primary navigation through documents, not the graph
+- **Multi-View**: Same data accessible through different lenses (documents, entities, timeline, graph)
 - **Intelligence Aesthetic**: Dark mode, monospace, high-stakes professional
-- **Performance-First**: Optimized rendering with configurable settings
+- **Performance-First**: Server-side rendering with client-side interactivity
+
+**Data Source:**
+All views consume `graph_data.json` from Zone A (The Factory), accessed through case-specific API routes.
 
 **Graph Data Contract (Aligned to `graph_data.json`):**
 - **Nodes** use `entity_type` and `name` (not `type`/`label`).
 - **Links** use `relation_type` (not `label`) and are the primary driver for view filters.
 - **Provenance** lives on `extracted_from` (comma-delimited string of document IDs; split + trim).
-- **Verification tiers** are `TIER_1_CERTIFIED`, `TIER_2_INSTITUTIONAL`, `TIER_2_ANALYST`, `TIER_3_AI`.
+- **Verification tiers** are `TIER_1_CERTIFIED`, `TIER_2_ANALYST`, `TIER_3_AI`, `TIER_4_SOURCE`.
+
+---
+
+## Navigation Architecture
+
+### Route Structure
+
+```
+/case/[caseId]/                    → Dashboard (case overview)
+/case/[caseId]/documents           → Document Browser
+/case/[caseId]/entities            → Entity Browser (grouped by type)
+/case/[caseId]/narrative           → Timeline View (grouped by decade)
+/case/[caseId]/graph               → Knowledge Graph (interactive visualization)
+/case/[caseId]/entity/[entityId]   → Entity Detail Page
+/case/[caseId]/document/[docId]    → Document Viewer
+```
+
+### Sidebar Navigation
+
+The case layout includes a persistent sidebar with navigation:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  HEADER: Case Title | Status                                        │
+├─────────────┬───────────────────────────────────────────────────────┤
+│             │                                                        │
+│  SIDEBAR    │                    MAIN CONTENT                        │
+│             │                                                        │
+│  Dashboard  │  (Varies by route)                                     │
+│  Documents  │                                                        │
+│  Entities   │                                                        │
+│  Narrative  │                                                        │
+│  Graph      │                                                        │
+│             │                                                        │
+├─────────────┴───────────────────────────────────────────────────────┤
+│  FOOTER: Verification Legend | Legal Disclaimer                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## API Endpoints
+
+All API routes follow Next.js App Router conventions with async params.
+
+### GET `/api/cases/[caseId]/dashboard`
+
+Returns aggregated metrics for the case dashboard.
+
+**Response:**
+```typescript
+interface DashboardData {
+  metrics: {
+    documents: number;
+    entities: number;
+    relationships: number;
+    stage: string;           // Current workflow stage
+    stageProgress: number;   // 0-100 percentage
+  };
+  verificationDistribution: {
+    TIER_3_AI: number;
+    TIER_2_ANALYST: number;
+    TIER_1_CERTIFIED: number;
+    TIER_4_SOURCE: number;
+  };
+  entityTypeSummary: Record<string, number>;
+  dateRange: {
+    earliest: string | null;  // ISO date
+    latest: string | null;
+  };
+  workflowStages: WorkflowStages;
+}
+```
+
+### GET `/api/cases/[caseId]/entities`
+
+Returns all entities grouped by type.
+
+**Response:**
+```typescript
+interface EntitiesResponse {
+  entities: {
+    PERSON: EntityInfo[];
+    PROPERTY: EntityInfo[];
+    ORGANIZATION: EntityInfo[];
+    LOCATION: EntityInfo[];
+  };
+  totalCount: number;
+  documentCount: number;
+  metadata: GraphMetadata;
+}
+
+interface EntityInfo {
+  id: string;
+  name: string;
+  entity_type: EntityType;
+  verification: Verification;
+  extracted_from: string;
+  // Type-specific fields (dates, addresses, etc.)
+}
+```
+
+### GET `/api/cases/[caseId]/timeline`
+
+Returns documents grouped by time period for narrative view.
+
+**Response:**
+```typescript
+interface TimelineResponse {
+  periods: TimePeriod[];
+  totalDocuments: number;
+  dateRange: {
+    earliest_document: string | null;
+    latest_document: string | null;
+  };
+}
+
+interface TimePeriod {
+  id: string;
+  title: string;        // Contextual title (e.g., "Expropriation Period")
+  startYear: number;
+  endYear: number;
+  documents: DocumentInfo[];
+  entities: EntityInfo[];
+}
+```
+
+**Period Titles (Contextual to Cuban History):**
+| Year Range | Title |
+|------------|-------|
+| 1959-1961 | "Expropriation Period" |
+| 1962-1969 | "Early Revolutionary Period" |
+| 1950-1958 | "Pre-Revolutionary Period" |
+| Default | "[Decade] - [Decade+9]" |
+
+### GET `/api/cases/[caseId]/graph`
+
+Returns the full graph data for visualization.
+
+**Response:** Complete `GraphData` object as defined in `/lib/types.ts`.
+
+---
+
+## Page Components
+
+### Dashboard Page (`/case/[caseId]/page.tsx`)
+
+The case overview page with key metrics and workflow progress.
+
+**Features:**
+- Metrics grid (stage, documents, entities, relationships)
+- Verification status bar (stacked progress by tier)
+- Workflow checklist (intake, processing, analysis, certification)
+- Click-through links to detail views
+
+**Key Components:**
+- `WorkflowChecklist` - Expandable checklist with completion status
+
+### Entity Browser (`/case/[caseId]/entities/page.tsx`)
+
+Displays all entities grouped by type with verification badges.
+
+**Features:**
+- Type-based grouping (PERSON, PROPERTY, ORGANIZATION, LOCATION)
+- Expandable sections per entity type
+- Entity count badges
+- Verification tier indicators
+- Click-through to entity detail pages
+
+**Component:** `components/Entities/EntityBrowser.tsx`
+
+```typescript
+interface EntityBrowserProps {
+  entities: GroupedEntities;
+  caseId: string;
+}
+```
+
+### Narrative Timeline (`/case/[caseId]/narrative/page.tsx`)
+
+Documents organized chronologically by decade with contextual Cuban history titles.
+
+**Features:**
+- Time period grouping (decade-based)
+- Contextual period titles
+- AI disclaimer banner (TIER_3_AI warning)
+- Expandable period sections
+- Document cards with extracted entities
+
+**Component:** `components/Narrative/TimelinePeriod.tsx`
+
+```typescript
+interface TimelinePeriodProps {
+  period: TimePeriodData;
+  caseId: string;
+  index: number;
+  defaultOpen?: boolean;
+}
+```
+
+**Visual Design:**
+- Timeline track with period markers
+- Period cards with document count
+- Entity chips showing extracted entities per document
+- Alternating layout for visual interest
+
+### Graph View (`/case/[caseId]/graph/page.tsx`)
+
+Interactive knowledge graph visualization.
+
+**Features:**
+- Full-page graph canvas
+- Navigation bar with back button
+- Node click → entity detail navigation
+- Settings panel integration
+
+**Component:** `components/Graph/GraphView.tsx`
+
+```typescript
+interface GraphViewProps {
+  caseId: string;
+}
+```
 
 ---
 
@@ -389,22 +615,41 @@ code, .data-field, .node-label { font-family: var(--font-mono); }
 
 ## Page Structure
 
-### Layout
+### Case Layout (Sidebar Navigation)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  HEADER: Case Title | Status | Legal Disclaimer Toggle             │
+│  HEADER: Logo | Case Title | User Menu                              │
+├─────────────┬───────────────────────────────────────────────────────┤
+│             │                                                        │
+│  SIDEBAR    │                    MAIN CONTENT                        │
+│  ─────────  │                                                        │
+│  Dashboard  │  Content varies by route:                              │
+│  Documents  │  - Dashboard: Metrics, workflow, verification          │
+│  Entities   │  - Entities: Grouped entity browser                    │
+│  Narrative  │  - Narrative: Timeline periods                         │
+│  Graph      │  - Graph: Force-directed visualization                 │
+│             │                                                        │
+├─────────────┴───────────────────────────────────────────────────────┤
+│  FOOTER: Legal Disclaimer | Verification Legend                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Graph Page Layout (Full-Screen)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  HEADER: ← Back to Case | Case Title                                │
 ├──────────────────────────────────────────┬──────────────────────────┤
 │                                          │                          │
 │                                          │      DOSSIER PANEL       │
 │            KNOWLEDGE GRAPH               │                          │
 │            (Force-Directed)              │  - Entity Details        │
 │                                          │  - Source Documents      │
-│  ⚙️ Settings Panel (Floating)           │  - Timeline Events       │
-│                                          │  - Related Entities      │
+│  ⚙️ Settings Panel (Floating)           │  - Related Entities      │
 │                                          │                          │
 ├──────────────────────────────────────────┴──────────────────────────┤
-│  FOOTER: Verification Legend | Processing Date | Disclaimer         │
+│  FOOTER: Verification Legend | Node Count                            │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -938,6 +1183,17 @@ module.exports = {
 
 ## Changelog
 
+### Version 3.0.0 (2026-01-26)
+- **Document-First Architecture**: Complete navigation redesign
+- Added sidebar navigation with Dashboard, Documents, Entities, Narrative, Graph views
+- New API endpoints: `/dashboard`, `/entities`, `/timeline`, `/graph`
+- New components: EntityBrowser, TimelinePeriod, GraphView
+- Dashboard with real-time metrics and workflow tracking
+- Timeline view with decade-based grouping and contextual Cuban history titles
+- Entity browser with type-based grouping
+- Updated page structure documentation
+- Added TIER_4_SOURCE verification tier for source documents
+
 ### Version 2.0.0 (2026-01-26)
 - Added Filters tab with entity type toggles and orphan hiding
 - Implemented real-time graph filtering based on settings
@@ -957,4 +1213,4 @@ module.exports = {
 
 ---
 
-*This specification reflects the current MVP1 implementation of The Vault interface. For backend integration details, see `/docs/architecture/ARCHITECTURE.md`. For data schemas, see `/farmer_factory/structure/SCHEMA.md`.*
+*This specification reflects the current MVP1 implementation of The Vault interface with document-first navigation. For backend integration details, see `/docs/architecture/ARCHITECTURE.md`. For data schemas, see `/farmer_factory/structure/SCHEMA.md`.*

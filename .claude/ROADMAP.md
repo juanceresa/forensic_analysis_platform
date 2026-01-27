@@ -385,6 +385,51 @@ farmer_vault/
 
 ---
 
+## Phase 8A.1: Document-First Frontend ✅ COMPLETE (2026-01-26)
+
+**Deliverables:**
+- ✅ Document-first navigation architecture
+- ✅ Sidebar navigation (Dashboard, Documents, Entities, Narrative, Graph)
+- ✅ Dashboard with real-time metrics and workflow tracking
+- ✅ Entity browser with type-based grouping
+- ✅ Timeline view with decade-based document grouping
+- ✅ API routes for all data views
+- ✅ Tests passing (12 tests)
+
+**Implementation:** See `docs/plans/2026-01-26-document-first-frontend-redesign.md`
+
+**New API Routes:**
+- `/api/cases/[caseId]/dashboard` - Aggregated metrics, verification distribution
+- `/api/cases/[caseId]/entities` - Entities grouped by type
+- `/api/cases/[caseId]/timeline` - Documents grouped by decade
+- `/api/cases/[caseId]/graph` - Full graph data
+
+**New Components:**
+- `EntityBrowser` - Type-grouped entity display
+- `TimelinePeriod` - Expandable timeline periods
+- `GraphView` - Knowledge graph wrapper with navigation
+- `WorkflowChecklist` - Workflow stage tracking
+
+**Key Features:**
+- Contextual Cuban history titles for timeline periods (e.g., "Expropriation Period")
+- AI disclaimer banners for TIER_3_AI data
+- Verification status bar with tier breakdown
+- Workflow progression tracking
+- Click-through navigation between views
+
+**Architecture:**
+```
+/case/[caseId]/              → Dashboard (metrics, workflow)
+/case/[caseId]/documents     → Document Browser
+/case/[caseId]/entities      → Entity Browser (by type)
+/case/[caseId]/narrative     → Timeline View (by decade)
+/case/[caseId]/graph         → Knowledge Graph
+```
+
+**Next Steps:** Phase 8B for authentication and database integration
+
+---
+
 ## Phase 7: Export & CLI
 
 ### Dependencies
