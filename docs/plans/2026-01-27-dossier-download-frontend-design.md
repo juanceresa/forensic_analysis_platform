@@ -14,6 +14,7 @@
 1. **Authentication** — Only logged-in users can access `/api/cases/[caseId]/dossier`
 2. **Authorization** — User must have access to the specific case (Supabase RLS)
 3. **Audit logging** — Log every dossier download (who, when, which case)
+4. **Prod guard until 8B ships** — Route must refuse requests in production unless a feature flag explicitly enables it.
 
 ### For local development (MVP):
 - Feature works without auth for testing
@@ -67,7 +68,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { caseId: string } }
 ) {
+  // DEV-GUARD: Remove once Phase 8B ships
+  if (process.env.NODE_ENV === 'production' && process.env.ENABLE_DOSSIER_DOWNLOAD !== 'true') {
+    return new Response('Not enabled', { status: 403 });
+  }
+
   const { caseId } = params;
+  if (!/^[A-Za-z0-9_-]+$/.test(caseId)) {
+    return new Response('Invalid caseId', { status: 400 });
+  }
   const pdfPath = path.join(
     process.cwd(),
     '..',
@@ -81,11 +90,14 @@ export async function GET(
     return new Response('Dossier not found', { status: 404 });
   }
 
-  const file = readFileSync(pdfPath);
-  return new Response(file, {
+  const stat = statSync(pdfPath);
+  const stream = createReadStream(pdfPath);
+  return new Response(stream as any, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${caseId}_dossier.pdf"`,
+      'Content-Length': stat.size.toString(),
+      'Cache-Control': 'private, no-store',
     },
   });
 }
@@ -95,6 +107,9 @@ export async function HEAD(
   { params }: { params: { caseId: string } }
 ) {
   const { caseId } = params;
+  if (!/^[A-Za-z0-9_-]+$/.test(caseId)) {
+    return new Response(null, { status: 400 });
+  }
   const pdfPath = path.join(
     process.cwd(),
     '..',
@@ -133,6 +148,7 @@ Dashboard page → WorkflowChecklist component → New final step
 **When dossier is not yet generated:**
 ```
 ○ Dossier in preparation
+   [Check again]
 ```
 
 ### Component Logic
@@ -155,7 +171,20 @@ useEffect(() => {
 }, [caseId]);
 
 const handleDownload = () => {
-  window.open(`/api/cases/${caseId}/dossier`, '_blank');
+  fetch(`/api/cases/${caseId}/dossier`)
+    .then(async res => {
+      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${caseId}_dossier.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    })
+    .catch(() => {
+      // surface error state/toast
+    });
 };
 ```
 
@@ -168,6 +197,7 @@ const handleDownload = () => {
 | `app/api/cases/[caseId]/dossier/route.ts` | Create | API route for HEAD/GET |
 | `components/Dashboard/WorkflowChecklist.tsx` | Modify | Add dossier step |
 | `app/case/[caseId]/page.tsx` | Modify | Pass caseId to checklist if needed |
+| `components/Dashboard/WorkflowChecklist.tsx` | Add | "Check again" button to re-run HEAD |
 
 ---
 
@@ -184,6 +214,8 @@ const handleDownload = () => {
 - API route returns 404 when no PDF
 - API route returns 200 + PDF when file exists
 - WorkflowChecklist shows correct state based on availability
+- Invalid caseId returns 400
+- Dev guard blocks in production unless feature flag enabled
 
 ---
 

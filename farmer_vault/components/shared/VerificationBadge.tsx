@@ -1,27 +1,33 @@
 interface VerificationBadgeProps {
-  tier: 'TIER_1_CERTIFIED' | 'TIER_2_ANALYST' | 'TIER_3_AI' | 'TIER_4_SOURCE';
+  tier: 'TIER_1_CERTIFIED' | 'TIER_2_ANALYST' | 'TIER_2_INSTITUTIONAL' | 'TIER_3_AI' | 'TIER_4_SOURCE';
   size?: 'tiny' | 'small' | 'medium' | 'large';
 }
 
+const TIER_CONFIG = {
+  TIER_3_AI: {
+    label: 'AI',
+    className: 'bg-[rgb(245_158_11_/_0.1)] text-[#fbbf24] border-[rgb(245_158_11_/_0.2)]',
+  },
+  TIER_2_ANALYST: {
+    label: 'Analyst',
+    className: 'bg-[rgb(59_130_246_/_0.1)] text-[#60a5fa] border-[rgb(59_130_246_/_0.2)]',
+  },
+  TIER_2_INSTITUTIONAL: {
+    label: 'Institutional',
+    className: 'bg-[rgb(139_92_246_/_0.1)] text-[#a78bfa] border-[rgb(139_92_246_/_0.2)]',
+  },
+  TIER_1_CERTIFIED: {
+    label: 'Certified',
+    className: 'bg-[rgb(16_185_129_/_0.1)] text-[#34d399] border-[rgb(16_185_129_/_0.2)]',
+  },
+  TIER_4_SOURCE: {
+    label: 'Source',
+    className: 'bg-[rgb(168_85_247_/_0.1)] text-[#c084fc] border-[rgb(168_85_247_/_0.2)]',
+  },
+};
+
 export function VerificationBadge({ tier, size = 'medium' }: VerificationBadgeProps) {
-  const config = {
-    TIER_3_AI: {
-      label: 'AI',
-      className: 'bg-[rgb(245_158_11_/_0.1)] text-[#fbbf24] border-[rgb(245_158_11_/_0.2)]',
-    },
-    TIER_2_ANALYST: {
-      label: 'Analyst',
-      className: 'bg-[rgb(59_130_246_/_0.1)] text-[#60a5fa] border-[rgb(59_130_246_/_0.2)]',
-    },
-    TIER_1_CERTIFIED: {
-      label: 'Certified',
-      className: 'bg-[rgb(16_185_129_/_0.1)] text-[#34d399] border-[rgb(16_185_129_/_0.2)]',
-    },
-    TIER_4_SOURCE: {
-      label: 'Source',
-      className: 'bg-[rgb(168_85_247_/_0.1)] text-[#c084fc] border-[rgb(168_85_247_/_0.2)]',
-    },
-  }[tier];
+  const config = TIER_CONFIG[tier];
 
   const sizeClasses = {
     tiny: 'px-1.5 py-0.5 text-[10px]',

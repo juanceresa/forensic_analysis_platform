@@ -50,112 +50,112 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
       case 'PERSON':
         return (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {entity.birth_date && (
+            {entity.birth_date ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Birth Date</dt>
-                <dd className="text-slate-300 font-mono tabular-nums">{entity.birth_date as string}</dd>
+                <dd className="text-slate-300 font-mono tabular-nums">{String(entity.birth_date)}</dd>
               </>
-            )}
-            {entity.nationality && (
+            ) : null}
+            {entity.nationality ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Nationality</dt>
-                <dd className="text-slate-300">{entity.nationality as string}</dd>
+                <dd className="text-slate-300">{String(entity.nationality)}</dd>
               </>
-            )}
-            {entity.profession && (
+            ) : null}
+            {entity.profession ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Profession</dt>
-                <dd className="text-slate-300">{entity.profession as string}</dd>
+                <dd className="text-slate-300">{String(entity.profession)}</dd>
               </>
-            )}
-            {entity.residence && (
+            ) : null}
+            {entity.residence ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Residence</dt>
-                <dd className="text-slate-300">{entity.residence as string}</dd>
+                <dd className="text-slate-300">{String(entity.residence)}</dd>
               </>
-            )}
+            ) : null}
           </dl>
         );
       case 'PROPERTY':
         return (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {entity.address && (
+            {entity.address ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Address</dt>
-                <dd className="text-slate-300">{entity.address as string}</dd>
+                <dd className="text-slate-300">{String(entity.address)}</dd>
               </>
-            )}
-            {entity.area && (
+            ) : null}
+            {entity.area ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Area</dt>
                 <dd className="text-slate-300 font-mono tabular-nums">
-                  {entity.area as string} {entity.area_unit as string}
+                  {String(entity.area)} {entity.area_unit ? String(entity.area_unit) : ''}
                 </dd>
               </>
-            )}
-            {entity.registry_number && (
+            ) : null}
+            {entity.registry_number ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Registry</dt>
-                <dd className="text-slate-300 font-mono">{entity.registry_number as string}</dd>
+                <dd className="text-slate-300 font-mono">{String(entity.registry_number)}</dd>
               </>
-            )}
+            ) : null}
           </dl>
         );
       case 'ORGANIZATION':
         return (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {entity.org_type && (
+            {entity.org_type ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Type</dt>
-                <dd className="text-slate-300">{entity.org_type as string}</dd>
+                <dd className="text-slate-300">{String(entity.org_type)}</dd>
               </>
-            )}
-            {entity.address && (
+            ) : null}
+            {entity.address ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Address</dt>
-                <dd className="text-slate-300">{entity.address as string}</dd>
+                <dd className="text-slate-300">{String(entity.address)}</dd>
               </>
-            )}
+            ) : null}
           </dl>
         );
       case 'LOCATION':
         return (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {entity.location_type && (
+            {entity.location_type ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Type</dt>
-                <dd className="text-slate-300">{entity.location_type as string}</dd>
+                <dd className="text-slate-300">{String(entity.location_type)}</dd>
               </>
-            )}
-            {entity.country && (
+            ) : null}
+            {entity.country ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Country</dt>
-                <dd className="text-slate-300">{entity.country as string}</dd>
+                <dd className="text-slate-300">{String(entity.country)}</dd>
               </>
-            )}
+            ) : null}
           </dl>
         );
       case 'DOCUMENT':
         return (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {entity.document_type && (
+            {entity.document_type ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Type</dt>
-                <dd className="text-slate-300">{entity.document_type as string}</dd>
+                <dd className="text-slate-300">{String(entity.document_type)}</dd>
               </>
-            )}
-            {entity.date && (
+            ) : null}
+            {entity.date ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Date</dt>
-                <dd className="text-slate-300 font-mono tabular-nums">{entity.date as string}</dd>
+                <dd className="text-slate-300 font-mono tabular-nums">{String(entity.date)}</dd>
               </>
-            )}
-            {entity.page_count && (
+            ) : null}
+            {entity.page_count ? (
               <>
                 <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Pages</dt>
-                <dd className="text-slate-300 font-mono tabular-nums">{entity.page_count as number}</dd>
+                <dd className="text-slate-300 font-mono tabular-nums">{String(entity.page_count)}</dd>
               </>
-            )}
+            ) : null}
           </dl>
         );
       default:

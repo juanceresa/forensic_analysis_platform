@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Card } from '@/components/shared';
+import { DossierDownload } from '@/components/Dashboard';
 
 interface DashboardPageProps {
   params: Promise<{ caseId: string }>;
@@ -232,6 +233,11 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
               Case Progression
             </h2>
             <WorkflowChecklist stages={data.workflowStages} />
+
+            {/* Dossier Download - Final Deliverable */}
+            <div className="mt-6 pt-6 border-t border-slate-800">
+              <DossierDownload caseId={caseId} />
+            </div>
           </Card>
         </div>
       </div>
