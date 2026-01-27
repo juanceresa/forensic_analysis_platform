@@ -135,6 +135,29 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
             )}
           </dl>
         );
+      case 'DOCUMENT':
+        return (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {entity.document_type && (
+              <>
+                <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Type</dt>
+                <dd className="text-slate-300">{entity.document_type as string}</dd>
+              </>
+            )}
+            {entity.date && (
+              <>
+                <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Date</dt>
+                <dd className="text-slate-300 font-mono tabular-nums">{entity.date as string}</dd>
+              </>
+            )}
+            {entity.page_count && (
+              <>
+                <dt className="text-slate-500 font-mono uppercase tracking-wider text-xs">Pages</dt>
+                <dd className="text-slate-300 font-mono tabular-nums">{entity.page_count as number}</dd>
+              </>
+            )}
+          </dl>
+        );
       default:
         return null;
     }

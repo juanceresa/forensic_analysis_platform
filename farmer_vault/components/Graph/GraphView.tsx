@@ -16,6 +16,7 @@ const ENTITY_TYPE_COLORS: Record<string, { color: string; label: string }> = {
   PROPERTY: { color: '#a78bfa', label: 'Property' },
   ORGANIZATION: { color: '#fb923c', label: 'Organization' },
   LOCATION: { color: '#4ade80', label: 'Location' },
+  DOCUMENT: { color: '#f472b6', label: 'Document' },
 };
 
 export function GraphView({ caseId }: GraphViewProps) {
