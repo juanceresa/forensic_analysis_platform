@@ -92,18 +92,22 @@ class DossierPreparer:
 
         graph = KnowledgeGraph.load(graph_path)
 
-        # 2. Validate focal entities exist
-        self._assert_entity_exists(graph, focal_property_id, expected_type="PROPERTY")
-        self._assert_entity_exists(graph, focal_family_member_id, expected_type="PERSON")
+        # 2. Resolve and validate focal entities (supports name-based lookup)
+        resolved_property_id = self._assert_entity_exists(
+            graph, focal_property_id, expected_type="PROPERTY"
+        )
+        resolved_family_member_id = self._assert_entity_exists(
+            graph, focal_family_member_id, expected_type="PERSON"
+        )
 
         # 3. Load extractions (optional, for richer evidence)
         self._load_extractions()
 
         # 4. Build sections
         timeline = self._build_timeline(graph)
-        family = self._build_family_tree(graph, focal_family_member_id)
-        property_data = self._build_property(graph, focal_property_id)
-        ownership_history = self._build_ownership_chain(graph, focal_property_id)
+        family = self._build_family_tree(graph, resolved_family_member_id)
+        property_data = self._build_property(graph, resolved_property_id)
+        ownership_history = self._build_ownership_chain(graph, resolved_property_id)
         documents = self._build_document_inventory(graph)
 
         # 5. Calculate verification stats
@@ -133,29 +137,101 @@ class DossierPreparer:
             disclaimer_text=STANDARD_DISCLAIMER,
         )
 
-    def _assert_entity_exists(
-        self, graph: KnowledgeGraph, entity_id: str, expected_type: str | None = None
-    ) -> None:
-        """Verify an entity exists in the graph.
+    def _resolve_entity_id(
+        self, graph: KnowledgeGraph, identifier: str, expected_type: str | None = None
+    ) -> str:
+        """Resolve an entity identifier to its actual ID.
+
+        Supports:
+        - Exact ID match
+        - Name-based lookup (case-insensitive, partial match)
 
         Args:
             graph: KnowledgeGraph instance
-            entity_id: Entity ID to check
+            identifier: Entity ID or name to find
+            expected_type: Expected entity type (optional, used to narrow search)
+
+        Returns:
+            The resolved entity ID
+
+        Raises:
+            PrepareError: If entity not found or ambiguous
+        """
+        # Try exact ID match first
+        entity = graph.get_entity(identifier)
+        if entity is not None:
+            if expected_type:
+                actual_type = entity.get("entity_type")
+                if actual_type != expected_type:
+                    raise PrepareError(
+                        f"Entity {identifier} is type {actual_type}, expected {expected_type}"
+                    )
+            return identifier
+
+        # Fall back to name-based search
+        identifier_lower = identifier.lower().strip()
+        matches: list[tuple[str, dict]] = []
+
+        for node_id in graph.graph.nodes():
+            node_data = graph.get_entity(node_id)
+            if not node_data:
+                continue
+
+            # Filter by type if specified
+            if expected_type and node_data.get("entity_type") != expected_type:
+                continue
+
+            # Check name match
+            name = node_data.get("name", "")
+            if name and identifier_lower in name.lower():
+                matches.append((node_id, node_data))
+
+        if not matches:
+            raise PrepareError(
+                f"Entity not found: '{identifier}'. "
+                f"Use 'list-entities' command to see available entities."
+            )
+
+        if len(matches) == 1:
+            logger.info(f"Resolved '{identifier}' to entity ID: {matches[0][0]}")
+            return matches[0][0]
+
+        # Multiple matches - check for exact name match
+        exact_matches = [
+            (nid, data) for nid, data in matches
+            if data.get("name", "").lower() == identifier_lower
+        ]
+        if len(exact_matches) == 1:
+            logger.info(f"Resolved '{identifier}' to entity ID: {exact_matches[0][0]}")
+            return exact_matches[0][0]
+
+        # Ambiguous - list options
+        options = "\n".join(
+            f"  - {data.get('name', 'Unnamed')} (ID: {nid})"
+            for nid, data in matches[:5]
+        )
+        raise PrepareError(
+            f"Ambiguous entity name '{identifier}'. Multiple matches found:\n{options}\n"
+            f"Please use the exact ID or a more specific name."
+        )
+
+    def _assert_entity_exists(
+        self, graph: KnowledgeGraph, entity_id: str, expected_type: str | None = None
+    ) -> str:
+        """Verify an entity exists and return its resolved ID.
+
+        Args:
+            graph: KnowledgeGraph instance
+            entity_id: Entity ID or name to check
             expected_type: Expected entity type (optional)
+
+        Returns:
+            The resolved entity ID
 
         Raises:
             PrepareError: If entity not found or wrong type
         """
-        entity = graph.get_entity(entity_id)
-        if entity is None:
-            raise PrepareError(f"Entity not found: {entity_id}")
-
-        if expected_type:
-            actual_type = entity.get("entity_type")
-            if actual_type != expected_type:
-                raise PrepareError(
-                    f"Entity {entity_id} is type {actual_type}, expected {expected_type}"
-                )
+        return self._resolve_entity_id(graph, entity_id, expected_type)
 
     def _load_extractions(self) -> None:
         """Load extraction JSON files for richer evidence quotes."""
