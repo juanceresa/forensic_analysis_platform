@@ -1,9 +1,9 @@
 # Analyst Verification Guide — Civic Table Platform
 
 > **Document Classification:** Internal Operations Manual
-> **Version:** 1.1.0
+> **Version:** 1.2.0
 > **Created:** 2025-01-22
-> **Last Updated:** 2026-01-23
+> **Last Updated:** 2026-01-27
 > **Audience:** Civic Table Analysts
 
 ---
@@ -532,6 +532,168 @@ The following features are planned for the analyst workflow but not included in 
 **Why:** Families come with what they have - often incomplete documents from exile. Our job is to organize and verify what exists, not highlight what's missing. Gap detection helps **us** do better work, not make families feel deficient.
 
 **Reference:** See `docs/plans/2026-01-23-gap-detection-decision.md` for architectural rationale.
+
+---
+
+## Generating Client Dossiers
+
+Once verification is complete, the primary deliverable is a **Forensic Dossier** — a professional PDF document that presents the case evidence in a format suitable for legal proceedings.
+
+### Understanding the Dossier
+
+**What it is:**
+- A polished PDF document assembling all verified evidence
+- Contains timeline, family history, property history, and evidence inventory
+- Includes verification tier indicators and methodology disclosure
+- Professional appearance suitable for attorneys and tribunals
+
+**What it is NOT:**
+- A legal brief or argument
+- A claim of ownership
+- Legal advice
+
+### Analyst Control: Choosing the Focus
+
+**Key concept:** You decide what goes into each dossier by selecting:
+
+1. **The Property** — Which property is this dossier about?
+2. **The Family Member** — Who is the claimant/heir?
+
+**Why this matters:**
+- A single case may have multiple properties (Villa Aurelia, Hacienda Aguarás, etc.)
+- A single case may have multiple family members (different heirs, different branches)
+- Each property + claimant combination is a distinct restitution claim
+- You generate separate dossiers for separate claims
+
+**Example scenarios:**
+| Dossier | Property | Claimant | Use Case |
+|---------|----------|----------|----------|
+| Dossier A | Villa Aurelia | Mario Ceresa | Primary residence claim |
+| Dossier B | Hacienda Aguarás | Elena Rodriguez | Agricultural property claim |
+| Dossier C | Villa Aurelia | Giovanni Ceresa | Heir of Mario, different claimant |
+
+### Generating a Dossier
+
+**Prerequisites:**
+- Case has been processed (`process` command complete)
+- Entities have been verified (ideally most TIER_2_ANALYST)
+- LaTeX installed on your system (see Admin Guide)
+
+**Step 1: List available properties**
+```bash
+cd /path/to/forensic_analysis_platform
+python3 farmer_factory/cli.py list-entities CASE-ID --type PROPERTY
+```
+
+Review the list and note the ID of the property you want to focus on.
+
+**Step 2: List available family members**
+```bash
+python3 farmer_factory/cli.py list-entities CASE-ID --type PERSON
+```
+
+Review the list and note the ID of the claimant/family member.
+
+**Step 3: Generate the dossier**
+```bash
+python3 farmer_factory/cli.py generate-dossier CASE-ID \
+  --property-id "PROPERTY_ID_HERE" \
+  --family-member-id "PERSON_ID_HERE"
+```
+
+**Output:**
+- LaTeX file: `cases/CASE-ID/output/CASE-ID_dossier.tex`
+- PDF file: `cases/CASE-ID/output/CASE-ID_dossier.pdf`
+
+**Step 4: Review before delivery**
+- Open the PDF and review all sections
+- Verify no legal conclusions appear
+- Check timeline accuracy
+- Confirm family tree is correct
+- Ensure verification tiers are displayed
+
+### Dossier Sections
+
+Each dossier contains:
+
+| Section | Contents | Your Review Focus |
+|---------|----------|-------------------|
+| **Executive Summary** | 2-paragraph overview | Factual, no legal conclusions |
+| **Methodology & Disclaimer** | How evidence was processed | Always included, don't modify |
+| **Timeline** | Chronological events | Dates accurate, sources cited |
+| **The Family** | Lineage and key figures | Relationships correct |
+| **The Property** | Description and location | Address and details accurate |
+| **Ownership History** | How family acquired/lost property | Narrative spine is clear |
+| **Evidence Inventory** | Document-by-document summary | All docs accounted for |
+| **Appendix** | Full citations, glossary | Technical reference |
+
+### Dry Run (No PDF)
+
+To generate just the `.tex` file without compiling to PDF:
+
+```bash
+python3 farmer_factory/cli.py generate-dossier CASE-ID \
+  --property-id "PROPERTY_ID" \
+  --family-member-id "PERSON_ID" \
+  --dry-run
+```
+
+Useful for:
+- Testing on systems without LaTeX
+- Reviewing the raw template output
+- Debugging template issues
+
+### Client Access
+
+Once generated, the dossier PDF appears in the Vault dashboard:
+
+1. Client logs into Vault
+2. Navigates to case dashboard
+3. **"Dossier ready"** appears in workflow checklist
+4. Client clicks **"Download PDF"**
+
+**Note:** Dossier only appears when you have generated it. Until then, client sees "Dossier in preparation."
+
+### Multiple Dossiers
+
+For cases with multiple claims, generate separate dossiers:
+
+```bash
+# Dossier for Villa Aurelia + Mario
+python3 farmer_factory/cli.py generate-dossier TEST-CERESA \
+  --property-id "villa_aurelia_id" \
+  --family-member-id "mario_id"
+
+# Rename output before generating next
+mv cases/TEST-CERESA/output/TEST-CERESA_dossier.pdf \
+   cases/TEST-CERESA/output/TEST-CERESA_villa_aurelia_mario.pdf
+
+# Dossier for Hacienda Aguaras + Elena
+python3 farmer_factory/cli.py generate-dossier TEST-CERESA \
+  --property-id "hacienda_aguaras_id" \
+  --family-member-id "elena_id"
+```
+
+**Future enhancement:** Multiple dossier management in UI (not in MVP).
+
+### Common Issues
+
+**"xelatex not found"**
+- LaTeX not installed. See Admin Guide for installation.
+- Use `--dry-run` to generate .tex without PDF.
+
+**"Property/Person not found"**
+- Double-check the ID from `list-entities` output
+- IDs are long strings with underscores, copy exactly
+
+**Empty sections in dossier**
+- Missing data in graph (e.g., no family relations extracted)
+- Run extraction again or manually review source documents
+- Some sections may be empty if data doesn't exist
+
+**Timeline out of order**
+- Document dates may be incorrectly extracted
+- Review and re-verify date entities
 
 ---
 
