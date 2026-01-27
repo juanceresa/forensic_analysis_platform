@@ -1,26 +1,104 @@
-import { Card } from '@/components/shared';
+import { TimelinePeriod } from '@/components/Narrative';
 
 interface NarrativePageProps {
   params: Promise<{ caseId: string }>;
 }
 
+async function getTimeline(caseId: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const res = await fetch(`${baseUrl}/api/cases/${caseId}/timeline`, {
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch timeline');
+  }
+
+  return res.json();
+}
+
 export default async function NarrativePage({ params }: NarrativePageProps) {
   const { caseId } = await params;
 
-  return (
-    <div className="p-8">
-      <div className="max-w-4xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-2xl font-mono mb-2">Narrative</h1>
-          <p className="text-slate-400">Case: {caseId}</p>
-        </header>
+  try {
+    const data = await getTimeline(caseId);
 
-        <Card>
-          <p className="text-slate-400">
-            Timeline narrative view coming soon. Will show expandable periods with supporting documents and entities.
-          </p>
-        </Card>
+    return (
+      <div className="p-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <header className="mb-6">
+            <h1 className="text-3xl font-mono mb-2">Case Narrative</h1>
+            <p className="text-slate-400">
+              {data.totalDocuments} documents spanning{' '}
+              {data.dateRange?.earliest_document && data.dateRange?.latest_document
+                ? `${new Date(data.dateRange.earliest_document).getFullYear()} - ${new Date(data.dateRange.latest_document).getFullYear()}`
+                : 'multiple years'}
+            </p>
+          </header>
+
+          {/* AI Disclaimer Banner */}
+          <div className="mb-8 p-4 bg-amber-500/5 border border-amber-500/20 rounded">
+            <div className="flex items-start gap-3">
+              <svg
+                className="w-5 h-5 text-amber-400 shrink-0 mt-0.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+              <div>
+                <p className="text-sm text-amber-400 font-medium">AI-Generated Timeline</p>
+                <p className="text-xs text-amber-400/70 mt-1">
+                  This timeline is organized by AI based on document dates. Entity extractions
+                  and relationships are TIER_3_AI verified and require analyst review before
+                  use in legal proceedings.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          {data.periods.length === 0 ? (
+            <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
+              <p className="text-slate-500 font-mono text-sm">No timeline data available</p>
+            </div>
+          ) : (
+            <div className="relative">
+              {data.periods.map((period: any, index: number) => (
+                <TimelinePeriod
+                  key={period.id}
+                  period={period}
+                  caseId={caseId}
+                  index={index}
+                  defaultOpen={index === 0}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  } catch (error) {
+    return (
+      <div className="p-8">
+        <div className="max-w-4xl mx-auto">
+          <header className="mb-8">
+            <h1 className="text-2xl font-mono mb-2">Case Narrative</h1>
+            <p className="text-slate-400">Case: {caseId}</p>
+          </header>
+
+          <div className="p-8 bg-slate-900 border border-red-800/50 rounded text-center">
+            <p className="text-red-400 font-mono text-sm">Failed to load timeline data</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }

@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { GraphData } from '@/lib/types';
 
-const CASES_DIR = path.join(process.cwd(), '../../cases');
+const CASES_DIR = path.join(process.cwd(), '../cases');
 
 export async function GET(
   request: NextRequest,

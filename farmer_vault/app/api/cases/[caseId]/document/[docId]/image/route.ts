@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-const CASES_DIR = path.join(process.cwd(), '../../cases');
+const CASES_DIR = path.join(process.cwd(), '../cases');
 
 export async function GET(
   request: NextRequest,

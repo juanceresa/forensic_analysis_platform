@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cache } from 'react';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import type { GraphData } from '@/lib/types';
 
-// PERFORMANCE: React.cache() ensures getGraphData is called only once per request
-// even if multiple components need it (eliminates waterfalls)
-export const getGraphData = cache(async (caseId: string): Promise<GraphData> => {
-  // Validate caseId format
-  if (!/^[A-Z0-9-]+$/.test(caseId)) {
-    throw new Error('Invalid case ID format');
-  }
-
-  // Read from Factory output (air gap maintained)
-  const graphPath = join(
-    process.cwd(),
-    '..',
-    'cases',
-    caseId,
-    'output',
-    'graph_data.json'
-  );
-
-  const graphData = await readFile(graphPath, 'utf-8');
-  return JSON.parse(graphData);
-});
+const CASES_DIR = path.join(process.cwd(), '../cases');
 
 export async function GET(
   request: NextRequest,
@@ -32,19 +11,16 @@ export async function GET(
 ) {
   try {
     const { caseId } = await params;
-    const data = await getGraphData(caseId);
-    return NextResponse.json(data);
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      return NextResponse.json(
-        { error: 'Case not found' },
-        { status: 404 }
-      );
-    }
 
-    console.error('Graph load error:', error);
+    const graphDataPath = path.join(CASES_DIR, caseId, 'output', 'graph_data.json');
+    const graphDataContent = await fs.readFile(graphDataPath, 'utf-8');
+    const graphData: GraphData = JSON.parse(graphDataContent);
+
+    return NextResponse.json(graphData);
+  } catch (error) {
+    console.error('Error fetching graph data:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to load graph data' },
+      { error: 'Failed to fetch graph data' },
       { status: 500 }
     );
   }
