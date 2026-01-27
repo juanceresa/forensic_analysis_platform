@@ -75,3 +75,4 @@ temp/
 .claude
 docs/plans/*
 docs/internal_docx/*
+.worktrees/
