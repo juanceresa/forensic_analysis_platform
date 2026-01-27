@@ -4,13 +4,12 @@ Civic Table - Factory CLI
 Command-line interface for document processing pipeline.
 """
 
-import os
 import sys
 from pathlib import Path
 
 # Add the parent directory to sys.path to allow absolute imports of farmer_factory
 current_dir = Path(__file__).resolve().parent
-if current_dir.name == 'farmer_factory':
+if current_dir.name == "farmer_factory":
     root_dir = current_dir.parent
     if str(root_dir) not in sys.path:
         sys.path.insert(0, str(root_dir))
@@ -22,6 +21,7 @@ from datetime import datetime
 # Load .env file if it exists
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     # python-dotenv not installed, env vars must be set manually
@@ -29,71 +29,135 @@ except ImportError:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
+def setup_domain(domain_code: str) -> None:
+    """Set up the active domain and refresh type enums.
+
+    Args:
+        domain_code: Domain identifier (e.g., "cuban_property")
+
+    Raises:
+        click.ClickException: If domain not found
+    """
+    from farmer_factory.domains import domain_registry
+    from farmer_factory.structure.schema import refresh_type_enums
+
+    # List available domains for validation
+    available = domain_registry.list_available_domains()
+    if domain_code not in available:
+        raise click.ClickException(
+            f"Unknown domain '{domain_code}'. Available: {', '.join(available)}"
+        )
+
+    # Set active domain
+    domain_registry.set_active(domain_code)
+    logger.info(f"Domain set to: {domain_code}")
+
+    # Refresh enums to match domain config
+    refresh_type_enums()
+    logger.debug("Type enums refreshed from domain config")
+
+
 @click.group()
-@click.version_option(version='1.0.0')
+@click.version_option(version="1.0.0")
 def cli():
     """Civic Table Factory - Document Processing Pipeline"""
     pass
 
 
 @cli.command()
-@click.option('--id', 'case_id', required=True, help='Case ID (e.g., CASE-001)')
-@click.option('--name', required=True, help='Case name (e.g., "Ceresa Family Archive")')
-@click.option('--family', required=True, help='Family name (e.g., "Ceresa")')
-def create_case(case_id: str, name: str, family: str):
+@click.option("--id", "case_id", required=True, help="Case ID (e.g., CASE-001)")
+@click.option("--name", required=True, help='Case name (e.g., "Ceresa Family Archive")')
+@click.option("--family", required=True, help='Family name (e.g., "Ceresa")')
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def create_case(case_id: str, name: str, family: str, domain: str):
     """Create a new case directory structure."""
+    # Validate domain exists
+    from farmer_factory.domains import domain_registry
+
+    available = domain_registry.list_available_domains()
+    if domain not in available:
+        raise click.ClickException(
+            f"Unknown domain '{domain}'. Available: {', '.join(available)}"
+        )
+
     logger.info(f"Creating case: {case_id}")
 
     # Create directory structure
-    case_dir = Path('cases') / case_id
+    case_dir = Path("cases") / case_id
 
     if case_dir.exists():
         logger.error(f"Case {case_id} already exists")
         raise click.ClickException(f"Case {case_id} already exists")
 
     # Create subdirectories
-    (case_dir / 'intake').mkdir(parents=True)
-    (case_dir / 'preprocessed').mkdir(parents=True)
-    (case_dir / 'ocr').mkdir(parents=True)
-    (case_dir / 'output').mkdir(parents=True)
+    (case_dir / "intake").mkdir(parents=True)
+    (case_dir / "preprocessed").mkdir(parents=True)
+    (case_dir / "ocr").mkdir(parents=True)
+    (case_dir / "output").mkdir(parents=True)
 
-    # Create case metadata file
+    # Create case metadata file with domain
     metadata = {
-        'id': case_id,
-        'name': name,
-        'family': family,
-        'created_at': datetime.now().isoformat(),
-        'status': 'INTAKE'
+        "id": case_id,
+        "name": name,
+        "family": family,
+        "domain": domain,
+        "created_at": datetime.now().isoformat(),
+        "status": "INTAKE",
     }
 
     import json
-    with open(case_dir / 'metadata.json', 'w') as f:
+
+    with open(case_dir / "metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)
 
     logger.info(f"✓ Case created at: {case_dir}")
-    logger.info(f"  Next steps:")
+    logger.info("  Next steps:")
     logger.info(f"    1. Copy PDFs to: {case_dir / 'intake'}/")
-    logger.info(f"    2. Run: python cli.py process {case_id}")
+    logger.info(f"    2. Run: python cli.py process {case_id} --domain {domain}")
 
-    click.echo(f"\n✓ Case {case_id} created successfully")
+    click.echo(f"\n✓ Case {case_id} created successfully (domain: {domain})")
 
 
 @cli.command()
-@click.argument('case_id')
-@click.option('--verbose', is_flag=True, help='Verbose output')
-@click.option('--file', 'single_file', help='Process only this PDF file from intake/ directory')
-@click.option('--force-typed', is_flag=True, help='Force all documents to use OCR path (ignore triage)')
-@click.option('--skip-validation', is_flag=True, help='Skip graph_data.json validation')
-def process(case_id: str, verbose: bool, single_file: str, force_typed: bool, skip_validation: bool):
+@click.argument("case_id")
+@click.option("--verbose", is_flag=True, help="Verbose output")
+@click.option(
+    "--file", "single_file", help="Process only this PDF file from intake/ directory"
+)
+@click.option(
+    "--force-typed",
+    is_flag=True,
+    help="Force all documents to use OCR path (ignore triage)",
+)
+@click.option("--skip-validation", is_flag=True, help="Skip graph_data.json validation")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def process(
+    case_id: str,
+    verbose: bool,
+    single_file: str,
+    force_typed: bool,
+    skip_validation: bool,
+    domain: str,
+):
     """Process case documents through the pipeline."""
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Set up domain configuration
+    setup_domain(domain)
 
     if single_file:
         logger.info(f"Processing case: {case_id}, file: {single_file}")
@@ -117,25 +181,25 @@ def process(case_id: str, verbose: bool, single_file: str, force_typed: bool, sk
             case_id,
             single_file=single_file,
             force_typed=force_typed,
-            skip_validation=skip_validation
+            skip_validation=skip_validation,
         )
 
         # Print summary
-        click.echo("\n" + "="*60)
+        click.echo("\n" + "=" * 60)
         click.echo("Processing Complete!")
-        click.echo("="*60)
+        click.echo("=" * 60)
         click.echo(f"Documents processed: {stats['documents_processed']}")
         click.echo(f"Entities extracted:  {stats['entities_extracted']}")
         click.echo(f"Entities merged:     {stats['entities_merged']}")
         click.echo(f"Relations added:     {stats['relations_added']}")
 
-        output_path = Path('cases') / case_id / 'output' / 'graph_data.json'
+        output_path = Path("cases") / case_id / "output" / "graph_data.json"
         click.echo(f"\nGraph saved to: {output_path}")
 
     except ProcessingError as e:
         logger.error(f"Processing failed: {e}")
         click.echo(f"\n❌ Processing failed: {e}", err=True)
-        case_dir = Path('cases') / case_id
+        case_dir = Path("cases") / case_id
         if case_dir.exists():
             click.echo(f"Check detailed logs: {case_dir}/processing.log")
         raise click.ClickException(str(e))
@@ -143,21 +207,21 @@ def process(case_id: str, verbose: bool, single_file: str, force_typed: bool, sk
     except Exception as e:
         logger.exception(f"Unexpected error: {e}")
         click.echo(f"\n❌ Unexpected error: {e}", err=True)
-        case_dir = Path('cases') / case_id
+        case_dir = Path("cases") / case_id
         if case_dir.exists():
             click.echo(f"Check detailed logs: {case_dir}/processing.log")
         raise click.ClickException(str(e))
 
 
 @cli.command()
-@click.argument('case_id')
-@click.option('--force', is_flag=True, help='Force re-upload even if already exists')
+@click.argument("case_id")
+@click.option("--force", is_flag=True, help="Force re-upload even if already exists")
 def upload(case_id: str, force: bool):
     """Upload graph_data.json to Supabase Storage."""
     logger.info(f"Uploading case: {case_id}")
 
-    case_dir = Path('cases') / case_id
-    graph_file = case_dir / 'output' / 'graph_data.json'
+    case_dir = Path("cases") / case_id
+    graph_file = case_dir / "output" / "graph_data.json"
 
     if not graph_file.exists():
         raise click.ClickException(f"Graph data not found: {graph_file}")
@@ -169,13 +233,21 @@ def upload(case_id: str, force: bool):
 
 
 @cli.command()
-@click.argument('case_id')
-def validate(case_id: str):
+@click.argument("case_id")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def validate(case_id: str, domain: str):
     """Validate graph_data.json against schema."""
+    # Set up domain for validation
+    setup_domain(domain)
+
     logger.info(f"Validating case: {case_id}")
 
-    case_dir = Path('cases') / case_id
-    graph_file = case_dir / 'output' / 'graph_data.json'
+    case_dir = Path("cases") / case_id
+    graph_file = case_dir / "output" / "graph_data.json"
 
     if not graph_file.exists():
         raise click.ClickException(f"Graph data not found: {graph_file}")
@@ -186,7 +258,7 @@ def validate(case_id: str):
         import json
         from farmer_factory.structure.schema import GraphExport
 
-        with open(graph_file, 'r', encoding='utf-8') as f:
+        with open(graph_file, "r", encoding="utf-8") as f:
             export_data = json.load(f)
 
         GraphExport.model_validate(export_data)
@@ -198,7 +270,7 @@ def validate(case_id: str):
 
 
 @cli.command()
-@click.argument('case_id')
+@click.argument("case_id")
 def retry(case_id: str):
     """Retry failed processing jobs."""
     logger.info(f"Retrying failed jobs for: {case_id}")
@@ -210,8 +282,8 @@ def retry(case_id: str):
 
 
 @cli.command()
-@click.argument('case_id')
-@click.option('--verbose', is_flag=True, help='Verbose output')
+@click.argument("case_id")
+@click.option("--verbose", is_flag=True, help="Verbose output")
 def retry_relations(case_id: str, verbose: bool):
     """Retry relation extraction for documents that failed.
 
@@ -225,7 +297,7 @@ def retry_relations(case_id: str, verbose: bool):
 
     click.echo("⚠️  retry-relations command not yet implemented")
     click.echo("    This will be implemented in a future update")
-    click.echo(f"\nFor now, re-run the full process command:")
+    click.echo("\nFor now, re-run the full process command:")
     click.echo(f"  python cli.py process {case_id}")
 
     # TODO: Implement retry logic
@@ -241,13 +313,20 @@ def retry_relations(case_id: str, verbose: bool):
 
 
 @cli.command()
-@click.argument('case_id')
-@click.option('--entity-type',
-              type=click.Choice(['PERSON', 'LOCATION', 'PROPERTY', 'ORGANIZATION']),
-              help='Train specific entity type (default: all)')
-@click.option('--num-examples', default=30,
-              help='Number of labeled examples to collect per type')
-def train_deduplication(case_id: str, entity_type: str, num_examples: int):
+@click.argument("case_id")
+@click.option(
+    "--entity-type",
+    help="Train specific entity type (default: all deduplicatable types from domain)",
+)
+@click.option(
+    "--num-examples", default=30, help="Number of labeled examples to collect per type"
+)
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def train_deduplication(case_id: str, entity_type: str, num_examples: int, domain: str):
     """
     Train entity deduplication models using labeled examples.
 
@@ -256,15 +335,20 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int):
     future processing runs.
 
     Example:
-        python cli.py train-deduplication TEST-CERESA --entity-type PERSON
+        python cli.py train-deduplication TEST-CERESA --entity-type PERSON --domain cuban_property
     """
+    # Set up domain configuration
+    setup_domain(domain)
+
+    from farmer_factory.domains import domain_registry
+
     try:
         from farmer_factory.structure.train_dedupe import train_dedupe_model
     except ModuleNotFoundError:
         from structure.train_dedupe import train_dedupe_model
 
-    case_dir = Path('cases') / case_id
-    extractions_dir = case_dir / 'extractions'
+    case_dir = Path("cases") / case_id
+    extractions_dir = case_dir / "extractions"
 
     if not extractions_dir.exists():
         raise click.ClickException(
@@ -272,21 +356,28 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int):
             f"Run 'python cli.py process {case_id}' first."
         )
 
-    click.echo(f"\n{'='*60}")
+    click.echo(f"\n{'=' * 60}")
     click.echo("Deduplication Model Training")
-    click.echo(f"{'='*60}\n")
+    click.echo(f"{'=' * 60}\n")
     click.echo(f"Case: {case_id}")
+    click.echo(f"Domain: {domain}")
     click.echo(f"Examples per type: {num_examples}\n")
 
-    entity_types = [entity_type] if entity_type else ['PERSON', 'LOCATION', 'PROPERTY', 'ORGANIZATION']
+    # Get entity types from domain config (filter to deduplicatable types)
+    if entity_type:
+        entity_types = [entity_type]
+    else:
+        # Default to common deduplicatable types available in domain
+        all_types = domain_registry.get_entity_types()
+        # Filter to types that typically need deduplication
+        dedup_types = ["PERSON", "LOCATION", "PROPERTY", "ORGANIZATION"]
+        entity_types = [t for t in dedup_types if t in all_types]
 
     for etype in entity_types:
         try:
             click.echo(f"\n--- Training {etype} ---\n")
             model = train_dedupe_model(
-                case_id=case_id,
-                entity_type=etype,
-                num_examples=num_examples
+                case_id=case_id, entity_type=etype, num_examples=num_examples
             )
             click.echo(f"✓ {etype} model trained and saved\n")
         except ValueError as e:
@@ -297,19 +388,19 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int):
             click.echo(f"❌ Failed to train {etype}: {e}\n")
             continue
 
-    click.echo(f"\n{'='*60}")
+    click.echo(f"\n{'=' * 60}")
     click.echo("Training Complete!")
-    click.echo(f"{'='*60}")
+    click.echo(f"{'=' * 60}")
     click.echo("\nModels saved to: farmer_factory/structure/models/")
     click.echo("\nNext steps:")
     click.echo(f"  1. Test models: python cli.py process {case_id} --force-typed")
     click.echo(f"  2. Review deduplication in: cases/{case_id}/output/graph_data.json")
-    click.echo(f"  3. If quality is good, process new cases with trained models")
+    click.echo("  3. If quality is good, process new cases with trained models")
 
 
 @cli.command()
-@click.argument('case_id')
-@click.option('--confirm', is_flag=True, help='Skip confirmation prompt')
+@click.argument("case_id")
+@click.option("--confirm", is_flag=True, help="Skip confirmation prompt")
 def clean(case_id: str, confirm: bool):
     """Clean case outputs for fresh processing.
 
@@ -321,13 +412,13 @@ def clean(case_id: str, confirm: bool):
 
     Your intake/ PDFs are never deleted.
     """
-    case_dir = Path('cases') / case_id
+    case_dir = Path("cases") / case_id
 
     if not case_dir.exists():
         raise click.ClickException(f"Case not found: {case_id}")
 
-    intake_dir = case_dir / 'intake'
-    if not intake_dir.exists() or not list(intake_dir.glob('*.pdf')):
+    intake_dir = case_dir / "intake"
+    if not intake_dir.exists() or not list(intake_dir.glob("*.pdf")):
         raise click.ClickException(f"No PDFs found in {intake_dir}/")
 
     # Show what will be deleted
@@ -347,23 +438,24 @@ def clean(case_id: str, confirm: bool):
             return
 
     # Clean directories
-    dirs_to_clean = ['extractions', 'ocr', 'preprocessed', 'output']
+    dirs_to_clean = ["extractions", "ocr", "preprocessed", "output"]
     for dir_name in dirs_to_clean:
         dir_path = case_dir / dir_name
         if dir_path.exists():
             import shutil
+
             shutil.rmtree(dir_path)
         dir_path.mkdir(parents=True, exist_ok=True)
 
     click.echo(f"\n✓ Case {case_id} cleaned successfully")
-    click.echo(f"\nReady for fresh processing:")
+    click.echo("\nReady for fresh processing:")
     click.echo(f"  python cli.py process {case_id}")
 
 
 @cli.command()
 def list_cases():
     """List all cases."""
-    cases_dir = Path('cases')
+    cases_dir = Path("cases")
 
     if not cases_dir.exists():
         click.echo("No cases directory found")
@@ -377,24 +469,52 @@ def list_cases():
 
     click.echo("\nCases:")
     for case_dir in cases:
-        metadata_file = case_dir / 'metadata.json'
+        metadata_file = case_dir / "metadata.json"
         if metadata_file.exists():
             import json
+
             with open(metadata_file) as f:
                 metadata = json.load(f)
-            click.echo(f"  {metadata['id']}: {metadata['name']} ({metadata.get('status', 'UNKNOWN')})")
+            click.echo(
+                f"  {metadata['id']}: {metadata['name']} ({metadata.get('status', 'UNKNOWN')})"
+            )
         else:
             click.echo(f"  {case_dir.name}: (no metadata)")
 
 
-@cli.command('generate-dossier')
-@click.argument('case_id')
-@click.option('--property-id', required=True, help='Entity ID of the focal property')
-@click.option('--family-member-id', required=True, help='Entity ID of primary claimant')
-@click.option('--output', 'output_dir', type=click.Path(), help='Output directory (default: cases/{case_id}/output)')
-@click.option('--engine', default='xelatex', type=click.Choice(['xelatex', 'pdflatex']), help='LaTeX engine')
-@click.option('--dry-run', is_flag=True, help='Generate .tex only, skip PDF compilation')
-def generate_dossier(case_id: str, property_id: str, family_member_id: str, output_dir: str, engine: str, dry_run: bool):
+@cli.command("generate-dossier")
+@click.argument("case_id")
+@click.option("--property-id", required=True, help="Entity ID of the focal property")
+@click.option("--family-member-id", required=True, help="Entity ID of primary claimant")
+@click.option(
+    "--output",
+    "output_dir",
+    type=click.Path(),
+    help="Output directory (default: cases/{case_id}/output)",
+)
+@click.option(
+    "--engine",
+    default="xelatex",
+    type=click.Choice(["xelatex", "pdflatex"]),
+    help="LaTeX engine",
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Generate .tex only, skip PDF compilation"
+)
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def generate_dossier(
+    case_id: str,
+    property_id: str,
+    family_member_id: str,
+    output_dir: str,
+    engine: str,
+    dry_run: bool,
+    domain: str,
+):
     """Generate PDF dossier for a case.
 
     Requires a processed case with graph_data.json.
@@ -403,8 +523,12 @@ def generate_dossier(case_id: str, property_id: str, family_member_id: str, outp
     Example:
         python cli.py generate-dossier TEST-CERESA \\
             --property-id "property_abc123" \\
-            --family-member-id "person_xyz789"
+            --family-member-id "person_xyz789" \\
+            --domain cuban_property
     """
+    # Set up domain configuration
+    setup_domain(domain)
+
     from farmer_factory.dossier import generate_dossier as gen_dossier
     from farmer_factory.dossier.compiler import check_latex_available
 
@@ -435,7 +559,7 @@ def generate_dossier(case_id: str, property_id: str, family_member_id: str, outp
 
         if dry_run:
             click.echo(f"\n✓ LaTeX generated: {result_path}")
-            click.echo(f"\nTo compile manually:")
+            click.echo("\nTo compile manually:")
             click.echo(f"  cd {result_path.parent}")
             click.echo(f"  {engine} {result_path.name}")
         else:
@@ -446,9 +570,14 @@ def generate_dossier(case_id: str, property_id: str, family_member_id: str, outp
         raise click.ClickException(str(e))
 
 
-@cli.command('list-entities')
-@click.argument('case_id')
-@click.option('--type', 'entity_type', type=click.Choice(['PERSON', 'PROPERTY', 'DOCUMENT', 'ORGANIZATION', 'LOCATION']), help='Filter by entity type')
+@cli.command("list-entities")
+@click.argument("case_id")
+@click.option(
+    "--type",
+    "entity_type",
+    type=click.Choice(["PERSON", "PROPERTY", "DOCUMENT", "ORGANIZATION", "LOCATION"]),
+    help="Filter by entity type",
+)
 def list_entities(case_id: str, entity_type: str):
     """List entities in a case graph for dossier generation.
 
@@ -479,5 +608,22 @@ def list_entities(case_id: str, entity_type: str):
         click.echo(f"    ID: {node_id}")
 
 
-if __name__ == '__main__':
+@cli.command("list-domains")
+def list_domains():
+    """List available domain configurations."""
+    from farmer_factory.domains import domain_registry
+
+    available = domain_registry.list_available_domains()
+
+    click.echo("\nAvailable Domains:")
+    click.echo("-" * 40)
+    for domain_code in sorted(available):
+        try:
+            config = domain_registry._loader.load(domain_code)
+            click.echo(f"  {domain_code}: {config.name}")
+        except Exception:
+            click.echo(f"  {domain_code}: (failed to load)")
+
+
+if __name__ == "__main__":
     cli()

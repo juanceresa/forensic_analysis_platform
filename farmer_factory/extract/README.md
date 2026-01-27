@@ -1,10 +1,10 @@
 # Extract Module
 
-> **Version:** 1.2.0
-> **Last Updated:** 2026-01-25
-> **Status:** Refactored for maintainability
+> **Version:** 1.3.0
+> **Last Updated:** 2026-01-27
+> **Status:** Domain-aware extraction
 
-Entity and relation extraction from OCR text using Claude API.
+Entity and relation extraction from OCR text using Claude API with domain-specific configuration.
 
 ---
 
@@ -12,9 +12,10 @@ Entity and relation extraction from OCR text using Claude API.
 
 This module handles:
 - OCR text processing (Google Cloud Vision)
-- Structured entity extraction (Claude API with custom prompts)
-- Relation extraction between entities
-- Schema validation with Pydantic
+- Structured entity extraction (Claude API with domain-specific prompts)
+- Relation extraction with domain-configured extraction hints
+- Schema validation with Pydantic against domain-defined types
+- **Domain-aware processing** - entity/relation types loaded from domain config
 
 ---
 
@@ -157,11 +158,73 @@ extraction = pipeline.extract_page(
 
 ---
 
+## Domain Configuration
+
+The extraction module is **domain-aware** - it loads entity types, relation types, and extraction hints from the active domain configuration.
+
+### Setting Up Domain
+
+```python
+from farmer_factory.domains import domain_registry
+from farmer_factory.structure.schema import refresh_type_enums
+
+# Set active domain before extraction
+domain_registry.set_active("cuban_property")
+refresh_type_enums()
+
+# Now extraction uses domain-specific configuration
+service = LLMExtractionService()
+```
+
+### Domain-Specific Features
+
+1. **System Context:** Domain-specific context injected into LLM prompts
+   - Loaded from `domains/configs/{domain}/prompts/system_context.txt`
+   - Provides historical/cultural context for extraction
+
+2. **Extraction Hints:** Per-relation-type keyword hints
+   - Configured in `domain.yaml` under `relation_types.*.extraction_hints`
+   - Example: `CONFISCATED` has hints like "confiscado", "expropiado"
+
+3. **Temporal vs State Relations:** Different handling for events vs ongoing states
+   - Temporal relations (SOLD, CONFISCATED) require dates
+   - State relations (OWNS, LOCATED_IN) default to ongoing
+
+### Helper Functions
+
+```python
+from farmer_factory.extract.llm import (
+    get_temporal_relations,   # Event relations (need dates)
+    get_state_relations,      # State relations (dates optional)
+    load_system_context,      # Domain-specific LLM context
+    get_relation_extraction_hints  # Per-relation keywords
+)
+
+# Check temporal relations for current domain
+temporal_rels = get_temporal_relations()
+# {"SOLD", "BOUGHT", "INHERITED", "CONFISCATED", ...}
+
+state_rels = get_state_relations()
+# {"OWNS", "LOCATED_IN", "EMPLOYED_BY", ...}
+
+# Load domain context for prompts
+context = load_system_context()
+# "You are analyzing historical Cuban property documents..."
+
+# Get extraction hints for relation prompts
+hints = get_relation_extraction_hints()
+# {"CONFISCATED": ["confiscado", "expropiado", "nacionalizado"], ...}
+```
+
+---
+
 ## Prompts
 
 All extraction prompts documented in `PROMPTS.md` in this directory:
 - **Prompt 1:** Entity Extraction (Structured Format)
-- **Prompt 2:** Relation Extraction
+- **Prompt 2:** Relation Extraction (now includes domain-specific hints)
+
+Domain-specific system context is prepended to prompts when available.
 
 See `PROMPTS.md` for complete prompt templates and design rationale.
 
@@ -180,6 +243,13 @@ python -m pytest tests/extract/test_llm.py::test_entity_extraction -v
 ---
 
 ## Version History
+
+**v1.3.0 (2026-01-27):**
+- Added domain-aware extraction
+- Entity/relation types loaded from domain configuration
+- System context injected from domain prompts
+- Extraction hints per relation type
+- Temporal vs state relation handling
 
 **v1.2.0 (2026-01-25):**
 - Refactored into focused modules (models, api_client)

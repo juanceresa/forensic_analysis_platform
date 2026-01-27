@@ -1,0 +1,53 @@
+# Cuban Property Restitution Domain Configuration
+# Version: 1.0.0
+
+domain:
+  name: "Cuban Property Restitution"
+  code: "cuban_property"
+  version: "1.0.0"
+  description: |
+    Documentary recovery for Cuban exile property claims.
+    Processes historical Cuban property documents (deeds, titles, wills,
+    confiscation decrees) to build evidentiary records for restitution claims.
+
+  # Language configuration
+  primary_language: "es"
+  supported_languages:
+    - "es"
+    - "en"
+
+  # Temporal scope
+  temporal_range:
+    start: "1900"
+    end: "1975"
+    focus_period: "1959-1965"  # Revolution and immediate aftermath
+
+  # Geographic scope
+  geographic_focus:
+    countries:
+      - "Cuba"
+    primary_regions:
+      - "La Habana"
+      - "Camagüey"
+      - "Oriente"
+      - "Las Villas"
+      - "Pinar del Río"
+      - "Matanzas"
+
+  # Use cases
+  use_cases:
+    - "FCSC claim preparation"
+    - "Lawyer negotiation leverage"
+    - "Family historical record"
+    - "Inheritance documentation"
+
+  # Success criteria
+  success_criteria:
+    primary_goal: "FCSC claim preparation"
+    verification_target: "TIER_2_ANALYST"
+    completeness_indicators:
+      - "Chain of title documented"
+      - "Confiscation event documented (if applicable)"
+      - "Current claimant lineage established"
+      - "Property description and location verified"
+      - "Supporting documents catalogued"

@@ -1,26 +1,170 @@
 """
 Pydantic schema models for Civic Table knowledge graph.
 
-Defines entity types, relation types, and validation rules.
+Entity types and relation types are loaded dynamically from domain configuration.
 """
 
 from enum import Enum
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
-import uuid
+from typing import Optional, List, Dict, Any, Set
+from pydantic import BaseModel, Field, field_validator
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# Dynamic Type Helpers
+# ============================================================================
+
+
+def get_valid_entity_types() -> Set[str]:
+    """
+    Get valid entity types from domain config, or defaults if no domain active.
+
+    Returns:
+        Set of valid entity type strings
+    """
+    try:
+        from farmer_factory.domains import domain_registry
+
+        if domain_registry.is_active:
+            return set(domain_registry.get_entity_types())
+    except Exception:
+        pass
+    # Fallback defaults
+    return {"PERSON", "PROPERTY", "ORGANIZATION", "LOCATION", "DOCUMENT"}
+
+
+def get_valid_relation_types() -> Set[str]:
+    """
+    Get valid relation types from domain config, or defaults if no domain active.
+
+    Returns:
+        Set of valid relation type strings
+    """
+    try:
+        from farmer_factory.domains import domain_registry
+
+        if domain_registry.is_active:
+            return set(domain_registry.get_relation_types())
+    except Exception:
+        pass
+    # Fallback defaults
+    return {
+        "OWNS",
+        "OWNED",
+        "INHERITED",
+        "SOLD",
+        "SOLD_TO",
+        "BOUGHT",
+        "PURCHASED_FROM",
+        "CONFISCATED",
+        "SPOUSE_OF",
+        "CHILD_OF",
+        "HEIR_OF",
+        "RELATED_TO",
+        "BORDERS_NORTH",
+        "BORDERS_SOUTH",
+        "BORDERS_EAST",
+        "BORDERS_WEST",
+        "MENTIONED_IN",
+        "WITNESSED",
+        "WITNESSED_BY",
+        "NOTARIZED",
+        "NOTARIZED_BY",
+        "ISSUED_BY",
+        "REPRESENTED_BY",
+        "EMPLOYED_BY",
+        "LOCATED_IN",
+        "REGISTERED_IN",
+        "CREDITOR_OF",
+        "DEBTOR_OF",
+    }
+
+
+def create_entity_type_enum():
+    """Create EntityType enum from domain config."""
+    types = get_valid_entity_types()
+    return Enum("EntityType", {t: t for t in sorted(types)}, type=str)
+
+
+def create_relation_type_enum():
+    """Create RelationType enum from domain config."""
+    types = get_valid_relation_types()
+    return Enum("RelationType", {t: t for t in sorted(types)}, type=str)
+
+
+# Create dynamic enums - these will use defaults until domain is set
+EntityType = create_entity_type_enum()
+RelationType = create_relation_type_enum()
+
+
+def refresh_type_enums():
+    """
+    Refresh EntityType and RelationType enums from current domain config.
+
+    Call this after setting the active domain to update the enums.
+    """
+    global EntityType, RelationType
+    EntityType = create_entity_type_enum()
+    RelationType = create_relation_type_enum()
+    logger.debug(
+        f"Refreshed enums: {len(EntityType.__members__)} entity types, "
+        f"{len(RelationType.__members__)} relation types"
+    )
+
+
+# ============================================================================
+# Verification
+# ============================================================================
 
 
 class VerificationTier(str, Enum):
     """Verification tier for entities and relations."""
+
     TIER_3_AI = "TIER_3_AI"
     TIER_2_ANALYST = "TIER_2_ANALYST"
     TIER_2_INSTITUTIONAL = "TIER_2_INSTITUTIONAL"
     TIER_1_CERTIFIED = "TIER_1_CERTIFIED"
 
 
+class LocationNature(str, Enum):
+    """
+    Nature of a location for disambiguation.
+
+    Based on Chilean KG paper recommendations for location disambiguation.
+    Distinguishes between:
+    - ADMINISTRATIVE: Political/jurisdictional (country, province, municipality)
+    - GEOGRAPHIC: Physical features (river, mountain, bay)
+    - PROPERTY: Named properties/estates (fincas, centrales, haciendas)
+    """
+
+    ADMINISTRATIVE = "ADMINISTRATIVE"
+    GEOGRAPHIC = "GEOGRAPHIC"
+    PROPERTY = "PROPERTY"
+
+
+class OrganizationNature(str, Enum):
+    """
+    Nature of an organization for disambiguation.
+
+    Helps distinguish between different types of organizations:
+    - GOVERNMENT: State entities, registries, courts
+    - BUSINESS: Companies, banks, commercial entities
+    - RELIGIOUS: Churches, religious orders
+    - PROFESSIONAL: Professional associations, colegios
+    """
+
+    GOVERNMENT = "GOVERNMENT"
+    BUSINESS = "BUSINESS"
+    RELIGIOUS = "RELIGIOUS"
+    PROFESSIONAL = "PROFESSIONAL"
+
+
 class Verification(BaseModel):
     """Verification metadata for entities and relations."""
+
     tier: VerificationTier
     confidence: float = Field(ge=0.0, le=1.0)
     verified_by: Optional[str] = None
@@ -28,29 +172,35 @@ class Verification(BaseModel):
     notes: Optional[str] = None
 
 
-class EntityType(str, Enum):
-    """Entity types in the knowledge graph."""
-    PERSON = "PERSON"
-    PROPERTY = "PROPERTY"
-    ORGANIZATION = "ORGANIZATION"
-    LOCATION = "LOCATION"
-    DOCUMENT = "DOCUMENT"
+# ============================================================================
+# Entity Models
+# ============================================================================
 
 
 class BaseEntity(BaseModel):
     """Base class for all entity types."""
+
     id: str
-    entity_type: EntityType
+    entity_type: str  # Validated against domain config
     verification: Verification
     extracted_from: str
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
     notes: Optional[str] = None
 
+    @field_validator("entity_type")
+    @classmethod
+    def validate_entity_type(cls, v: str) -> str:
+        valid_types = get_valid_entity_types()
+        if v not in valid_types:
+            raise ValueError(f"Invalid entity type '{v}'. Valid types: {valid_types}")
+        return v
+
 
 class Person(BaseEntity):
     """Person entity (owners, heirs, witnesses, notaries)."""
-    entity_type: Literal[EntityType.PERSON] = EntityType.PERSON
+
+    entity_type: str = "PERSON"
 
     # Core identity
     name: str
@@ -64,35 +214,21 @@ class Person(BaseEntity):
     profession: Optional[str] = None
     marital_status: Optional[str] = None
 
-    # Family relationships (names as strings, not IDs - for easy reading/querying)
-    mother: Optional[str] = Field(
-        default=None,
-        description="Name of mother (e.g., 'María López de Queral')"
-    )
-    father: Optional[str] = Field(
-        default=None,
-        description="Name of father (e.g., 'Manuel Queral')"
-    )
-    spouse: Optional[str] = Field(
-        default=None,
-        description="Name of spouse (e.g., 'Juan Ceresa'). For multiple spouses, use first/primary."
-    )
-    children: List[str] = Field(
-        default_factory=list,
-        description="Names of children (e.g., ['Mario Ceresa', 'Rosa Ceresa'])"
-    )
-    siblings: List[str] = Field(
-        default_factory=list,
-        description="Names of siblings (e.g., ['Carlos Queral', 'Ana Queral'])"
-    )
+    # Family relationships
+    mother: Optional[str] = Field(default=None, description="Name of mother")
+    father: Optional[str] = Field(default=None, description="Name of father")
+    spouse: Optional[str] = Field(default=None, description="Name of spouse")
+    children: List[str] = Field(default_factory=list, description="Names of children")
+    siblings: List[str] = Field(default_factory=list, description="Names of siblings")
 
     # Roles
     roles: List[str] = Field(default_factory=list)
 
 
 class Property(BaseEntity):
-    """Property entity (fincas, haciendas, urban properties)."""
-    entity_type: Literal[EntityType.PROPERTY] = EntityType.PROPERTY
+    """Property entity."""
+
+    entity_type: str = "PROPERTY"
 
     # Identity
     name: Optional[str] = None
@@ -114,28 +250,39 @@ class Property(BaseEntity):
 
 
 class Organization(BaseEntity):
-    """Organization entity (banks, courts, government agencies)."""
-    entity_type: Literal[EntityType.ORGANIZATION] = EntityType.ORGANIZATION
+    """Organization entity."""
+
+    entity_type: str = "ORGANIZATION"
 
     name: str
     org_type: Optional[str] = None
     location_id: Optional[str] = None
     address: Optional[str] = None
+    nature: Optional[str] = Field(
+        default=None,
+        description="Organization nature for disambiguation (GOVERNMENT, BUSINESS, RELIGIOUS, PROFESSIONAL)"
+    )
 
 
 class Location(BaseEntity):
-    """Location entity (cities, provinces, neighborhoods)."""
-    entity_type: Literal[EntityType.LOCATION] = EntityType.LOCATION
+    """Location entity."""
+
+    entity_type: str = "LOCATION"
 
     name: str
     location_type: Optional[str] = None
     parent_location_id: Optional[str] = None
     country: str = "Cuba"
+    nature: Optional[str] = Field(
+        default=None,
+        description="Location nature for disambiguation (ADMINISTRATIVE, GEOGRAPHIC, PROPERTY)"
+    )
 
 
 class Document(BaseEntity):
     """Document entity (source documents for provenance)."""
-    entity_type: Literal[EntityType.DOCUMENT] = EntityType.DOCUMENT
+
+    entity_type: str = "DOCUMENT"
 
     # Document identity
     title: Optional[str] = None
@@ -154,55 +301,16 @@ class Document(BaseEntity):
     language: str = "es"
 
 
-class RelationType(str, Enum):
-    """Relation types in the knowledge graph."""
-    # Property Ownership
-    OWNS = "OWNS"
-    OWNED = "OWNED"
-    INHERITED = "INHERITED"
-    SOLD = "SOLD"  # New: Person sold Property
-    SOLD_TO = "SOLD_TO"
-    BOUGHT = "BOUGHT"  # New: Person bought Property
-    PURCHASED_FROM = "PURCHASED_FROM"
-    CONFISCATED = "CONFISCATED"  # New: Property confiscated by Government
-
-    # Family Relations
-    SPOUSE_OF = "SPOUSE_OF"
-    CHILD_OF = "CHILD_OF"
-    HEIR_OF = "HEIR_OF"
-    RELATED_TO = "RELATED_TO"  # New: Generic family relation
-
-    # Property Boundaries
-    BORDERS_NORTH = "BORDERS_NORTH"
-    BORDERS_SOUTH = "BORDERS_SOUTH"
-    BORDERS_EAST = "BORDERS_EAST"
-    BORDERS_WEST = "BORDERS_WEST"
-
-    # Document Relations
-    MENTIONED_IN = "MENTIONED_IN"
-    WITNESSED = "WITNESSED"  # New: Person witnessed transaction
-    WITNESSED_BY = "WITNESSED_BY"
-    NOTARIZED = "NOTARIZED"  # New: Notary certified document
-    NOTARIZED_BY = "NOTARIZED_BY"
-    ISSUED_BY = "ISSUED_BY"
-
-    # Professional/Organizational
-    REPRESENTED_BY = "REPRESENTED_BY"
-    EMPLOYED_BY = "EMPLOYED_BY"
-
-    # Geographic
-    LOCATED_IN = "LOCATED_IN"  # New: Property/Person located in Location
-    REGISTERED_IN = "REGISTERED_IN"  # New: Property registered in Registry
-
-    # Financial
-    CREDITOR_OF = "CREDITOR_OF"
-    DEBTOR_OF = "DEBTOR_OF"
+# ============================================================================
+# Relation Model
+# ============================================================================
 
 
 class Relation(BaseModel):
     """Relation between entities in the knowledge graph."""
+
     id: str
-    type: RelationType
+    type: str  # Validated against domain config
     source_id: str
     target_id: str
     verification: Verification
@@ -216,9 +324,23 @@ class Relation(BaseModel):
     evidence: Optional[str] = None
     notes: Optional[str] = None
 
+    @field_validator("type")
+    @classmethod
+    def validate_relation_type(cls, v: str) -> str:
+        valid_types = get_valid_relation_types()
+        if v not in valid_types:
+            raise ValueError(f"Invalid relation type '{v}'. Valid types: {valid_types}")
+        return v
+
+
+# ============================================================================
+# Graph Export Models
+# ============================================================================
+
 
 class GraphMetadata(BaseModel):
     """Metadata for knowledge graph export."""
+
     case_id: str
     created_at: datetime
     updated_at: datetime
@@ -230,10 +352,12 @@ class GraphMetadata(BaseModel):
     verification_distribution: Dict[str, int] = Field(default_factory=dict)
     entity_type_summary: Dict[str, int] = Field(default_factory=dict)
     date_range: Optional[Dict[str, Optional[str]]] = None
+    domain: Optional[str] = None  # Track which domain was used
 
 
 class GraphExport(BaseModel):
     """Export format for graph_data.json."""
+
     metadata: GraphMetadata
     nodes: List[Dict[str, Any]]
     links: List[Dict[str, Any]]

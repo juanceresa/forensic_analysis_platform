@@ -1,0 +1,74 @@
+# Verification Tier Configuration
+# Shared across all domains
+
+verification:
+  tiers:
+    TIER_3_AI:
+      name: "AI Extracted"
+      code: "TIER_3_AI"
+      description: "Automatically extracted by AI. Requires analyst verification before use."
+      requirements: []
+      external: false
+      color: "#9CA3AF"  # Gray
+      icon: "🤖"
+      disclaimer: |
+        This data was extracted automatically by AI and has not been verified by a human analyst.
+        Do not rely on this information for legal or financial decisions without verification.
+
+    TIER_2_ANALYST:
+      name: "Analyst Verified"
+      code: "TIER_2_ANALYST"
+      description: "Verified by Civic Table analyst against source documents."
+      requirements:
+        - "Entity appears in at least one source document"
+        - "Key attributes match document text"
+        - "Relationships cross-referenced where possible"
+      external: false
+      color: "#3B82F6"  # Blue
+      icon: "✓"
+
+    TIER_2_INSTITUTIONAL:
+      name: "Institutionally Verified"
+      code: "TIER_2_INSTITUTIONAL"
+      description: "Verified by academic institution (e.g., Farmer House Democratic Repair Lab)."
+      requirements:
+        - "All TIER_2_ANALYST requirements met"
+        - "Verified by credentialed researcher"
+        - "Cross-referenced with institutional archives"
+      external: true
+      color: "#8B5CF6"  # Purple
+      icon: "🏛️"
+
+    TIER_1_CERTIFIED:
+      name: "Legally Certified"
+      code: "TIER_1_CERTIFIED"
+      description: "Accepted by external legal/regulatory body (e.g., FCSC, court)."
+      requirements:
+        - "All TIER_2 requirements met"
+        - "Accepted by relevant legal authority"
+        - "May include court certification or claim acceptance"
+      external: true
+      color: "#10B981"  # Green
+      icon: "⚖️"
+
+  # Tier progression rules
+  progression:
+    - from: "TIER_3_AI"
+      to: "TIER_2_ANALYST"
+      action: "analyst_review"
+      description: "Analyst reviews extraction against source documents"
+
+    - from: "TIER_2_ANALYST"
+      to: "TIER_2_INSTITUTIONAL"
+      action: "institutional_review"
+      description: "Institutional partner reviews and certifies"
+
+    - from: "TIER_2_ANALYST"
+      to: "TIER_1_CERTIFIED"
+      action: "legal_certification"
+      description: "External legal authority accepts/certifies"
+
+    - from: "TIER_2_INSTITUTIONAL"
+      to: "TIER_1_CERTIFIED"
+      action: "legal_certification"
+      description: "External legal authority accepts/certifies"

@@ -1,8 +1,8 @@
 # Farmer House Forensic Intelligence Platform — JSON Schema Specification
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.2.1
-> **Last Updated:** 2026-01-26
+> **Version:** 1.3.0
+> **Last Updated:** 2026-01-27
 > **Status:** MVP1 Schema (current `graph_data.json` export)
 
 ---
@@ -17,6 +17,40 @@ Key decisions:
 - Link types use `relation_type`.
 - Provenance uses `extracted_from` as a **comma-delimited string** of document IDs.
 - Metadata lives under `metadata` and includes verification distribution and entity type summaries.
+- **Entity and relation types are domain-configurable** (loaded from YAML configuration).
+
+---
+
+## Domain Configuration
+
+Entity types and relation types are **dynamically loaded** from domain configuration rather than hardcoded. The default domain is `cuban_property`.
+
+### How Types Are Determined
+
+```python
+from farmer_factory.domains import domain_registry
+from farmer_factory.structure.schema import get_valid_entity_types, get_valid_relation_types
+
+# Without active domain - uses defaults
+entity_types = get_valid_entity_types()
+# {"PERSON", "PROPERTY", "ORGANIZATION", "LOCATION", "DOCUMENT"}
+
+# With active domain - uses domain config
+domain_registry.set_active("cuban_property")
+entity_types = get_valid_entity_types()
+# Types from farmer_factory/domains/configs/cuban_property/domain.yaml
+```
+
+### Refreshing Types After Domain Change
+
+After changing the active domain, call `refresh_type_enums()` to update dynamic enums:
+
+```python
+from farmer_factory.structure.schema import refresh_type_enums
+refresh_type_enums()
+```
+
+See `farmer_factory/domains/README.md` for full domain configuration documentation.
 
 ---
 
@@ -84,6 +118,10 @@ Key decisions:
             "earliest_event": { "type": ["string", "null"] },
             "latest_event": { "type": ["string", "null"] }
           }
+        },
+        "domain": {
+          "type": ["string", "null"],
+          "description": "Domain configuration used for processing (e.g., 'cuban_property')"
         }
       }
     }
@@ -340,3 +378,42 @@ export interface GraphData {
 - Frontend filters should be **relation_type-driven** (not node type labels).
 - Multi-edge graphs are supported; `relation_id` distinguishes multiple links between the same nodes.
 - `extracted_from` is a comma-delimited string in the export; split + trim for UI use.
+- **Entity and relation types are domain-specific.** The types shown in this document are from the `cuban_property` domain. Other domains may define different types.
+- The `metadata.domain` field indicates which domain configuration was used for processing.
+
+---
+
+## Domain-Specific Types
+
+### Entity Types (cuban_property domain)
+
+| Type | Description |
+|------|-------------|
+| `PERSON` | Individual with legal standing (owner, heir, witness, notary) |
+| `PROPERTY` | Real estate asset (finca, urban property, land) |
+| `ORGANIZATION` | Legal entity (bank, company, government agency) |
+| `LOCATION` | Geographic entity (city, province, country) |
+| `DOCUMENT` | Source document for provenance tracking |
+
+### Relation Types (cuban_property domain)
+
+**Ownership & Transactions:**
+- `OWNS`, `OWNED` - Current/past ownership
+- `SOLD`, `SOLD_TO`, `BOUGHT`, `PURCHASED_FROM` - Sales
+- `INHERITED`, `CONFISCATED` - Transfers
+
+**Family:**
+- `SPOUSE_OF`, `CHILD_OF`, `HEIR_OF`, `RELATED_TO`
+
+**Property Boundaries:**
+- `BORDERS_NORTH`, `BORDERS_SOUTH`, `BORDERS_EAST`, `BORDERS_WEST`
+
+**Documentation:**
+- `MENTIONED_IN`, `WITNESSED`, `WITNESSED_BY`, `NOTARIZED`, `NOTARIZED_BY`
+- `ISSUED_BY`, `REPRESENTED_BY`
+
+**Other:**
+- `EMPLOYED_BY`, `LOCATED_IN`, `REGISTERED_IN`
+- `CREDITOR_OF`, `DEBTOR_OF`
+
+See `farmer_factory/domains/configs/cuban_property/domain.yaml` for the authoritative type definitions.

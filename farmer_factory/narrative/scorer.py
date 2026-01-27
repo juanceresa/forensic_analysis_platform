@@ -4,7 +4,6 @@ from typing import Dict, List, Optional
 import logging
 
 from farmer_factory.structure.graph import KnowledgeGraph
-from farmer_factory.structure.schema import EntityType, RelationType
 
 logger = logging.getLogger(__name__)
 
@@ -13,29 +12,29 @@ logger = logging.getLogger(__name__)
 WEIGHT_PROFILES = {
     "cuban_restitution": {
         "type_weights": {
-            EntityType.PROPERTY: 10.0,
-            EntityType.LOCATION: 8.0,
-            EntityType.PERSON: 5.0,
-            EntityType.ORGANIZATION: 3.0,
-            EntityType.DOCUMENT: 1.0
+            "PROPERTY": 10.0,
+            "LOCATION": 8.0,
+            "PERSON": 5.0,
+            "ORGANIZATION": 3.0,
+            "DOCUMENT": 1.0,
         },
         "relation_weights": {
             # Special events (highlighted)
-            RelationType.CONFISCATED: 5.0,  # Expropriations critical
-            RelationType.SOLD: 3.0,
-            RelationType.INHERITED: 3.0,
+            "CONFISCATED": 5.0,  # Expropriations critical
+            "SOLD": 3.0,
+            "INHERITED": 3.0,
             # Ownership
-            RelationType.OWNS: 3.0,
-            RelationType.BOUGHT: 2.5,
+            "OWNS": 3.0,
+            "BOUGHT": 2.5,
             # Other
-            RelationType.LOCATED_IN: 1.5,
-            RelationType.WITNESSED: 1.0,
-            RelationType.NOTARIZED: 1.0,
-            RelationType.EMPLOYED_BY: 1.0,
-            RelationType.RELATED_TO: 0.5,
+            "LOCATED_IN": 1.5,
+            "WITNESSED": 1.0,
+            "NOTARIZED": 1.0,
+            "EMPLOYED_BY": 1.0,
+            "RELATED_TO": 0.5,
         },
         "connection_multiplier": 2.0,
-        "document_multiplier": 3.0
+        "document_multiplier": 3.0,
     }
 }
 
@@ -44,9 +43,7 @@ class StoryScorer:
     """Calculate story centrality scores for entities in knowledge graph."""
 
     def __init__(
-        self,
-        profile: str = "cuban_restitution",
-        custom_weights: Optional[Dict] = None
+        self, profile: str = "cuban_restitution", custom_weights: Optional[Dict] = None
     ):
         """
         Initialize story scorer with weight profile.
@@ -59,7 +56,9 @@ class StoryScorer:
             # Use custom weights
             self.type_weights = custom_weights.get("type_weights", {})
             self.relation_weights = custom_weights.get("relation_weights", {})
-            self.connection_multiplier = custom_weights.get("connection_multiplier", 2.0)
+            self.connection_multiplier = custom_weights.get(
+                "connection_multiplier", 2.0
+            )
             self.document_multiplier = custom_weights.get("document_multiplier", 3.0)
         elif profile in WEIGHT_PROFILES:
             # Use named profile
@@ -71,11 +70,7 @@ class StoryScorer:
         else:
             raise ValueError(f"Unknown profile: {profile}")
 
-    def calculate_centrality(
-        self,
-        entity_id: str,
-        graph: KnowledgeGraph
-    ) -> float:
+    def calculate_centrality(self, entity_id: str, graph: KnowledgeGraph) -> float:
         """
         Calculate story centrality score for an entity.
 
@@ -93,8 +88,8 @@ class StoryScorer:
             logger.warning(f"Entity {entity_id} not found in graph")
             return 0.0
 
-        # Base score by entity type
-        entity_type = EntityType(entity_data["entity_type"])
+        # Base score by entity type (use string key)
+        entity_type = entity_data["entity_type"]
         base_score = self.type_weights.get(entity_type, 1.0)
 
         # Connection count (network importance)
@@ -113,18 +108,10 @@ class StoryScorer:
         weighted_relations = 0.0
         for relation in relations:
             rel_type_str = relation.get("relation_type", "")
-            try:
-                rel_type = RelationType(rel_type_str)
-                weighted_relations += self.relation_weights.get(rel_type, 1.0)
-            except ValueError:
-                logger.debug(f"Unknown relation type: {rel_type_str}")
-                weighted_relations += 1.0
+            weighted_relations += self.relation_weights.get(rel_type_str, 1.0)
 
         total_score = (
-            base_score +
-            connection_score +
-            document_score +
-            weighted_relations
+            base_score + connection_score + document_score + weighted_relations
         )
 
         logger.debug(
@@ -136,9 +123,7 @@ class StoryScorer:
         return total_score
 
     def rank_entities(
-        self,
-        entity_ids: List[str],
-        graph: KnowledgeGraph
+        self, entity_ids: List[str], graph: KnowledgeGraph
     ) -> List[tuple[str, float]]:
         """
         Rank entities by story centrality.

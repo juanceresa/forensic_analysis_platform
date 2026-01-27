@@ -5,8 +5,13 @@ from typing import List, Tuple, Dict, Any
 from pydantic import ValidationError
 
 from farmer_factory.structure.schema import (
-    BaseEntity, Person, Property, Organization, Location, Document,
-    Relation, EntityType
+    BaseEntity,
+    Person,
+    Property,
+    Organization,
+    Location,
+    Document,
+    Relation,
 )
 
 logger = logging.getLogger(__name__)
@@ -18,17 +23,15 @@ class SchemaValidator:
     def __init__(self):
         """Initialize schema validator."""
         self.entity_type_map = {
-            EntityType.PERSON: Person,
-            EntityType.PROPERTY: Property,
-            EntityType.ORGANIZATION: Organization,
-            EntityType.LOCATION: Location,
-            EntityType.DOCUMENT: Document,
+            "PERSON": Person,
+            "PROPERTY": Property,
+            "ORGANIZATION": Organization,
+            "LOCATION": Location,
+            "DOCUMENT": Document,
         }
 
     def validate_entity(
-        self,
-        entity_dict: Dict[str, Any],
-        entity_type: EntityType
+        self, entity_dict: Dict[str, Any], entity_type: str
     ) -> BaseEntity:
         """
         Validate and instantiate Pydantic model.
@@ -53,9 +56,7 @@ class SchemaValidator:
         return model_class(**entity_dict)
 
     def validate_extraction(
-        self,
-        entities: List[Dict[str, Any]],
-        relations: List[Dict[str, Any]]
+        self, entities: List[Dict[str, Any]], relations: List[Dict[str, Any]]
     ) -> Tuple[List[BaseEntity], List[Relation]]:
         """
         Validate entire extraction batch.
@@ -83,15 +84,15 @@ class SchemaValidator:
                     logger.error(f"Entity {i} missing 'entity_type' field")
                     continue
 
-                # Convert string to EntityType enum
-                try:
-                    entity_type = EntityType[entity_type_str]
-                except KeyError:
-                    logger.error(f"Entity {i} has invalid entity_type: {entity_type_str}")
+                # Validate entity type string
+                if entity_type_str not in self.entity_type_map:
+                    logger.error(
+                        f"Entity {i} has invalid entity_type: {entity_type_str}"
+                    )
                     continue
 
                 # Validate
-                validated_entity = self.validate_entity(entity_dict, entity_type)
+                validated_entity = self.validate_entity(entity_dict, entity_type_str)
                 valid_entities.append(validated_entity)
 
             except ValidationError as e:

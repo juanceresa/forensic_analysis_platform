@@ -1,0 +1,430 @@
+# Cuban Property Restitution - Relation Type Definitions
+# Extracted from farmer_factory/structure/schema.py
+
+relation_types:
+
+  # ============================================================================
+  # Property Ownership Relations
+  # ============================================================================
+
+  OWNS:
+    description: "Person/Organization currently owns Property"
+    category: "ownership"
+    source_types: [PERSON, ORGANIZATION]
+    target_types: [PROPERTY]
+    temporal: state
+    color: "#10B981"
+    extraction_hints:
+      - "propietario de"
+      - "dueño de"
+      - "pertenece a"
+      - "propiedad de"
+
+  OWNED:
+    description: "Person/Organization previously owned Property"
+    category: "ownership"
+    source_types: [PERSON, ORGANIZATION]
+    target_types: [PROPERTY]
+    temporal: state
+    color: "#6EE7B7"
+    extraction_hints:
+      - "fue propietario"
+      - "anterior dueño"
+
+  # ============================================================================
+  # Transaction Relations
+  # ============================================================================
+
+  SOLD:
+    description: "Person sold Property"
+    category: "transaction"
+    source_types: [PERSON]
+    target_types: [PROPERTY]
+    temporal: event
+    color: "#F59E0B"
+    creates_inverse: BOUGHT
+    extraction_hints:
+      - "vendió"
+      - "venta de"
+      - "enajenó"
+      - "traspasó"
+
+  SOLD_TO:
+    description: "Person sold Property to another Person"
+    category: "transaction"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: event
+    color: "#F59E0B"
+    extraction_hints:
+      - "vendió a"
+      - "traspasó a"
+
+  BOUGHT:
+    description: "Person bought Property"
+    category: "transaction"
+    source_types: [PERSON]
+    target_types: [PROPERTY]
+    temporal: event
+    color: "#FBBF24"
+    extraction_hints:
+      - "compró"
+      - "adquirió"
+      - "compra de"
+
+  PURCHASED_FROM:
+    description: "Person purchased Property from another Person"
+    category: "transaction"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: event
+    color: "#FBBF24"
+    extraction_hints:
+      - "compró de"
+      - "adquirió de"
+
+  # ============================================================================
+  # Succession Relations
+  # ============================================================================
+
+  INHERITED:
+    description: "Person inherited Property"
+    category: "succession"
+    source_types: [PERSON]
+    target_types: [PROPERTY]
+    temporal: event
+    color: "#8B5CF6"
+    extraction_hints:
+      - "heredó"
+      - "herencia de"
+      - "heredero de"
+      - "por herencia"
+
+  HEIR_OF:
+    description: "Person is heir of another Person"
+    category: "succession"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: state
+    color: "#A78BFA"
+    extraction_hints:
+      - "heredero de"
+      - "heredera de"
+      - "causahabiente"
+
+  # ============================================================================
+  # Expropriation Relations (HIGH PRIORITY)
+  # ============================================================================
+
+  CONFISCATED:
+    description: "Government/Organization confiscated Property"
+    category: "expropriation"
+    source_types: [ORGANIZATION]
+    target_types: [PROPERTY]
+    temporal: event
+    color: "#EF4444"
+    high_priority: true
+    narrative_template: "🚨 EXPROPRIATION EVENT"
+    extraction_hints:
+      - "confiscó"
+      - "confiscación"
+      - "expropiación"
+      - "intervención"
+      - "nacionalización"
+      - "ley de reforma agraria"
+
+  # ============================================================================
+  # Family Relations
+  # ============================================================================
+
+  SPOUSE_OF:
+    description: "Person is spouse of another Person"
+    category: "family"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: state
+    symmetric: true
+    color: "#EC4899"
+    extraction_hints:
+      - "casado con"
+      - "casada con"
+      - "esposa de"
+      - "esposo de"
+      - "cónyuge"
+
+  CHILD_OF:
+    description: "Person is child of another Person"
+    category: "family"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: state
+    symmetric: false
+    color: "#3B82F6"
+    extraction_hints:
+      - "hijo de"
+      - "hija de"
+
+  RELATED_TO:
+    description: "Generic family relation (when specific type unclear)"
+    category: "family"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: state
+    symmetric: true
+    color: "#6B7280"
+    fallback: true
+    extraction_hints:
+      - "pariente"
+      - "familiar"
+      - "hermano de"
+      - "hermana de"
+
+  # ============================================================================
+  # Property Boundary Relations
+  # ============================================================================
+
+  BORDERS_NORTH:
+    description: "Property borders to the north"
+    category: "boundary"
+    source_types: [PROPERTY]
+    target_types: [PROPERTY, LOCATION, PERSON]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "norte"
+      - "al norte"
+      - "lindando al norte"
+      - "por el norte"
+
+  BORDERS_SOUTH:
+    description: "Property borders to the south"
+    category: "boundary"
+    source_types: [PROPERTY]
+    target_types: [PROPERTY, LOCATION, PERSON]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "sur"
+      - "al sur"
+      - "lindando al sur"
+      - "por el sur"
+
+  BORDERS_EAST:
+    description: "Property borders to the east"
+    category: "boundary"
+    source_types: [PROPERTY]
+    target_types: [PROPERTY, LOCATION, PERSON]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "este"
+      - "al este"
+      - "lindando al este"
+      - "por el este"
+
+  BORDERS_WEST:
+    description: "Property borders to the west"
+    category: "boundary"
+    source_types: [PROPERTY]
+    target_types: [PROPERTY, LOCATION, PERSON]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "oeste"
+      - "al oeste"
+      - "lindando al oeste"
+      - "por el oeste"
+
+  # ============================================================================
+  # Document Relations
+  # ============================================================================
+
+  MENTIONED_IN:
+    description: "Entity mentioned in Document"
+    category: "document"
+    source_types: [PERSON, PROPERTY, ORGANIZATION, LOCATION]
+    target_types: [DOCUMENT]
+    temporal: state
+    color: "#6B7280"
+
+  WITNESSED:
+    description: "Person witnessed transaction/document"
+    category: "document"
+    source_types: [PERSON]
+    target_types: [DOCUMENT]
+    temporal: event
+    color: "#9CA3AF"
+    extraction_hints:
+      - "testigo"
+      - "presente"
+      - "presenció"
+
+  WITNESSED_BY:
+    description: "Document witnessed by Person"
+    category: "document"
+    source_types: [DOCUMENT]
+    target_types: [PERSON]
+    temporal: event
+    color: "#9CA3AF"
+
+  NOTARIZED:
+    description: "Notary certified document"
+    category: "document"
+    source_types: [PERSON]
+    target_types: [DOCUMENT]
+    temporal: event
+    color: "#9CA3AF"
+    extraction_hints:
+      - "notario"
+      - "ante mí"
+      - "certifico"
+      - "doy fe"
+
+  NOTARIZED_BY:
+    description: "Document notarized by Person"
+    category: "document"
+    source_types: [DOCUMENT]
+    target_types: [PERSON]
+    temporal: event
+    color: "#9CA3AF"
+
+  ISSUED_BY:
+    description: "Document issued by Organization"
+    category: "document"
+    source_types: [DOCUMENT]
+    target_types: [ORGANIZATION]
+    temporal: state
+    color: "#9CA3AF"
+
+  # ============================================================================
+  # Geographic and Administrative Relations
+  # ============================================================================
+
+  LOCATED_IN:
+    description: "Property/Organization located in Location"
+    category: "geographic"
+    source_types: [PROPERTY, ORGANIZATION, PERSON]
+    target_types: [LOCATION]
+    temporal: state
+    color: "#8B5CF6"
+    extraction_hints:
+      - "ubicado en"
+      - "sito en"
+      - "situado en"
+      - "en el término municipal de"
+
+  REGISTERED_IN:
+    description: "Property registered in Registry"
+    category: "administrative"
+    source_types: [PROPERTY]
+    target_types: [ORGANIZATION]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "inscrita en"
+      - "registrada en"
+      - "registro de la propiedad"
+
+  # ============================================================================
+  # Professional/Organizational Relations
+  # ============================================================================
+
+  REPRESENTED_BY:
+    description: "Person represented by another Person (legal)"
+    category: "professional"
+    source_types: [PERSON]
+    target_types: [PERSON]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "representado por"
+      - "apoderado"
+      - "en representación de"
+
+  EMPLOYED_BY:
+    description: "Person employed by Organization"
+    category: "professional"
+    source_types: [PERSON]
+    target_types: [ORGANIZATION]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "empleado de"
+      - "funcionario de"
+      - "jefe de"
+
+  # ============================================================================
+  # Financial Relations
+  # ============================================================================
+
+  CREDITOR_OF:
+    description: "Person/Organization is creditor of another"
+    category: "financial"
+    source_types: [PERSON, ORGANIZATION]
+    target_types: [PERSON, ORGANIZATION]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "acreedor"
+      - "préstamo a"
+
+  DEBTOR_OF:
+    description: "Person/Organization is debtor of another"
+    category: "financial"
+    source_types: [PERSON, ORGANIZATION]
+    target_types: [PERSON, ORGANIZATION]
+    temporal: state
+    color: "#6B7280"
+    extraction_hints:
+      - "deudor"
+      - "debe a"
+
+# ============================================================================
+# Relation Categories (for UI filtering)
+# ============================================================================
+
+categories:
+  ownership:
+    label: "Ownership"
+    description: "Property ownership relations"
+
+  transaction:
+    label: "Transactions"
+    description: "Sales, purchases, transfers"
+
+  succession:
+    label: "Succession"
+    description: "Inheritance and heirs"
+
+  expropriation:
+    label: "Expropriation"
+    description: "Government confiscation"
+    high_priority: true
+
+  family:
+    label: "Family"
+    description: "Family relationships"
+
+  boundary:
+    label: "Boundaries"
+    description: "Property boundaries"
+
+  document:
+    label: "Document"
+    description: "Document-related relations"
+
+  geographic:
+    label: "Geographic"
+    description: "Location relations"
+
+  administrative:
+    label: "Administrative"
+    description: "Registry and administrative"
+
+  professional:
+    label: "Professional"
+    description: "Employment and representation"
+
+  financial:
+    label: "Financial"
+    description: "Creditor/debtor relations"

@@ -61,7 +61,11 @@ class DedupeEntityResolver:
         Returns:
             Entity ID if match found, None otherwise
         """
-        entity_type_str = entity.entity_type.value
+        entity_type_str = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else entity.entity_type
+        )
 
         # Check if we have a trained model for this type
         if entity_type_str not in self.dedupers:
@@ -125,7 +129,11 @@ class DedupeEntityResolver:
 
     def _prepare_entity_data(self, entity: BaseEntity) -> Dict[str, Any]:
         """Extract fields for dedupe based on entity type."""
-        entity_type = entity.entity_type.value
+        entity_type = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else entity.entity_type
+        )
 
         if entity_type == "PERSON":
             return {

@@ -470,3 +470,63 @@ def test_graph_export():
     assert len(export.nodes) == 1
     assert len(export.links) == 1
     assert export.metadata.verification_distribution["TIER_3_AI"] == 3
+
+
+# --- Nature Enum Tests (from Chilean KG paper improvements) ---
+
+
+def test_location_nature_enum():
+    """Test LocationNature enum for disambiguation."""
+    from farmer_factory.structure.schema import LocationNature
+
+    # Should have distinct categories for location disambiguation
+    assert LocationNature.ADMINISTRATIVE == "ADMINISTRATIVE"
+    assert LocationNature.GEOGRAPHIC == "GEOGRAPHIC"
+    assert LocationNature.PROPERTY == "PROPERTY"
+
+
+def test_organization_nature_enum():
+    """Test OrganizationNature enum for disambiguation."""
+    from farmer_factory.structure.schema import OrganizationNature
+
+    # Should have distinct categories for organization disambiguation
+    assert OrganizationNature.GOVERNMENT == "GOVERNMENT"
+    assert OrganizationNature.BUSINESS == "BUSINESS"
+    assert OrganizationNature.RELIGIOUS == "RELIGIOUS"
+    assert OrganizationNature.PROFESSIONAL == "PROFESSIONAL"
+
+
+def test_location_with_nature():
+    """Test Location entity with nature field."""
+    loc = Location(
+        id="loc_123",
+        entity_type=EntityType.LOCATION,
+        name="Central Agramonte",
+        location_type="sugar_mill",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.85
+        ),
+        extracted_from="doc_001",
+        nature="PROPERTY"  # Distinguishes from administrative location
+    )
+    assert loc.nature == "PROPERTY"
+
+
+def test_organization_with_nature():
+    """Test Organization entity with nature field."""
+    from farmer_factory.structure.schema import OrganizationNature
+
+    org = Organization(
+        id="org_123",
+        entity_type=EntityType.ORGANIZATION,
+        name="Registro de la Propiedad de Camaguey",
+        org_type="registry",
+        verification=Verification(
+            tier=VerificationTier.TIER_3_AI,
+            confidence=0.90
+        ),
+        extracted_from="doc_001",
+        nature="GOVERNMENT"  # Distinguishes from private business
+    )
+    assert org.nature == "GOVERNMENT"

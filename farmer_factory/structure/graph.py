@@ -82,11 +82,17 @@ class KnowledgeGraph:
         Args:
             entity: Entity to add to graph
         """
+        # entity_type can be either an Enum or a str depending on schema version
+        entity_type_value = (
+            entity.entity_type.value
+            if hasattr(entity.entity_type, "value")
+            else entity.entity_type
+        )
         self.graph.add_node(
             entity.id,
-            entity_type=entity.entity_type.value,
+            entity_type=entity_type_value,
             verification=entity.verification.model_dump(),
-            **entity.model_dump(exclude={'id', 'entity_type', 'verification'})
+            **entity.model_dump(exclude={"id", "entity_type", "verification"}),
         )
         self.updated_at = datetime.now()
 
@@ -104,14 +110,20 @@ class KnowledgeGraph:
         if not self.graph.has_node(relation.target_id):
             raise ValueError(f"Target entity {relation.target_id} not found")
 
+        # relation.type can be either an Enum or a str depending on schema version
+        relation_type_value = (
+            relation.type.value if hasattr(relation.type, "value") else relation.type
+        )
         self.graph.add_edge(
             relation.source_id,
             relation.target_id,
             key=relation.id,
             relation_id=relation.id,
-            relation_type=relation.type.value,
+            relation_type=relation_type_value,
             verification=relation.verification.model_dump(),
-            **relation.model_dump(exclude={'id', 'type', 'source_id', 'target_id', 'verification'})
+            **relation.model_dump(
+                exclude={"id", "type", "source_id", "target_id", "verification"}
+            ),
         )
         self.updated_at = datetime.now()
 

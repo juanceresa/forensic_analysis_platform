@@ -1,9 +1,7 @@
 """Narrative generation orchestrator with session cost tracking."""
 
-import json
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime
 
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.narrative.constellation import ConstellationAnalyzer
@@ -11,13 +9,15 @@ from farmer_factory.narrative.prompts import NarrativePrompts
 from farmer_factory.narrative.cache import InMemoryCache, NarrativeCache
 from farmer_factory.narrative.models import (
     NarrativeResult,
-    FactualClaim,
     EvidenceCitation,
-    EventHighlight
+    EventHighlight,
 )
-from farmer_factory.narrative.exceptions import SessionCostLimitExceeded, InsufficientGraphData
+from farmer_factory.narrative.exceptions import (
+    SessionCostLimitExceeded,
+    InsufficientGraphData,
+)
 from farmer_factory.extract.api_client import ClaudeAPIClient
-from farmer_factory.structure.schema import VerificationTier, RelationType
+from farmer_factory.structure.schema import VerificationTier
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Anthropic pricing (2026 estimates)
 MODEL_PRICING = {
     "haiku": {"input": 0.25 / 1_000_000, "output": 1.25 / 1_000_000},  # per token
-    "sonnet": {"input": 3.00 / 1_000_000, "output": 15.00 / 1_000_000}
+    "sonnet": {"input": 3.00 / 1_000_000, "output": 15.00 / 1_000_000},
 }
 
 
@@ -36,7 +36,7 @@ class NarrativeGenerator:
         self,
         api_key: Optional[str] = None,
         use_cache: bool = True,
-        cache: Optional[NarrativeCache] = None
+        cache: Optional[NarrativeCache] = None,
     ):
         """
         Initialize narrative generator.
@@ -57,7 +57,7 @@ class NarrativeGenerator:
         clicked_node_id: str,
         graph: KnowledgeGraph,
         session_id: str,
-        max_cost_per_session: float = 1.0
+        max_cost_per_session: float = 1.0,
     ) -> NarrativeResult:
         """
         Generate contextual narrative for clicked entity.
@@ -85,7 +85,9 @@ class NarrativeGenerator:
             SessionCostLimitExceeded: If session cost exceeds limit
             InsufficientGraphData: If entity not found
         """
-        logger.info(f"Generating narrative for {clicked_node_id} (session: {session_id})")
+        logger.info(
+            f"Generating narrative for {clicked_node_id} (session: {session_id})"
+        )
 
         # Step 1-2: Analyze constellation and identify hub
         constellation, hub_id = self.analyzer.analyze(clicked_node_id, graph)
@@ -96,7 +98,9 @@ class NarrativeGenerator:
         # Step 3: Check session cost limit (before generating anything)
         current_cost = self.session_costs.get(session_id, 0.0)
         if current_cost >= max_cost_per_session:
-            raise SessionCostLimitExceeded(session_id, current_cost, max_cost_per_session)
+            raise SessionCostLimitExceeded(
+                session_id, current_cost, max_cost_per_session
+            )
 
         # Handle insufficient data (< 3 entities)
         if len(constellation) < 3:
@@ -123,7 +127,7 @@ class NarrativeGenerator:
                 focal_entity_type=hub_entity.get("entity_type", "UNKNOWN"),
                 constellation=constellation,
                 graph=graph,
-                model=model
+                model=model,
             )
         except Exception as e:
             error_message = str(e).lower()
@@ -138,7 +142,7 @@ class NarrativeGenerator:
                     focal_entity_type=hub_entity.get("entity_type", "UNKNOWN"),
                     constellation=constellation,
                     graph=graph,
-                    model=model
+                    model=model,
                 )
             else:
                 raise
@@ -160,7 +164,7 @@ class NarrativeGenerator:
             highlighted_events=highlighted_events,
             graph=graph,
             constellation=constellation,
-            generation_cost=cost
+            generation_cost=cost,
         )
 
         # Step 8: Cache result
@@ -170,7 +174,7 @@ class NarrativeGenerator:
                 focal_entity_id=hub_id,
                 graph_hash=graph_hash,
                 data=result.model_dump(),
-                ttl=3600
+                ttl=3600,
             )
 
         return result
@@ -182,7 +186,7 @@ class NarrativeGenerator:
         focal_entity_type: str,
         constellation: set,
         graph: KnowledgeGraph,
-        model: str
+        model: str,
     ) -> tuple[str, float]:
         """
         Single-stage narrative generation.
@@ -196,19 +200,20 @@ class NarrativeGenerator:
             focal_entity_name=focal_entity_name,
             focal_entity_type=focal_entity_type,
             constellation=constellation,
-            graph=graph
+            graph=graph,
         )
 
         # Build prompt
         prompt = self.prompts.build_narrative_prompt(graph_context)
 
         # Call LLM
-        model_name = "claude-haiku-4-5-20251001" if model == "haiku" else "claude-sonnet-4-5-20250929"
-
-        narrative = self.api_client.call_with_retry(
-            prompt=prompt,
-            model=model_name
+        model_name = (
+            "claude-haiku-4-5-20251001"
+            if model == "haiku"
+            else "claude-sonnet-4-5-20250929"
         )
+
+        narrative = self.api_client.call_with_retry(prompt=prompt, model=model_name)
 
         # Estimate cost (rough)
         input_tokens = len(prompt.split()) * 1.3  # Rough token estimate
@@ -216,7 +221,9 @@ class NarrativeGenerator:
         pricing = MODEL_PRICING[model]
         cost = (input_tokens * pricing["input"]) + (output_tokens * pricing["output"])
 
-        logger.info(f"Generated narrative with {model}: ~{output_tokens:.0f} tokens, ${cost:.4f}")
+        logger.info(
+            f"Generated narrative with {model}: ~{output_tokens:.0f} tokens, ${cost:.4f}"
+        )
 
         return narrative, cost
 
@@ -226,7 +233,7 @@ class NarrativeGenerator:
         focal_entity_name: str,
         focal_entity_type: str,
         constellation: set,
-        graph: KnowledgeGraph
+        graph: KnowledgeGraph,
     ) -> Dict[str, Any]:
         """Build graph context dict for prompt."""
         entities = []
@@ -243,7 +250,9 @@ class NarrativeGenerator:
 
                 extracted_from = entity.get("extracted_from", "")
                 if extracted_from:
-                    documents.update(doc.strip() for doc in extracted_from.split(",") if doc.strip())
+                    documents.update(
+                        doc.strip() for doc in extracted_from.split(",") if doc.strip()
+                    )
 
             # Get relations
             rels = graph.get_relations(entity_id, direction="both")
@@ -262,29 +271,31 @@ class NarrativeGenerator:
                     rel_type = rel.get("relation_type", "UNKNOWN")
                     date = rel.get("date", "")
 
-                    relations.append({
-                        "type": rel_type,
-                        "source": source_entity.get("name", source) if source_entity else source,
-                        "target": target_entity.get("name", target) if target_entity else target,
-                        "date": date,
-                        "document_id": rel.get("document_id") or rel.get("extracted_from"),
-                        "evidence": rel.get("evidence")
-                    })
+                    relations.append(
+                        {
+                            "type": rel_type,
+                            "source": source_entity.get("name", source)
+                            if source_entity
+                            else source,
+                            "target": target_entity.get("name", target)
+                            if target_entity
+                            else target,
+                            "date": date,
+                            "document_id": rel.get("document_id")
+                            or rel.get("extracted_from"),
+                            "evidence": rel.get("evidence"),
+                        }
+                    )
 
         return {
-            "focal_entity": {
-                "name": focal_entity_name,
-                "type": focal_entity_type
-            },
+            "focal_entity": {"name": focal_entity_name, "type": focal_entity_type},
             "entities": entities,
             "relations": relations,
-            "documents": list(documents)
+            "documents": list(documents),
         }
 
     def _extract_highlighted_events(
-        self,
-        constellation: set,
-        graph: KnowledgeGraph
+        self, constellation: set, graph: KnowledgeGraph
     ) -> List[EventHighlight]:
         """Extract special events (CONFISCATED, SOLD, INHERITED) for highlighting."""
         highlighted = []
@@ -300,40 +311,40 @@ class NarrativeGenerator:
                     continue  # Skip duplicate
                 seen_relations.add(rel_id)
 
-                rel_type_str = rel.get("relation_type", "")
-                try:
-                    rel_type = RelationType(rel_type_str)
+                rel_type = rel.get("relation_type", "")
 
-                    if rel_type in [RelationType.CONFISCATED, RelationType.SOLD, RelationType.INHERITED]:
-                        source_entity = graph.get_entity(rel.get("source"))
-                        target_entity = graph.get_entity(rel.get("target"))
+                # Highlight special events: confiscations, sales, inheritances
+                if rel_type in ["CONFISCATED", "SOLD", "INHERITED"]:
+                    source_entity = graph.get_entity(rel.get("source"))
+                    target_entity = graph.get_entity(rel.get("target"))
 
-                        if not source_entity or not target_entity:
-                            continue
+                    if not source_entity or not target_entity:
+                        continue
 
-                        event = EventHighlight(
-                            event_type=rel_type.value,
-                            summary=f"{source_entity.get('name', '?')} {rel_type.value.lower()} {target_entity.get('name', '?')}",
-                            date=rel.get("date"),
-                            citation_number=citation_counter,
-                            evidence=[
-                                EvidenceCitation(
-                                    doc_id=rel.get("extracted_from", "unknown"),
-                                    quote=rel.get("evidence", ""),
-                                    confidence=rel.get("verification", {}).get("confidence", 0.8),
-                                    verification_tier=rel.get("verification", {}).get("tier", VerificationTier.TIER_3_AI)
-                                )
-                            ],
-                            parties_involved=[
-                                source_entity.get("name", "Unknown"),
-                                target_entity.get("name", "Unknown")
-                            ]
-                        )
-                        highlighted.append(event)
-                        citation_counter += 1
-
-                except ValueError:
-                    continue
+                    event = EventHighlight(
+                        event_type=rel_type,
+                        summary=f"{source_entity.get('name', '?')} {rel_type.lower()} {target_entity.get('name', '?')}",
+                        date=rel.get("date"),
+                        citation_number=citation_counter,
+                        evidence=[
+                            EvidenceCitation(
+                                doc_id=rel.get("extracted_from", "unknown"),
+                                quote=rel.get("evidence", ""),
+                                confidence=rel.get("verification", {}).get(
+                                    "confidence", 0.8
+                                ),
+                                verification_tier=rel.get("verification", {}).get(
+                                    "tier", VerificationTier.TIER_3_AI
+                                ),
+                            )
+                        ],
+                        parties_involved=[
+                            source_entity.get("name", "Unknown"),
+                            target_entity.get("name", "Unknown"),
+                        ],
+                    )
+                    highlighted.append(event)
+                    citation_counter += 1
 
         return highlighted
 
@@ -348,7 +359,7 @@ class NarrativeGenerator:
         highlighted_events: List[EventHighlight],
         graph: KnowledgeGraph,
         constellation: set,
-        generation_cost: float
+        generation_cost: float,
     ) -> NarrativeResult:
         """Build NarrativeResult from generation outputs."""
         # Count unique documents
@@ -358,7 +369,9 @@ class NarrativeGenerator:
             if entity:
                 extracted_from = entity.get("extracted_from", "")
                 if extracted_from:
-                    unique_docs.update(doc.strip() for doc in extracted_from.split(",") if doc.strip())
+                    unique_docs.update(
+                        doc.strip() for doc in extracted_from.split(",") if doc.strip()
+                    )
 
         # Placeholder facts (narrative text contains inline citations)
         # In real implementation, would parse [①] markers and extract evidence
@@ -376,14 +389,11 @@ class NarrativeGenerator:
             total_documents=len(unique_docs),
             total_citations=len(highlighted_events),  # Approximate
             generation_cost=generation_cost,
-            from_cache=False
+            from_cache=False,
         )
 
     def _create_simple_narrative(
-        self,
-        entity_id: str,
-        graph: KnowledgeGraph,
-        session_id: str
+        self, entity_id: str, graph: KnowledgeGraph, session_id: str
     ) -> NarrativeResult:
         """Create simple narrative for insufficient data (< 3 entities)."""
         entity = graph.get_entity(entity_id)
@@ -402,15 +412,21 @@ class NarrativeGenerator:
         context = {
             "name": name,
             "type": entity_type,
-            "document": extracted_from.split(",")[0].strip() if extracted_from else "unknown",
+            "document": extracted_from.split(",")[0].strip()
+            if extracted_from
+            else "unknown",
             "role": entity.get("profession") or entity.get("roles", [None])[0],
-            "connections": []
+            "connections": [],
         }
 
         # Get connected entities
         relations = graph.get_relations(entity_id, direction="both")
         for rel in relations[:3]:  # Max 3 connections
-            other_id = rel.get("target") if rel.get("source") == entity_id else rel.get("source")
+            other_id = (
+                rel.get("target")
+                if rel.get("source") == entity_id
+                else rel.get("source")
+            )
             other = graph.get_entity(other_id)
             if other:
                 context["connections"].append(other.get("name", other_id))
@@ -419,10 +435,7 @@ class NarrativeGenerator:
         prompt = self.prompts.build_simple_narrative_prompt(context)
         model_name = "claude-haiku-4-5-20251001"
 
-        narrative = self.api_client.call_with_retry(
-            prompt=prompt,
-            model=model_name
-        )
+        narrative = self.api_client.call_with_retry(prompt=prompt, model=model_name)
 
         # Minimal cost
         cost = 0.001
@@ -441,5 +454,5 @@ class NarrativeGenerator:
             total_documents=doc_count,
             total_citations=0,
             generation_cost=cost,
-            is_simple_entity=True
+            is_simple_entity=True,
         )

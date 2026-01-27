@@ -1,0 +1,477 @@
+# Cuban Property Restitution - Entity Type Definitions
+# Extracted from farmer_factory/structure/schema.py
+
+entity_types:
+
+  PERSON:
+    description: "Individual person (owner, heir, witness, notary, official)"
+    icon: "👤"
+    color: "#3B82F6"  # Blue
+
+    core_fields:
+      - name: name
+        type: string
+        required: true
+        description: "Full name as written in documents"
+
+      - name: alternate_names
+        type: list[string]
+        required: false
+        description: "Titles, abbreviations, nicknames (e.g., 'Don Mario Ceresa')"
+
+    domain_fields:
+      # Demographics
+      - name: birth_date
+        type: date
+        required: false
+        extraction_hints:
+          - "nacido"
+          - "nació"
+          - "fecha de nacimiento"
+          - "natural de"
+
+      - name: death_date
+        type: date
+        required: false
+        extraction_hints:
+          - "fallecido"
+          - "murió"
+          - "fecha de defunción"
+
+      - name: nationality
+        type: string
+        required: false
+        default: "Cuban"
+        extraction_hints:
+          - "nacionalidad"
+          - "ciudadano"
+
+      - name: residence
+        type: string
+        required: false
+        extraction_hints:
+          - "domiciliado en"
+          - "vecino de"
+          - "residente de"
+          - "con domicilio en"
+
+      - name: profession
+        type: string
+        required: false
+        extraction_hints:
+          - "profesión"
+          - "ocupación"
+          - "oficio"
+          - "de profesión"
+
+      - name: marital_status
+        type: enum
+        values:
+          - "soltero"
+          - "soltera"
+          - "casado"
+          - "casada"
+          - "viudo"
+          - "viuda"
+          - "divorciado"
+          - "divorciada"
+          - "unknown"
+        required: false
+        extraction_hints:
+          - "casado con"
+          - "casada con"
+          - "soltero"
+          - "soltera"
+          - "viuda de"
+          - "viudo de"
+
+      # Family relationships (critical for lineage)
+      - name: mother
+        type: string
+        required: false
+        description: "Mother's name"
+        extraction_hints:
+          - "hija de"
+          - "hijo de"
+          - "y de"  # In "hijo de [father] y de [mother]"
+
+      - name: father
+        type: string
+        required: false
+        description: "Father's name"
+        extraction_hints:
+          - "hijo de"
+          - "hija de"
+
+      - name: spouse
+        type: string
+        required: false
+        description: "Spouse's name (primary if multiple)"
+        extraction_hints:
+          - "casado con"
+          - "casada con"
+          - "esposa de"
+          - "esposo de"
+          - "su esposa"
+          - "su esposo"
+
+      - name: children
+        type: list[string]
+        required: false
+        description: "Names of children"
+        extraction_hints:
+          - "sus hijos"
+          - "herederos"
+          - "menores"
+
+      - name: siblings
+        type: list[string]
+        required: false
+        description: "Names of siblings"
+        extraction_hints:
+          - "hermano de"
+          - "hermana de"
+          - "sus hermanos"
+
+      # Roles in documents
+      - name: roles
+        type: list[string]
+        required: false
+        values:
+          - "owner"
+          - "seller"
+          - "buyer"
+          - "heir"
+          - "witness"
+          - "notary"
+          - "official"
+          - "creditor"
+          - "debtor"
+          - "representative"
+        extraction_hints:
+          - "propietario"
+          - "vendedor"
+          - "comprador"
+          - "heredero"
+          - "testigo"
+          - "notario"
+
+  PROPERTY:
+    description: "Real property (finca, hacienda, urban property, sugar mill)"
+    icon: "🏠"
+    color: "#10B981"  # Green
+
+    core_fields:
+      - name: name
+        type: string
+        required: false
+        description: "Property name if named (e.g., 'Central Santa Maria')"
+
+    domain_fields:
+      - name: property_type
+        type: enum
+        values:
+          - "finca"
+          - "hacienda"
+          - "ingenio"
+          - "central"
+          - "colonia"
+          - "sitio"
+          - "potrero"
+          - "urban"
+          - "commercial"
+          - "residential"
+        required: false
+        extraction_hints:
+          - "finca"
+          - "hacienda"
+          - "ingenio"
+          - "central"
+          - "propiedad"
+          - "terreno"
+
+      - name: address
+        type: string
+        required: false
+        extraction_hints:
+          - "calle"
+          - "avenida"
+          - "carretera"
+          - "camino"
+
+      - name: description
+        type: string
+        required: false
+        description: "Detailed property description"
+
+      - name: area
+        type: float
+        required: false
+        description: "Property area measurement"
+
+      - name: area_unit
+        type: enum
+        values:
+          - "hectares"
+          - "caballerías"
+          - "acres"
+          - "square_meters"
+          - "varas"
+        required: false
+        extraction_hints:
+          - "hectáreas"
+          - "caballerías"
+          - "metros cuadrados"
+
+      # Cuban registry fields
+      - name: registry_number
+        type: string
+        required: false
+        description: "Registry inscription reference"
+        extraction_hints:
+          - "inscrita al"
+          - "folio"
+          - "tomo"
+          - "número"
+
+      - name: cadastral_info
+        type: string
+        required: false
+        description: "Cadastral information"
+        extraction_hints:
+          - "finca número"
+          - "cadastral"
+          - "catastro"
+
+      - name: folio_number
+        type: string
+        required: false
+        description: "Folio number in registry"
+        extraction_hints:
+          - "folio"
+
+  ORGANIZATION:
+    description: "Organization (bank, court, government agency, company)"
+    icon: "🏛️"
+    color: "#F59E0B"  # Amber
+
+    core_fields:
+      - name: name
+        type: string
+        required: true
+
+    domain_fields:
+      - name: org_type
+        type: enum
+        values:
+          - "bank"
+          - "court"
+          - "notary_office"
+          - "registry"
+          - "government_agency"
+          - "company"
+          - "ministry"
+        required: false
+        extraction_hints:
+          - "banco"
+          - "juzgado"
+          - "notaría"
+          - "registro"
+          - "instituto"
+          - "ministerio"
+
+      - name: address
+        type: string
+        required: false
+
+    # Known organizations for Cuban property context
+    known_entities:
+      - name: "Instituto Nacional de Reforma Agraria"
+        aliases:
+          - "INRA"
+        org_type: "government_agency"
+
+      - name: "Ministerio de Recuperación de Bienes Malversados"
+        aliases:
+          - "MRBM"
+        org_type: "government_agency"
+
+      - name: "Junta Central de Planificación"
+        aliases:
+          - "JUCEPLAN"
+        org_type: "government_agency"
+
+      - name: "Banco Nacional de Cuba"
+        aliases:
+          - "BNC"
+        org_type: "bank"
+
+  LOCATION:
+    description: "Geographic location (province, municipality, city, barrio)"
+    icon: "📍"
+    color: "#8B5CF6"  # Purple
+
+    core_fields:
+      - name: name
+        type: string
+        required: true
+
+    domain_fields:
+      - name: location_type
+        type: enum
+        values:
+          - "country"
+          - "province"
+          - "municipality"
+          - "city"
+          - "town"
+          - "barrio"
+          - "neighborhood"
+          - "district"
+        required: false
+        extraction_hints:
+          - "provincia"
+          - "municipio"
+          - "ciudad"
+          - "barrio"
+          - "término municipal"
+
+      - name: parent_location
+        type: string
+        required: false
+        description: "Parent location (e.g., province name for a municipality)"
+
+      - name: country
+        type: string
+        required: false
+        default: "Cuba"
+
+    # Known locations for Cuban context
+    known_entities:
+      - name: "La Habana"
+        aliases:
+          - "Havana"
+          - "Ciudad de La Habana"
+        location_type: "province"
+
+      - name: "Camagüey"
+        location_type: "province"
+
+      - name: "Oriente"
+        location_type: "province"
+
+      - name: "Las Villas"
+        aliases:
+          - "Santa Clara"
+        location_type: "province"
+
+      - name: "Pinar del Río"
+        location_type: "province"
+
+      - name: "Matanzas"
+        location_type: "province"
+
+      - name: "Florida"
+        parent_location: "Camagüey"
+        location_type: "municipality"
+
+      - name: "Miramar"
+        parent_location: "La Habana"
+        location_type: "neighborhood"
+
+      - name: "Vedado"
+        parent_location: "La Habana"
+        location_type: "neighborhood"
+
+  DOCUMENT:
+    description: "Source document (deed, certificate, decree, correspondence)"
+    icon: "📄"
+    color: "#6B7280"  # Gray
+
+    core_fields:
+      - name: title
+        type: string
+        required: false
+        description: "Document title or description"
+
+      - name: document_type
+        type: string
+        required: true
+        description: "Type of document"
+
+      - name: file_path
+        type: string
+        required: true
+        description: "Path to document file"
+
+      - name: page_count
+        type: integer
+        required: true
+
+    domain_fields:
+      - name: document_number
+        type: string
+        required: false
+        description: "Official document number"
+
+      - name: date
+        type: date
+        required: false
+        description: "Document date"
+
+      - name: issuer
+        type: string
+        required: false
+        description: "Issuing organization or official"
+
+      - name: language
+        type: string
+        required: false
+        default: "es"
+
+      - name: ocr_text
+        type: string
+        required: false
+        description: "OCR-extracted text content"
+
+# Document type taxonomy for Cuban property
+document_types:
+  - code: "escritura"
+    label: "Escritura (Deed)"
+    description: "Notarial deed documenting property transaction"
+
+  - code: "certificacion"
+    label: "Certificación"
+    description: "Official certification of registry records"
+
+  - code: "testamento"
+    label: "Testamento (Will)"
+    description: "Last will and testament"
+
+  - code: "decreto"
+    label: "Decreto"
+    description: "Government decree (often confiscation)"
+
+  - code: "resolucion"
+    label: "Resolución"
+    description: "Administrative resolution"
+
+  - code: "acta"
+    label: "Acta"
+    description: "Official record or minutes"
+
+  - code: "carta"
+    label: "Carta/Correspondencia"
+    description: "Letter or correspondence"
+
+  - code: "plano"
+    label: "Plano"
+    description: "Property map or survey"
+
+  - code: "tasacion"
+    label: "Tasación"
+    description: "Property valuation"
+
+  - code: "hipoteca"
+    label: "Hipoteca"
+    description: "Mortgage document"

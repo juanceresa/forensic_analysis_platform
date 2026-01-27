@@ -6,6 +6,7 @@ import logging
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.structure.resolver import DedupeEntityResolver
 from farmer_factory.structure.schema import Document, Verification, VerificationTier
+from farmer_factory.structure.postprocessor import GraphPostProcessor
 
 if TYPE_CHECKING:
     from farmer_factory.extract import ExtractionResult
@@ -215,8 +216,14 @@ class GraphBuilder:
         for extraction in extractions:
             self.add_extraction(extraction)
 
+        # Post-process graph to remove redundancies
+        postprocessor = GraphPostProcessor()
+        cleanup_stats = postprocessor.remove_redundant_edges(self.graph)
+        self.processing_stats.update(cleanup_stats)
+
         logger.info(
             f"Batch complete: {self.processing_stats['entities_extracted']} entities extracted, "
             f"{self.processing_stats['entities_merged']} merged, "
-            f"{self.processing_stats['relations_added']} relations added"
+            f"{self.processing_stats['relations_added']} relations added, "
+            f"{cleanup_stats['edges_removed']} redundant edges removed"
         )

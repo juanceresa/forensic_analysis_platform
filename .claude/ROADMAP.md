@@ -1,7 +1,7 @@
 # Farmer House Forensic Intelligence Platform — Implementation Roadmap
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.5.0
+> **Version:** 1.7.0
 > **Last Updated:** 2026-01-27
 > **Status:** MVP1 Planning (with dependencies and acceptance criteria)
 
@@ -10,6 +10,20 @@
 ## Overview
 
 This document provides the implementation roadmap for MVP1. It breaks down work into phases and tasks suitable for Claude Code execution.
+
+**Strategic Vision:** See `docs/strategy/CIVIC_ARCHITECTURE_VISION.md` for the foundational strategic document that frames Civic Table as civic infrastructure for documentary recovery—generalizable beyond Cuban property restitution to genealogy, academic research, investigative journalism, and parallel restitution contexts.
+
+---
+
+## Strategic Priorities (from Civic Architecture Vision)
+
+These priorities guide post-MVP development:
+
+1. **Domain Configuration Abstraction (Phase 9)** — Pull Cuban-specific elements into config layer
+2. **Methodology Publication** — Document at general level (not Cuba-specific)
+3. **Identify Domain #2 Partner** — Genealogy, academic archive, or parallel restitution
+
+**Key Insight:** 70% of the platform is domain-agnostic. The technical core (OCR → extraction → graph → verification → dossier) generalizes; only entity types, relation types, prompts, and success criteria are domain-specific.
 
 ---
 
@@ -1001,9 +1015,182 @@ LOG_LEVEL=INFO
 
 ---
 
+## Phase 9: Domain Configuration Abstraction
+
+### Status: 🟡 IN PROGRESS (Infrastructure Complete, Integration Pending)
+
+### Overview
+Abstract Cuban-specific elements into a configuration layer, enabling the platform to serve multiple domains (genealogy, academic research, investigative journalism, parallel restitution claims).
+
+**Design Document:** `docs/architecture/DOMAIN_CONFIGURATION.md`
+**Strategic Document:** `docs/strategy/CIVIC_ARCHITECTURE_VISION.md`
+
+### Why This Matters
+- **70% of the platform is domain-agnostic** — only entity types, relation types, prompts, and success criteria need configuration
+- **Market expansion** — Genealogy ($4.7B market), academic/DH, investigative journalism
+- **Methodology publication** — Document at general level, with Cuban property as case study
+- **Competitive moat** — No one else has end-to-end documentary recovery infrastructure
+
+### Implementation Status
+
+**✅ COMPLETE - Infrastructure (2026-01-27):**
+```
+farmer_factory/domains/
+├── __init__.py              ✅ Public API exports
+├── models.py                ✅ Pydantic models for domain configs
+├── loader.py                ✅ YAML loader with caching
+├── registry.py              ✅ Singleton registry for active domain
+├── cuban_property/
+│   ├── __init__.py          ✅
+│   ├── domain.yaml          ✅ Domain manifest (name, version, scope)
+│   ├── entities.yaml        ✅ 5 entity types, 39 total fields
+│   ├── relations.yaml       ✅ 28 relation types with categories
+│   └── prompts/
+│       └── system_context.txt ✅ Cuban-specific extraction context
+└── base/
+    └── verification.yaml    ✅ 4-tier verification system
+```
+
+**🔲 PENDING - Integration:**
+- Refactor `extract/llm.py` to use domain prompts
+- Refactor `structure/schema.py` for dynamic entity/relation types
+- Add `--domain` CLI flag
+- Update tests to be domain-aware
+
+### Elements Abstracted
+
+| Element | Status | Location |
+|---------|--------|----------|
+| **Entity types** | ✅ | `domains/cuban_property/entities.yaml` |
+| **Entity fields** | ✅ | `domains/cuban_property/entities.yaml` |
+| **Relation types** | ✅ | `domains/cuban_property/relations.yaml` |
+| **Extraction context** | ✅ | `domains/cuban_property/prompts/system_context.txt` |
+| **Verification tiers** | ✅ | `domains/base/verification.yaml` |
+| **Known entities** | ✅ | In entities.yaml (INRA, locations, etc.) |
+| **Extraction hints** | ✅ | Per-field and per-relation hints |
+
+### Implemented Structure
+
+```
+farmer_factory/domains/
+├── __init__.py              # domain_registry, DomainLoader, DomainConfig
+├── models.py                # FieldDefinition, EntityTypeConfig, RelationTypeConfig, DomainConfig
+├── loader.py                # DomainLoader (YAML parsing, caching)
+├── registry.py              # DomainRegistry singleton
+│
+├── cuban_property/          # Cuban Property Restitution domain
+│   ├── domain.yaml          # name, version, language, temporal/geographic scope
+│   ├── entities.yaml        # PERSON (14 fields), PROPERTY (9), ORGANIZATION (3), LOCATION (4), DOCUMENT (9)
+│   ├── relations.yaml       # 28 relation types in 11 categories
+│   └── prompts/
+│       └── system_context.txt
+│
+└── base/                    # Shared across domains
+    └── verification.yaml    # TIER_3_AI, TIER_2_ANALYST, TIER_2_INSTITUTIONAL, TIER_1_CERTIFIED
+```
+
+### Domain Configuration Schema
+
+```yaml
+# domains/cuban_property/schema.yaml
+domain:
+  name: "Cuban Property Restitution"
+  code: "cuban_property"
+  version: "1.0.0"
+  language: "es"  # Primary document language
+  temporal_range: "1940-1965"
+
+entity_types:
+  PERSON:
+    fields:
+      - name: name
+        type: string
+        required: true
+      - name: alternate_names
+        type: list[string]
+      - name: birth_date
+        type: date
+      - name: mother
+        type: string
+        description: "Name of mother (from 'hijo de' phrases)"
+      # ... more fields
+
+  PROPERTY:
+    fields:
+      - name: name
+        type: string
+      - name: property_type
+        type: enum
+        values: [finca, hacienda, ingenio, urban, commercial]
+      - name: registry_number
+        type: string
+      # ... more fields
+
+relation_types:
+  - type: OWNS
+    source: [PERSON, ORGANIZATION]
+    target: [PROPERTY]
+    temporal: true
+
+  - type: CONFISCATED
+    source: [ORGANIZATION]  # Government
+    target: [PROPERTY]
+    temporal: true
+
+  - type: CHILD_OF
+    source: [PERSON]
+    target: [PERSON]
+    symmetric: false
+
+verification:
+  criteria:
+    TIER_2_ANALYST:
+      description: "Civic Table analyst verified against source documents"
+      requirements:
+        - "Entity appears in at least one source document"
+        - "Key attributes match document text"
+    TIER_1_CERTIFIED:
+      description: "FCSC claim accepted or legal certification"
+      external: true
+
+success_definition:
+  primary_goal: "FCSC claim preparation"
+  secondary_goals:
+    - "Lawyer negotiation leverage"
+    - "Family historical record"
+```
+
+### Tasks
+
+| Task | Description | Dependencies | Acceptance Criteria |
+|------|-------------|--------------|---------------------|
+| 9.1 | Design domain config schema | CIVIC_ARCHITECTURE_VISION.md | YAML schema handles Cuban case fully |
+| 9.2 | Extract Cuban-specific elements | Current schema.py, PROMPTS.md | All hardcoded Cuban elements identified |
+| 9.3 | Create domain loader | Pydantic, YAML | Loads and validates domain configs |
+| 9.4 | Refactor extraction prompts | Current prompts | Prompts use domain config context |
+| 9.5 | Refactor schema.py | Domain loader | Entity/relation types from config |
+| 9.6 | Create cuban_property domain | All above | MVP functionality preserved |
+| 9.7 | Create genealogy domain (pilot) | Domain framework | Basic genealogy schema works |
+| 9.8 | Documentation | All above | DOMAIN_CONFIGURATION.md complete |
+
+### Acceptance Criteria
+- ✅ Cuban property domain config fully specifies current behavior
+- ✅ Core modules load entity/relation types from domain config
+- ✅ Extraction prompts parameterized by domain
+- ✅ MVP1 functionality unchanged when using cuban_property domain
+- ✅ Can create new domain by writing config files (no code changes)
+- ✅ Genealogy pilot domain processes test documents
+- ✅ Documentation explains how to add new domains
+
+### Risks
+- MEDIUM: Config complexity becomes unwieldy → Mitigation: Start simple, add features as needed
+- LOW: Breaking changes to MVP → Mitigation: Domain config should produce identical behavior for Cuban case
+
+---
+
 ## Success Criteria
 
-MVP1 complete when:
+### MVP1 Complete When:
 - ✅ 300 documents processed via CLI
 - ✅ graph_data.json validates against schema
 - ✅ **Case creation via CLI works** (create-case command)
@@ -1028,6 +1215,14 @@ MVP1 complete when:
 - ✅ **Executive summary is LLM-polished** (hybrid template + Claude)
 - ✅ **PDF downloadable from Vault** (authenticated endpoint)
 - 🔲 **Property geolocation maps** (optional enhancement, Phase 8A.3)
+
+### Strategic Foundation Complete When:
+- ✅ **Civic Architecture Vision documented** (`docs/strategy/CIVIC_ARCHITECTURE_VISION.md`)
+- ✅ **Market analysis completed** (genealogy, academic, journalism, parallel restitution)
+- ✅ **Competitive landscape documented** (gap identified, no direct competitor)
+- ✅ **Domain configuration schema designed** (Phase 9 planned)
+- 🔲 **Methodology publication outlined** (general, not Cuba-specific)
+- 🔲 **Domain #2 partner identified** (genealogy society, academic project, or parallel restitution)
 
 ---
 
