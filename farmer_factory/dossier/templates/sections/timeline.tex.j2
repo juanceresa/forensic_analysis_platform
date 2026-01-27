@@ -22,7 +22,9 @@ This timeline presents all documented events in chronological order, covering bo
 << event.event_type | latex_escape >> &
 << event.summary | latex_escape >><% if event.entities_involved %> \textit{(<< event.entities_involved | join(', ') | latex_escape >>)}<% endif %> &
 <% if event.source_doc_id %><< event.source_doc_id | latex_escape | truncate(15) >><% else %>---<% endif %> \\
-<% if not loop.last %>\addlinespace<% endif %>
+<% if not loop.last %>
+\addlinespace
+<% endif %>
 <% endfor %>
 
 \end{longtable}
@@ -44,4 +46,4 @@ This timeline presents all documented events in chronological order, covering bo
 <% endif %>
 <% endfor %>
 
-\verificationsummary{<< d.timeline | length >>}{<% for tier, count in timeline_tiers.items() %><< count >> << tier >><% if not loop.last %>, <% endif %><% endfor %>}
+\verificationsummary{<< d.timeline | length >>}{<% for tier, count in timeline_tiers.items() %><< count >> << tier | latex_escape >><% if not loop.last %>, <% endif %><% endfor %>}
