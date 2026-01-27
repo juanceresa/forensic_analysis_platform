@@ -15,7 +15,7 @@ type TabType = 'ocr' | 'entities';
 
 export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('ocr');
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.25); // Start zoomed out to fit document
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -54,7 +54,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
               aria-label="Zoom out"
               className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors
                          focus-visible:ring-2 focus-visible:ring-blue-500"
-              onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
+              onClick={() => setZoom(z => Math.max(0.1, z - 0.1))}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
@@ -67,7 +67,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
               aria-label="Zoom in"
               className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors
                          focus-visible:ring-2 focus-visible:ring-blue-500"
-              onClick={() => setZoom(z => Math.min(2, z + 0.25))}
+              onClick={() => setZoom(z => Math.min(1, z + 0.1))}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -77,7 +77,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
               aria-label="Reset zoom"
               className="ml-auto px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-sm transition-colors
                          focus-visible:ring-2 focus-visible:ring-blue-500"
-              onClick={() => setZoom(1)}
+              onClick={() => setZoom(0.25)}
             >
               Reset
             </button>

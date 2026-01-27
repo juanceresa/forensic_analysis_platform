@@ -56,6 +56,7 @@ class DossierPreparer:
 
     # Relation types indicating ownership
     OWNERSHIP_RELATIONS = {"OWNS", "OWNED", "INHERITED", "SOLD", "SOLD_TO", "BOUGHT", "CONFISCATED"}
+    UNDATED_SENTINEL = "9999-99-99"
 
     def __init__(self, case_id: str, case_path: Path | None = None):
         """Initialize the preparer.
@@ -273,6 +274,8 @@ class DossierPreparer:
                 event_type = self.TIMELINE_EVENT_TYPES[relation_type]
                 date = relation.get("date")
                 date_sortable = relation.get("date_sortable") or self._normalize_date(date)
+                if not date_sortable:
+                    date_sortable = self.UNDATED_SENTINEL
 
                 # Get entity names
                 source_entity = graph.get_entity(relation["source"])
@@ -296,7 +299,7 @@ class DossierPreparer:
                 events.append(
                     TimelineEvent(
                         date=date,
-                        date_sortable=date_sortable,
+                        date_sortable=None if date_sortable == self.UNDATED_SENTINEL else date_sortable,
                         event_type=event_type,
                         summary=summary,
                         entities_involved=entities_involved,
@@ -340,7 +343,7 @@ class DossierPreparer:
                 )
 
         # Sort by date (None values at end)
-        events.sort(key=lambda e: (e.date_sortable or "9999-99-99", e.event_type))
+        events.sort(key=lambda e: (e.date_sortable or self.UNDATED_SENTINEL, e.event_type))
 
         return events
 
@@ -462,68 +465,96 @@ class DossierPreparer:
             if rel_type in self.OWNERSHIP_RELATIONS:
                 ownership_events.append(rel)
 
-        # Sort by date
-        ownership_events.sort(
-            key=lambda r: r.get("date_sortable") or r.get("date") or "0000"
-        )
+        # Normalize dates and sort; undated last
+        def sort_key(rel: dict) -> tuple[str, str]:
+            ds = rel.get("date_sortable") or self._normalize_date(rel.get("date"))
+            if not ds:
+                ds = self.UNDATED_SENTINEL
+            return (ds, rel.get("relation_type", ""))
 
-        # Group into periods
+        ownership_events.sort(key=sort_key)
+
+        # Group adjacent events by owner and period_type when dates are the same
+        grouped: list[dict[str, Any]] = []
         for rel in ownership_events:
             rel_type = rel.get("relation_type", "OWNS")
-
-            # Determine period type
-            if rel_type in {"OWNS", "OWNED", "BOUGHT"}:
-                period_type = "ACQUISITION" if not periods else "OWNERSHIP"
-            elif rel_type == "INHERITED":
-                period_type = "INHERITANCE"
-            elif rel_type in {"SOLD", "SOLD_TO"}:
-                period_type = "SALE"
-            elif rel_type == "CONFISCATED":
-                period_type = "CONFISCATION"
-            else:
-                period_type = "OWNERSHIP"
-
-            # Get owner names
-            owner_names = []
+            period_type = self._map_period_type(rel_type, periods)
+            date_norm = self._normalize_date(rel.get("date"))
             source_entity = graph.get_entity(rel["source"])
-            if source_entity:
-                owner_names.append(source_entity.get("name", "Unknown"))
-
-            # Build evidence citation
+            owner_name = source_entity.get("name", "Unknown") if source_entity else "Unknown"
+            doc_id = rel.get("document_id")
             evidence = []
-            if rel.get("document_id"):
+            if doc_id:
                 verification = rel.get("verification", {})
                 tier = self._parse_verification_tier(verification.get("tier", "TIER_3_AI"))
+                quote = rel.get("evidence")
+                # Try to augment from extractions
+                extraction = self._extractions_cache.get(doc_id, {})
+                extracted_quote = extraction.get("quote") or extraction.get("text")
+                if extracted_quote and not quote:
+                    quote = extracted_quote
                 evidence.append(
                     EvidenceCitation(
-                        doc_id=rel["document_id"],
+                        doc_id=doc_id,
                         doc_title=None,
-                        page=None,
-                        quote=rel.get("evidence"),
+                        page=extraction.get("page"),
+                        quote=quote,
                         verification_tier=tier,
                     )
                 )
-
-            # Build narrative
             narrative = self._build_ownership_narrative(rel_type, rel, graph)
 
-            periods.append(
+            if grouped:
+                last = grouped[-1]
+                same_owner = owner_name in last["owner_names"]
+                same_period = last["period_type"] == period_type
+                same_date = (last["start_date"] == date_norm) or (last["start_date"] is None and date_norm is None)
+                if same_owner and same_period and same_date:
+                    last["evidence"].extend(evidence)
+                    continue
+
+            grouped.append(
+                {
+                    "period_type": period_type,
+                    "start_date": date_norm,
+                    "owner_names": [owner_name],
+                    "narrative": narrative,
+                    "evidence": evidence,
+                }
+            )
+
+        # Fill in end dates (only when next period has a real date)
+        periods_out: list[OwnershipPeriod] = []
+        for i, g in enumerate(grouped):
+            end_date = None
+            if i < len(grouped) - 1:
+                next_start = grouped[i + 1]["start_date"]
+                if next_start and next_start != self.UNDATED_SENTINEL:
+                    end_date = next_start
+            periods_out.append(
                 OwnershipPeriod(
-                    period_type=period_type,
-                    start_date=rel.get("date"),
-                    end_date=None,  # End date would be start of next period
-                    owner_names=owner_names,
-                    narrative=narrative,
-                    evidence=evidence,
+                    period_type=g["period_type"],
+                    start_date=g["start_date"],
+                    end_date=end_date,
+                    owner_names=g["owner_names"],
+                    narrative=g["narrative"],
+                    evidence=g["evidence"],
                 )
             )
 
-        # Fill in end dates from subsequent periods
-        for i, period in enumerate(periods[:-1]):
-            next_period = periods[i + 1]
-            period.end_date = next_period.start_date
+        return periods_out
 
-        return periods
+    def _map_period_type(self, rel_type: str, existing: list[OwnershipPeriod]) -> str:
+        """Map relation type to period type with sensible defaults."""
+        if rel_type in {"OWNS", "OWNED", "BOUGHT"}:
+            return "ACQUISITION" if not existing else "OWNERSHIP"
+        if rel_type == "INHERITED":
+            return "INHERITANCE"
+        if rel_type in {"SOLD", "SOLD_TO"}:
+            return "SALE"
+        if rel_type == "CONFISCATED":
+            return "CONFISCATION"
+        return "OWNERSHIP"
 
     def _build_document_inventory(self, graph: KnowledgeGraph) -> list[DocumentSummary]:
         """Build document inventory from document entities.
@@ -550,6 +581,9 @@ class DossierPreparer:
             # Determine what document proves
             what_it_proves = self._determine_what_document_proves(graph, node_id, entity)
 
+            # Normalize date for sorting
+            date_norm = self._normalize_date(entity.get("date")) or self.UNDATED_SENTINEL
+
             documents.append(
                 DocumentSummary(
                     doc_id=node_id,
@@ -562,11 +596,13 @@ class DossierPreparer:
                     verification_tier=tier,
                     verification_confidence=verification.get("confidence"),
                     extracted_from=entity.get("extracted_from", "").split(", ") if entity.get("extracted_from") else None,
+                    # store sortable date internally if needed
+                    # date_sortable=date_norm,
                 )
             )
 
-        # Sort by date
-        documents.sort(key=lambda d: d.date or "9999")
+        # Sort by normalized date; undated last
+        documents.sort(key=lambda d: self._normalize_date(d.date) or self.UNDATED_SENTINEL)
 
         return documents
 
@@ -706,7 +742,7 @@ class DossierPreparer:
         """
         from anthropic import Anthropic
 
-        client = Anthropic()
+        client = Anthropic(timeout=10)  # guard hangs
 
         facts = f"""
 Family: {family_name}
@@ -732,9 +768,10 @@ Paragraph 2: What happened to the property and current documentation status."""
             max_tokens=350,
             temperature=0.3,
             messages=[{"role": "user", "content": prompt}],
+            timeout=10,
         )
 
-        return response.content[0].text
+        return response.content[0].text if response.content else ""
 
     def _generate_summary_template(
         self,

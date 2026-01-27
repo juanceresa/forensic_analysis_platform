@@ -13,12 +13,57 @@ type SortBy = 'date' | 'type';
 
 export function DocumentList({ documents, caseId }: DocumentListProps) {
   const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState<string | null>(null);
 
-  const sortedDocuments = useMemo(() => {
-    const docs = [...documents];
+  // Get unique document types for filter chips
+  const documentTypes = useMemo(() => {
+    const types = new Set<string>();
+    documents.forEach(doc => {
+      if (doc.type) types.add(doc.type);
+    });
+    return Array.from(types).sort();
+  }, [documents]);
 
+  // Compute summary stats
+  const stats = useMemo(() => {
+    if (documents.length === 0) return null;
+
+    const dates = documents
+      .filter(d => d.date)
+      .map(d => new Date(d.date!).getTime());
+
+    const avgConfidence = documents.reduce((sum, d) => sum + d.confidence, 0) / documents.length;
+
+    return {
+      total: documents.length,
+      dateRange: dates.length > 0
+        ? {
+            earliest: new Date(Math.min(...dates)),
+            latest: new Date(Math.max(...dates))
+          }
+        : null,
+      avgConfidence: Math.round(avgConfidence * 100),
+    };
+  }, [documents]);
+
+  // Filter and sort documents
+  const filteredDocuments = useMemo(() => {
+    let docs = [...documents];
+
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      docs = docs.filter(d => d.filename.toLowerCase().includes(term));
+    }
+
+    // Apply type filter
+    if (selectedType) {
+      docs = docs.filter(d => d.type === selectedType);
+    }
+
+    // Sort
     if (sortBy === 'date') {
-      // Sort by date (earliest first)
       return docs.sort((a, b) => {
         if (!a.date && !b.date) return 0;
         if (!a.date) return 1;
@@ -26,20 +71,18 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
     } else {
-      // Sort by type, then by date within type
       return docs.sort((a, b) => {
         if (!a.type && !b.type) return 0;
         if (!a.type) return 1;
         if (!b.type) return -1;
         if (a.type !== b.type) return a.type.localeCompare(b.type);
-        // Within same type, sort by date
         if (!a.date && !b.date) return 0;
         if (!a.date) return 1;
         if (!b.date) return -1;
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
     }
-  }, [documents, sortBy]);
+  }, [documents, searchTerm, selectedType, sortBy]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -56,6 +99,75 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
       {/* Header */}
       <header className="mb-6">
         <h1 className="text-2xl font-mono mb-4">Documents</h1>
+
+        {/* Summary stats */}
+        {stats && (
+          <div className="mb-4 p-3 bg-slate-900 border border-slate-800 rounded flex flex-wrap gap-6 text-sm">
+            <div>
+              <span className="text-slate-500">Total:</span>{' '}
+              <span className="font-mono text-slate-300">{stats.total}</span>
+            </div>
+            {stats.dateRange && (
+              <div>
+                <span className="text-slate-500">Date range:</span>{' '}
+                <span className="font-mono text-slate-300">
+                  {stats.dateRange.earliest.getFullYear()} – {stats.dateRange.latest.getFullYear()}
+                </span>
+              </div>
+            )}
+            <div>
+              <span className="text-slate-500">Avg OCR:</span>{' '}
+              <span className="font-mono text-slate-300">{stats.avgConfidence}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Search input */}
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded
+                       text-slate-100 placeholder-slate-500 font-mono text-sm
+                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Type filter chips */}
+        {documentTypes.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500 font-mono mr-1">Filter:</span>
+            <button
+              onClick={() => setSelectedType(null)}
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors
+                focus-visible:ring-2 focus-visible:ring-blue-500
+                ${
+                  selectedType === null
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                }`}
+            >
+              All
+            </button>
+            {documentTypes.map(type => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors
+                  focus-visible:ring-2 focus-visible:ring-blue-500
+                  ${
+                    selectedType === type
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                  }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Sort controls */}
         <div className="flex items-center gap-2">
@@ -89,7 +201,7 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
 
       {/* Document grid */}
       <div className="grid gap-3">
-        {sortedDocuments.map((doc, index) => (
+        {filteredDocuments.map((doc, index) => (
           <Link
             key={doc.id}
             href={`/case/${caseId}/document/${encodeURIComponent(doc.id)}`}
@@ -132,9 +244,24 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
         ))}
       </div>
 
-      {sortedDocuments.length === 0 && (
+      {filteredDocuments.length === 0 && (
         <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
-          <p className="text-slate-500 font-mono text-sm">No documents found</p>
+          <p className="text-slate-500 font-mono text-sm">
+            {documents.length === 0
+              ? 'No documents found'
+              : 'No documents match your search'}
+          </p>
+          {(searchTerm || selectedType) && documents.length > 0 && (
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedType(null);
+              }}
+              className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       )}
     </>

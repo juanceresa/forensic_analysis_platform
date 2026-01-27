@@ -109,15 +109,15 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
   const entityTypes: (keyof GroupedEntities)[] = ['PERSON', 'PROPERTY', 'ORGANIZATION', 'LOCATION', 'DOCUMENT'];
 
   // Filter entities by search term across all groups
+  // Always normalize to ensure all entity types exist (API may omit empty types)
   const filteredEntities = useMemo(() => {
-    if (!searchTerm) return entities;
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm?.toLowerCase() || '';
     return {
-      PERSON: entities.PERSON?.filter(e => e.name?.toLowerCase().includes(term)) || [],
-      PROPERTY: entities.PROPERTY?.filter(e => e.name?.toLowerCase().includes(term)) || [],
-      ORGANIZATION: entities.ORGANIZATION?.filter(e => e.name?.toLowerCase().includes(term)) || [],
-      LOCATION: entities.LOCATION?.filter(e => e.name?.toLowerCase().includes(term)) || [],
-      DOCUMENT: entities.DOCUMENT?.filter(e => e.name?.toLowerCase().includes(term)) || [],
+      PERSON: (entities.PERSON || []).filter(e => !term || e.name?.toLowerCase().includes(term)),
+      PROPERTY: (entities.PROPERTY || []).filter(e => !term || e.name?.toLowerCase().includes(term)),
+      ORGANIZATION: (entities.ORGANIZATION || []).filter(e => !term || e.name?.toLowerCase().includes(term)),
+      LOCATION: (entities.LOCATION || []).filter(e => !term || e.name?.toLowerCase().includes(term)),
+      DOCUMENT: (entities.DOCUMENT || []).filter(e => !term || e.name?.toLowerCase().includes(term)),
     };
   }, [entities, searchTerm]);
 

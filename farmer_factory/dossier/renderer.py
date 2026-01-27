@@ -98,6 +98,8 @@ class DossierRenderer:
             ("}", r"\}"),
             ("~", r"\textasciitilde{}"),
             ("^", r"\textasciicircum{}"),
+            ('"', r"''"),
+            ("'", r"'"),
         ]
 
         for char, replacement in replacements:
@@ -201,4 +203,4 @@ class DossierRenderer:
             shutil.copy(style_src, style_dst)
             logger.debug(f"Copied style file to {style_dst}")
         else:
-            logger.warning(f"Style file not found: {style_src}")
+            raise RenderError(f"Style file not found: {style_src}")

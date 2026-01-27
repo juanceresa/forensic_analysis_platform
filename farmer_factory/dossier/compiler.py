@@ -121,13 +121,13 @@ class DossierCompiler:
                     self.engine,
                     "-interaction=nonstopmode",
                     "-output-directory",
-                    str(output_dir),
-                    str(tex_path),
+                    str(output_dir.resolve()),
+                    tex_path.name,  # Just filename since cwd is tex_path.parent
                 ],
                 capture_output=True,
                 text=True,
                 timeout=self.timeout,
-                cwd=tex_path.parent,  # Run from source dir for relative paths
+                cwd=tex_path.parent.resolve(),  # Run from source dir for relative paths
             )
 
             if result.returncode != 0:

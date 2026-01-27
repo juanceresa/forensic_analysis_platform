@@ -10,13 +10,17 @@ export async function GET(
 ) {
   try {
     const { caseId, docId } = await params;
+    const decodedDocId = decodeURIComponent(docId);
+
+    // Strip _page_N suffix to get base document name
+    const baseDocName = decodedDocId.replace(/_page_\d+$/, '');
 
     const intakeDir = path.join(CASES_DIR, caseId, 'intake');
 
     // Find matching intake file
     const intakeFiles = await fs.readdir(intakeDir);
     const matchingFile = intakeFiles.find(f =>
-      f.replace(/\.(pdf|jpg|png)$/i, '') === docId
+      f.replace(/\.(pdf|jpg|png)$/i, '') === baseDocName
     );
 
     if (!matchingFile) {
