@@ -1,25 +1,30 @@
-import { Card } from '@/components/shared';
+import { DocumentList } from '@/components/Documents/DocumentList';
 
 interface DocumentsPageProps {
   params: Promise<{ caseId: string }>;
 }
 
+async function fetchDocuments(caseId: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const res = await fetch(`${baseUrl}/api/cases/${caseId}/documents`, {
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch documents');
+  }
+
+  return res.json();
+}
+
 export default async function DocumentsPage({ params }: DocumentsPageProps) {
   const { caseId } = await params;
+  const { documents } = await fetchDocuments(caseId);
 
   return (
     <div className="p-8">
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8">
-          <h1 className="text-2xl font-mono mb-2">Documents</h1>
-          <p className="text-slate-400">Case: {caseId}</p>
-        </header>
-
-        <Card>
-          <p className="text-slate-400">
-            Document list view coming soon. Will show chronological list of all processed documents.
-          </p>
-        </Card>
+        <DocumentList documents={documents} caseId={caseId} />
       </div>
     </div>
   );
