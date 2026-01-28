@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Callable
 
 from farmer_factory.extract.models import (
     PersonExtraction,
@@ -44,10 +44,7 @@ def parse_entity_response(response_text: str) -> StructuredEntityExtractionResul
         response_text: Raw response from Claude
 
     Returns:
-        Validated StructuredEntityExtractionResult
-
-    Raises:
-        ValueError: If JSON parsing or validation fails
+        Validated StructuredEntityExtractionResult (returns empty result with error notes on failure)
     """
     try:
         cleaned_text = _extract_json_from_response(response_text)
@@ -89,10 +86,7 @@ def parse_relation_response(response_text: str) -> RelationExtractionResult:
         response_text: Raw response from Claude
 
     Returns:
-        Validated RelationExtractionResult
-
-    Raises:
-        ValueError: If JSON parsing or validation fails
+        Validated RelationExtractionResult (returns empty result with error notes on failure)
     """
     try:
         cleaned_text = _extract_json_from_response(response_text)
@@ -162,7 +156,7 @@ def transform_to_final_entities(
             notes=entity.notes,
         )
 
-        short_id = str(uuid.uuid4())[:8]
+        short_id = uuid.uuid4().hex[:8]
         entity_id = f"{document_id}_{entity.entity_type.lower()}_{short_id}"
         context_note = f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}..."
 
@@ -248,7 +242,7 @@ def transform_to_final_relations(
     entities: List[BaseEntity],
     document_id: str,
     document_date: Optional[str],
-    match_entity_func,
+    match_entity_func: Callable[[str, List[BaseEntity]], Optional[str]],
 ) -> List[Relation]:
     """
     Transform intermediate relations to final schema.
