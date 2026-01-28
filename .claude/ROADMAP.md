@@ -1,8 +1,8 @@
 # Farmer House Forensic Intelligence Platform — Implementation Roadmap
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.8.0
-> **Last Updated:** 2026-01-27
+> **Version:** 1.9.0
+> **Last Updated:** 2026-01-28
 > **Status:** MVP1 Planning (with dependencies and acceptance criteria)
 
 ---
@@ -1347,6 +1347,88 @@ tests/
 ### Next Steps
 - EVENT entity type implementation (see design doc)
 - Extraction fine-tuning based on golden test results
+
+---
+
+## Phase 9A.3: OCR Translation & Text Normalization
+
+### Status: ✅ COMPLETE (2026-01-28)
+
+### Overview
+Offline translation of non-English OCR text during document processing, with dual-backend support (local CTranslate2 or Google Cloud Translation). Also includes OCR text normalization for cleaner output.
+
+### Tasks
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 9A.3.1 | `extract/translator.py` | ✅ | Dual-backend translation service (local + GCP) |
+| 9A.3.2 | `extract/ocr.py` | ✅ | OCR text normalization (newlines, hyphenation) |
+| 9A.3.3 | `processing/pipeline.py` | ✅ | Translation step with feature flag |
+| 9A.3.4 | `config/settings.py` | ✅ | `translation_enabled`, `translation_backend` settings |
+| 9A.3.5 | Frontend integration | ✅ | "English" tab in DocumentViewer when translation exists |
+| 9A.3.6 | API route | ✅ | Reads pre-generated translations from `ocr_translated/` |
+| 9A.3.7 | Documentation | ✅ | Admin guide setup instructions |
+
+### Architecture
+
+**Two translation backends, same interface:**
+
+| Backend | Setting | How It Works | Trade-offs |
+|---------|---------|--------------|------------|
+| **Local** (default) | `TRANSLATION_BACKEND=local` | CTranslate2 + subword-nmt with Argos model files | Free, offline, no PII exposure. Lower quality, 30s model load. |
+| **GCP** | `TRANSLATION_BACKEND=gcp` | Google Cloud Translation API v2 | Better quality for legal docs. 500k chars/month free, then $20/M. |
+
+**Why not the Argos Python API?**
+The `argostranslate` Python package pulls in stanza → PyTorch → OpenMP conflicts → segfaults on macOS. We bypass it entirely and call CTranslate2 (the underlying engine) directly with a pure-Python BPE tokenizer (`subword-nmt`). Same model, same output, no native library conflicts.
+
+### Data Flow
+```
+Processing Pipeline (TRANSLATION_ENABLED=true)
+        ↓
+OCR text + detected language
+        ↓
+needs_translation("es") → True
+        ↓
+translate_text(ocr_text, source_language="es")
+        ↓ (local: CTranslate2 + BPE | gcp: Cloud Translation API)
+Translated text saved to cases/CASE-ID/ocr_translated/{doc_id}.txt
+        ↓
+Frontend reads file → shows "English" tab in DocumentViewer
+```
+
+### OCR Text Normalization
+- Joins hyphenated line breaks ("Dis-\ntrito" → "Distrito")
+- Collapses excessive newlines (3+ → 2)
+- Joins mid-sentence line breaks within paragraphs
+- Applied during OCR processing, before translation
+
+### Files Created/Modified
+```
+farmer_factory/extract/
+├── translator.py          ✅ NEW - Dual-backend translation service
+├── ocr.py                 ✅ MODIFIED - Added normalize_ocr_text()
+└── __init__.py            ✅ MODIFIED - Added translator exports
+
+farmer_factory/config/
+└── settings.py            ✅ MODIFIED - translation_enabled, translation_backend
+
+farmer_factory/processing/
+└── pipeline.py            ✅ MODIFIED - Translation step + KMP_DUPLICATE_LIB_OK
+
+farmer_factory/requirements.txt  ✅ MODIFIED - ctranslate2, subword-nmt
+
+farmer_vault/
+├── app/api/cases/[caseId]/document/[docId]/route.ts  ✅ MODIFIED - Reads translations
+└── components/Documents/DocumentViewer.tsx            ✅ MODIFIED - English tab
+
+docs/guides/ADMIN_GUIDE.md  ✅ MODIFIED - Translation setup docs
+```
+
+### Key Decisions
+- **Feature-flagged:** `TRANSLATION_ENABLED=false` by default for compliance
+- **Processing-time:** Translations run once during processing, not on-demand
+- **Offline-first:** Local backend is default (zero cost, no PII exposure)
+- **GCP migration path:** Swap `TRANSLATION_BACKEND=gcp` when quality matters
 
 ---
 
