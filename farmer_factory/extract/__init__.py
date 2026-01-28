@@ -42,7 +42,8 @@ from .parsers import (
 
 # Export translator
 from .translator import (
-    TranslationService,
+    LocalTranslationService,
+    GCPTranslationService,
     translate_text,
     needs_translation,
 )
@@ -85,7 +86,8 @@ __all__ = [
     "transform_to_final_relations",
 
     # Translator
-    "TranslationService",
+    "LocalTranslationService",
+    "GCPTranslationService",
     "translate_text",
     "needs_translation",
 ]

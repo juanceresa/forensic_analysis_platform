@@ -12,7 +12,7 @@ import dedupe.variables
 # Person fields - multi-attribute matching
 PERSON_FIELDS = [
     # Core identity - PRIMARY matching field
-    dedupe.variables.String('name'),
+    dedupe.variables.String('name', has_missing=True),
 
     # Demographics - SECONDARY matching fields (help distinguish people with common names)
     dedupe.variables.String('birth_date', has_missing=True),
@@ -31,7 +31,7 @@ PERSON_FIELDS = [
 
 # Location fields
 LOCATION_FIELDS = [
-    dedupe.variables.String('name'),
+    dedupe.variables.String('name', has_missing=True),
     dedupe.variables.String('location_type', has_missing=True),
     dedupe.variables.String('country', has_missing=True),
     dedupe.variables.String('parent_location_id', has_missing=True),
@@ -47,7 +47,7 @@ PROPERTY_FIELDS = [
 
 # Organization fields
 ORGANIZATION_FIELDS = [
-    dedupe.variables.String('name'),
+    dedupe.variables.String('name', has_missing=True),
     dedupe.variables.String('org_type', has_missing=True),
     dedupe.variables.String('location_id', has_missing=True),
 ]

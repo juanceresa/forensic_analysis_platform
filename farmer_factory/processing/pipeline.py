@@ -30,6 +30,7 @@ from farmer_factory.structure import (
     GraphExporter
 )
 from farmer_factory.intake import ManifestManager
+from farmer_factory.intake.document_groups import load_document_groups
 from farmer_factory.config.settings import settings
 from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, setup_logging
 from .exceptions import ProcessingError
@@ -133,6 +134,14 @@ def process_case(
         resolver = DedupeEntityResolver(threshold=0.5)
 
         builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
+
+        # Load and apply document groups if available
+        doc_groups = load_document_groups(case_dir)
+        if doc_groups and doc_groups.is_confirmed():
+            builder.set_document_groups(doc_groups)
+            logger.info(f"Loaded {len(doc_groups.groups)} confirmed document groups")
+        elif doc_groups:
+            logger.info("Document groups found but not CONFIRMED, skipping grouping")
     except Exception as e:
         raise ProcessingError(f"Failed to initialize graph builder: {e}")
 
@@ -247,7 +256,7 @@ def process_case(
             document_id=pdf_path.stem,
             filename=pdf_path.name,
             status="success",
-            part_count=1,  # TODO: Track multi-part documents from document_groups
+            part_count=1,
             page_count=len(page_images),
         )
 

@@ -87,17 +87,25 @@ class DedupeEntityResolver:
         # Prepare data for dedupe
         data_dict = {}
 
-        # Add new entity
+        # Add new entity - skip if name is empty (dedupe can't compare empty strings)
         new_entity_data = self._prepare_entity_data(entity)
+        if not new_entity_data.get('name'):
+            return None
         data_dict[entity.id] = new_entity_data
 
-        # Add candidates
+        # Add candidates, filtering out those with empty names
         for candidate_id, candidate_data in candidates:
             candidate_entity_data = self._prepare_entity_data_from_dict(
                 candidate_data,
                 entity_type_str
             )
+            if not candidate_entity_data.get('name'):
+                continue
             data_dict[candidate_id] = candidate_entity_data
+
+        # Need at least 2 records (new entity + 1 candidate) to compare
+        if len(data_dict) < 2:
+            return None
 
         # Get deduper for this entity type
         deduper = self.dedupers[entity_type_str]
@@ -137,32 +145,32 @@ class DedupeEntityResolver:
 
         if entity_type == "PERSON":
             return {
-                'name': entity.name or '',
-                'birth_date': entity.birth_date or '',
-                'death_date': entity.death_date or '',
-                'residence': entity.residence or '',
-                'profession': entity.profession or '',
-                'nationality': entity.nationality or '',
+                'name': entity.name or None,
+                'birth_date': entity.birth_date or None,
+                'death_date': entity.death_date or None,
+                'residence': entity.residence or None,
+                'profession': entity.profession or None,
+                'nationality': entity.nationality or None,
             }
         elif entity_type == "LOCATION":
             return {
-                'name': entity.name or '',
-                'location_type': entity.location_type or '',
-                'country': entity.country or '',
-                'parent_location_id': entity.parent_location_id or '',
+                'name': entity.name or None,
+                'location_type': entity.location_type or None,
+                'country': entity.country or None,
+                'parent_location_id': entity.parent_location_id or None,
             }
         elif entity_type == "PROPERTY":
             return {
-                'name': entity.name or '',
-                'property_type': entity.property_type or '',
-                'location_id': entity.location_id or '',
+                'name': entity.name or None,
+                'property_type': entity.property_type or None,
+                'location_id': entity.location_id or None,
                 'area': float(entity.area) if entity.area is not None else None,
             }
         elif entity_type == "ORGANIZATION":
             return {
-                'name': entity.name or '',
-                'org_type': entity.org_type or '',
-                'location_id': entity.location_id or '',
+                'name': entity.name or None,
+                'org_type': entity.org_type or None,
+                'location_id': entity.location_id or None,
             }
         else:
             return {}
@@ -175,33 +183,33 @@ class DedupeEntityResolver:
         """Extract fields from graph node data."""
         if entity_type == "PERSON":
             return {
-                'name': entity_data.get('name') or '',
-                'birth_date': entity_data.get('birth_date') or '',
-                'death_date': entity_data.get('death_date') or '',
-                'residence': entity_data.get('residence') or '',
-                'profession': entity_data.get('profession') or '',
-                'nationality': entity_data.get('nationality') or '',
+                'name': entity_data.get('name') or None,
+                'birth_date': entity_data.get('birth_date') or None,
+                'death_date': entity_data.get('death_date') or None,
+                'residence': entity_data.get('residence') or None,
+                'profession': entity_data.get('profession') or None,
+                'nationality': entity_data.get('nationality') or None,
             }
         elif entity_type == "LOCATION":
             return {
-                'name': entity_data.get('name') or '',
-                'location_type': entity_data.get('location_type') or '',
-                'country': entity_data.get('country') or '',
-                'parent_location_id': entity_data.get('parent_location_id') or '',
+                'name': entity_data.get('name') or None,
+                'location_type': entity_data.get('location_type') or None,
+                'country': entity_data.get('country') or None,
+                'parent_location_id': entity_data.get('parent_location_id') or None,
             }
         elif entity_type == "PROPERTY":
             area_value = entity_data.get('area')
             return {
-                'name': entity_data.get('name') or '',
-                'property_type': entity_data.get('property_type') or '',
-                'location_id': entity_data.get('location_id') or '',
+                'name': entity_data.get('name') or None,
+                'property_type': entity_data.get('property_type') or None,
+                'location_id': entity_data.get('location_id') or None,
                 'area': float(area_value) if area_value is not None else None,
             }
         elif entity_type == "ORGANIZATION":
             return {
-                'name': entity_data.get('name') or '',
-                'org_type': entity_data.get('org_type') or '',
-                'location_id': entity_data.get('location_id') or '',
+                'name': entity_data.get('name') or None,
+                'org_type': entity_data.get('org_type') or None,
+                'location_id': entity_data.get('location_id') or None,
             }
         else:
             return {}
