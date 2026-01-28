@@ -5,6 +5,7 @@ to measure and track extraction quality over time.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Set
 
@@ -162,3 +163,114 @@ class TestGoldenMetrics:
 # - sample_testamento.txt - Will/Testament document
 # - sample_hipoteca.txt - Mortgage document
 # - sample_confiscacion.txt - Confiscation document (post-1959)
+
+
+# Helper functions for A/B comparison tests
+def get_expected_names(expected: dict, entity_category: str) -> Set[str]:
+    """Extract normalized names from expected entities."""
+    names = set()
+    for entity in expected["expected_entities"].get(entity_category, []):
+        name = entity.get("name", "")
+        if name:
+            names.add(name.lower().strip())
+    return names
+
+
+def extract_entity_names(entities: list, entity_type: str) -> Set[str]:
+    """Extract normalized names from extracted entities of a specific type."""
+    names = set()
+    for entity in entities:
+        type_val = entity.entity_type.value if hasattr(entity.entity_type, "value") else entity.entity_type
+        if type_val == entity_type:
+            name = getattr(entity, "name", None)
+            if name:
+                names.add(name.lower().strip())
+    return names
+
+
+class ExtractionMetrics:
+    """Metrics for evaluating extraction quality."""
+
+    def __init__(self, precision: float, recall: float, f1: float, true_positives: int):
+        self.precision = precision
+        self.recall = recall
+        self.f1 = f1
+        self.true_positives = true_positives
+
+    @classmethod
+    def calculate(cls, expected: Set[str], extracted: Set[str]) -> "ExtractionMetrics":
+        """Calculate precision, recall, and F1 score."""
+        if not extracted:
+            return cls(0.0, 0.0, 0.0, 0)
+
+        true_positives = len(expected & extracted)
+        precision = true_positives / len(extracted) if extracted else 0.0
+        recall = true_positives / len(expected) if expected else 0.0
+        f1 = (
+            2 * (precision * recall) / (precision + recall)
+            if (precision + recall) > 0
+            else 0.0
+        )
+
+        return cls(precision, recall, f1, true_positives)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("ANTHROPIC_API_KEY"),
+    reason="ANTHROPIC_API_KEY not set"
+)
+class TestZeroShotExtraction:
+    """Test zero-shot extraction quality against golden standards."""
+
+    @pytest.fixture
+    def service(self):
+        return LLMExtractionService(
+            api_key=os.environ.get("ANTHROPIC_API_KEY"),
+            prompt_mode="zero_shot"
+        )
+
+    def test_escritura_person_recall_zero_shot(self, service):
+        """Test zero-shot person recall on escritura."""
+        text, expected = load_golden_case("sample_escritura")
+        result = service.extract_from_text(
+            text=text, ocr_confidence=0.95, document_id="sample_escritura_zero_shot"
+        )
+
+        expected_names = get_expected_names(expected, "persons")
+        extracted_names = extract_entity_names(result.entities, "PERSON")
+        metrics = ExtractionMetrics.calculate(expected_names, extracted_names)
+
+        # Zero-shot threshold may be lower - we're testing cost/quality tradeoff
+        assert metrics.recall >= 0.4, (
+            f"Zero-shot person recall {metrics.recall:.2f} below threshold. "
+            f"Found {metrics.true_positives}/{len(expected_names)}."
+        )
+
+    def test_compare_few_shot_vs_zero_shot(self):
+        """Compare few-shot vs zero-shot quality and cost."""
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        text, expected = load_golden_case("sample_escritura")
+
+        # Few-shot extraction
+        service_few = LLMExtractionService(api_key=api_key, prompt_mode="few_shot")
+        result_few = service_few.extract_from_text(
+            text=text, ocr_confidence=0.95, document_id="test_few"
+        )
+        few_shot_count = len(extract_entity_names(result_few.entities, "PERSON"))
+
+        # Zero-shot extraction
+        service_zero = LLMExtractionService(api_key=api_key, prompt_mode="zero_shot")
+        result_zero = service_zero.extract_from_text(
+            text=text, ocr_confidence=0.95, document_id="test_zero"
+        )
+        zero_shot_count = len(extract_entity_names(result_zero.entities, "PERSON"))
+
+        print(f"\n=== FEW-SHOT vs ZERO-SHOT COMPARISON ===")
+        print(f"Few-shot persons: {few_shot_count}")
+        print(f"Zero-shot persons: {zero_shot_count}")
+        print(f"Prompt mode in few-shot metadata: {result_few.metadata.get('prompt_mode')}")
+        print(f"Prompt mode in zero-shot metadata: {result_zero.metadata.get('prompt_mode')}")
+
+        # Both should extract something
+        assert few_shot_count > 0
+        assert zero_shot_count > 0
