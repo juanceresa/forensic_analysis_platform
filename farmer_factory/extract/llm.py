@@ -1,10 +1,9 @@
 """LLM extraction service for entity extraction from OCR text using Claude API."""
 
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional
 from difflib import SequenceMatcher
 import logging
-import json
 import time
 import uuid
 
@@ -22,6 +21,19 @@ from farmer_factory.extract.models import (
 from farmer_factory.extract.api_client import ClaudeAPIClient
 from farmer_factory.extract.chunker import TextChunker
 from farmer_factory.domains import domain_registry
+from farmer_factory.extract.prompts import (
+    build_entity_prompt,
+    build_relation_prompt,
+    get_temporal_relations,
+    get_state_relations,
+)
+from farmer_factory.extract.parsers import (
+    parse_entity_response,
+    parse_relation_response,
+    transform_to_final_entities,
+    transform_to_final_relations,
+    apply_temporal_logic,
+)
 
 # Chunk threshold from Chilean KG paper (arXiv:2408.11975)
 CHUNK_THRESHOLD = 5000  # Characters - process as chunks if longer
@@ -29,93 +41,7 @@ CHUNK_THRESHOLD = 5000  # Characters - process as chunks if longer
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# Domain-Aware Relation Type Helpers
-# ============================================================================
-
-
-def get_temporal_relations() -> Set[str]:
-    """Get temporal relation types from active domain config."""
-    if not domain_registry.is_active:
-        # Fallback to hardcoded defaults if no domain active
-        logger.warning("No active domain - using default temporal relations")
-        return {"SOLD", "BOUGHT", "INHERITED", "CONFISCATED", "WITNESSED", "NOTARIZED"}
-    return set(domain_registry.get_temporal_relations())
-
-
-def get_state_relations() -> Set[str]:
-    """Get state relation types from active domain config."""
-    if not domain_registry.is_active:
-        # Fallback to hardcoded defaults if no domain active
-        logger.warning("No active domain - using default state relations")
-        return {"OWNS", "LOCATED_IN", "EMPLOYED_BY", "RELATED_TO", "REGISTERED_IN"}
-    return set(domain_registry.get_state_relations())
-
-
-def load_system_context() -> str:
-    """
-    Load system context from active domain's prompts directory.
-
-    Returns:
-        System context string for LLM prompts, or empty string if not found.
-    """
-    if not domain_registry.is_active:
-        logger.warning("No active domain - cannot load system context")
-        return ""
-
-    prompts_dir = domain_registry.active.prompts_dir
-    if not prompts_dir:
-        return ""
-
-    from pathlib import Path
-
-    context_file = Path(prompts_dir) / "system_context.txt"
-    if context_file.exists():
-        logger.debug(f"Loading system context from {context_file}")
-        return context_file.read_text(encoding="utf-8")
-
-    logger.debug(f"System context file not found: {context_file}")
-    return ""
-
-
-def get_entity_extraction_hints() -> Dict[str, Dict[str, List[str]]]:
-    """
-    Get extraction hints for all entity types from domain config.
-
-    Returns:
-        Dict mapping entity type -> field name -> list of extraction hints
-        e.g., {"PERSON": {"residence": ["domiciliado en", "vecino de"]}}
-    """
-    if not domain_registry.is_active:
-        return {}
-
-    hints = {}
-    for entity_type, config in domain_registry.active.entity_types.items():
-        hints[entity_type] = {}
-        for field in config.get_all_fields():
-            if field.extraction_hints:
-                hints[entity_type][field.name] = field.extraction_hints
-
-    return hints
-
-
-def get_relation_extraction_hints() -> Dict[str, List[str]]:
-    """
-    Get extraction hints for all relation types from domain config.
-
-    Returns:
-        Dict mapping relation type -> list of extraction hints
-        e.g., {"OWNS": ["propietario de", "dueño de"]}
-    """
-    if not domain_registry.is_active:
-        return {}
-
-    hints = {}
-    for rel_type, config in domain_registry.active.relation_types.items():
-        if config.extraction_hints:
-            hints[rel_type] = config.extraction_hints
-
-    return hints
+# Helper functions have been moved to farmer_factory.extract.prompts.helpers
 
 
 @dataclass
@@ -143,303 +69,8 @@ class LLMExtractionService:
         self.api_key = api_key
         self.api_client = ClaudeAPIClient(api_key=api_key)
 
-    def _build_entity_prompt(
-        self,
-        text: str,
-        document_id: str,
-        document_type: str = "unknown",
-        ocr_quality: float = 0.0,
-    ) -> str:
-        """
-        Build structured entity extraction prompt.
-
-        Extracts entities with full biographical and family relationship data.
-
-        Args:
-            text: OCR-extracted text
-            document_id: Document identifier
-            document_type: Type of document
-            ocr_quality: OCR confidence score
-
-        Returns:
-            Formatted prompt string
-        """
-        # Map OCR quality to human-readable description
-        if ocr_quality >= 0.9:
-            quality_desc = "High (clear text)"
-        elif ocr_quality >= 0.7:
-            quality_desc = "Medium (some unclear characters)"
-        elif ocr_quality >= 0.5:
-            quality_desc = "Low (multiple unclear sections)"
-        else:
-            quality_desc = "Very Low (significant OCR challenges)"
-
-        # Load domain-specific system context
-        system_context = load_system_context()
-        context_section = f"\n{system_context}\n" if system_context else ""
-
-        prompt = f"""{context_section}You are a forensic document analyst extracting entities from historical Cuban property documents. Extract factual information only — never make legal conclusions.
-
-Analyze the following OCR text and extract all entities with their detailed attributes.
-
-ENTITY TYPES:
-1. PERSON - Extract biographical and family relationship data
-2. PROPERTY - Extract property details
-3. ORGANIZATION - Extract organization details
-4. LOCATION - Extract geographic information
-5. DATE - Dates mentioned in document (returned separately)
-6. MONETARY_VALUE - Financial amounts (returned separately)
-7. REGISTRY_REFERENCE - Registry references (returned separately)
-
-PERSON ENTITY SCHEMA:
-{{
-  "entity_type": "PERSON",
-  "name": "Mario Ceresa",  // Required: Full name as written in document
-  "alternate_names": ["Don Mario Ceresa", "M. Ceresa"],  // Optional: Titles, abbreviations
-
-  // Demographics (extract if mentioned):
-  "birth_date": "1920" or "1920-03-15",  // Year or full date
-  "death_date": null,
-  "nationality": "Cuban",
-  "residence": "Miramar, Havana",  // Where they live
-  "profession": "industrialist",
-  "marital_status": "married" or "casado/casada",
-
-  // Family relationships (CRITICAL - extract if mentioned):
-  "mother": "María López de Queral",  // Mother's name
-  "father": "Juan Ceresa",  // Father's name
-  "spouse": "Rosa Queral",  // Spouse name (use primary if multiple)
-  "children": ["Mario Ceresa Jr.", "Rosa Ceresa"],  // List of children's names
-  "siblings": ["Carlos Ceresa"],  // List of siblings' names
-
-  // Roles (what they're doing in this document):
-  "roles": ["owner", "seller"],  // e.g., owner, buyer, seller, witness, notary
-
-  // Extraction metadata:
-  "confidence": 0.95,  // 0.0-1.0 based on OCR clarity
-  "context": "...comparece Don Mario Ceresa, hijo de Juan Ceresa y María López...",
-  "notes": "Family relationships mentioned in preamble"
-}}
-
-IMPORTANT - Family Relationships:
-- Look for phrases like "hijo de" (son of), "hija de" (daughter of)
-- "casado con" (married to), "esposa de" (wife of), "esposo de" (husband of)
-- "hermano de" (brother of), "hermana de" (sister of)
-- Extract EXACTLY as written, preserve Spanish names completely
-- If only partial info (e.g., just father mentioned), that's fine
-- Don't invent relationships not stated in the text
-
-PROPERTY ENTITY SCHEMA:
-{{
-  "entity_type": "PROPERTY",
-  "name": "Central Santa Maria",  // Property name
-  "property_type": "sugar mill" or "ingenio",  // Type: finca, ingenio, central, hacienda
-  "location": "Florida, Camagüey",  // Location as text (will be linked later)
-  "address": "Carretera Central Km 15",
-  "description": "Sugar mill with 500 hectares",
-  "area": 500.0,
-  "area_unit": "hectares" or "caballerías",
-  "registry_number": "Folio 123, Tomo V",
-  "cadastral_info": "Finca 456",
-  "folio_number": "123",
-  "confidence": 0.90,
-  "context": "...la finca Central Santa Maria...",
-  "notes": "Area mentioned in cadastral description"
-}}
-
-ORGANIZATION ENTITY SCHEMA:
-{{
-  "entity_type": "ORGANIZATION",
-  "name": "Banco Núñez",
-  "org_type": "bank" or "banco",
-  "location": "Havana",
-  "address": "Calle Obispo 305",
-  "confidence": 0.85,
-  "context": "...el Banco Núñez...",
-  "notes": null
-}}
-
-LOCATION ENTITY SCHEMA:
-{{
-  "entity_type": "LOCATION",
-  "name": "Florida",
-  "location_type": "municipality" or "municipio",
-  "parent_location": "Camagüey",  // Parent location (e.g., province)
-  "country": "Cuba",
-  "confidence": 0.95,
-  "context": "...en el municipio de Florida...",
-  "notes": null
-}}
-
-OCR QUALITY CONSIDERATIONS:
-- If text is unclear, lower confidence score and note in "notes"
-- Common OCR errors in Spanish: ñ→n, á→a, rn→m, ll→U
-- Handwritten text may have lower confidence
-
-EXTRACTION RULES:
-- Extract only what the document explicitly states
-- Preserve original Spanish terms and names
-- If a field is not mentioned, use null or empty list []
-- For PERSON entities, family relationships are HIGH PRIORITY
-- Don't guess or infer data not in the text
-
-DOCUMENT METADATA:
-Document ID: {document_id}
-Document Type: {document_type}
-OCR Quality: {quality_desc} ({ocr_quality:.2f})
-Language: Spanish
-
-OCR TEXT:
-{text}
-
-Respond with JSON in this format:
-{{
-  "entities": [
-    // Array of PERSON, PROPERTY, ORGANIZATION, LOCATION entities
-  ],
-  "dates": [
-    // Dates found: {{"value": "15 de marzo de 1958", "normalized": "1958-03-15", "context": "..."}}
-  ],
-  "monetary_values": [
-    // Money amounts: {{"value": "$50,000 pesos", "normalized": {{"amount": 50000, "currency": "pesos"}}, "context": "..."}}
-  ],
-  "registry_refs": [
-    // Registry references: {{"value": "Folio 123", "normalized": "Folio 123, Tomo V", "context": "..."}}
-  ],
-  "document_date": "1958-03-15",  // Main document date
-  "document_date_confidence": 0.90,
-  "extraction_notes": "Overall good OCR quality. Family relationships extracted from preamble."
-}}"""
-        return prompt
-
-    def _build_relation_prompt(
-        self,
-        text: str,
-        entities: List[BaseEntity],
-        document_id: str,
-        document_type: str = "unknown",
-    ) -> str:
-        """
-        Build relation extraction prompt using PROMPTS.md template.
-
-        Args:
-            text: OCR-extracted text
-            entities: Previously extracted entities
-            document_id: Document identifier
-            document_type: Type of document
-
-        Returns:
-            Formatted prompt string
-        """
-        # Build entities JSON for prompt
-        entities_list = []
-        for entity in entities:
-            entities_list.append(
-                {
-                    "id": entity.id,
-                    "type": entity.entity_type,
-                    "name": getattr(entity, "name", str(entity.id)),
-                }
-            )
-
-        entities_json = json.dumps(entities_list, indent=2, ensure_ascii=False)
-
-        # Load domain-specific system context
-        system_context = load_system_context()
-        context_section = f"\n{system_context}\n" if system_context else ""
-
-        # Build relation types section from domain config
-        relation_hints = get_relation_extraction_hints()
-        if domain_registry.is_active and relation_hints:
-            relation_types_section = "RELATION TYPES:\n"
-            for rel_type, config in domain_registry.active.relation_types.items():
-                hints_str = ""
-                if config.extraction_hints:
-                    hints_str = f" (look for: {', '.join(config.extraction_hints[:3])})"
-                relation_types_section += (
-                    f"- {rel_type}: {config.description}{hints_str}\n"
-                )
-        else:
-            # Fallback to hardcoded types
-            relation_types_section = """RELATION TYPES:
-- OWNS: Person/Organization owns Property (current or historical)
-- SOLD: Person sold Property to another Person (transaction)
-- BOUGHT: Person bought Property from another Person
-- INHERITED: Person inherited Property (from another Person)
-- CONFISCATED: Government/Organization confiscated Property
-- WITNESSED: Person witnessed a transaction or legal act
-- NOTARIZED: Notary certified a document
-- REGISTERED_IN: Property registered in a Registry
-- LOCATED_IN: Property/Person located in a Location
-- EMPLOYED_BY: Person employed by Organization
-- RELATED_TO: Family relationship between Persons
-"""
-
-        prompt = f"""{context_section}You are a forensic document analyst extracting relationships from historical Cuban property documents. Extract factual relationships only — never make legal conclusions about claim validity.
-
-Analyze the OCR text and the previously extracted entities to identify relationships between them.
-
-For each relationship, provide:
-1. relation_type: One of the defined types below
-2. source_entity: The entity at the start of the relationship
-3. target_entity: The entity at the end of the relationship
-4. confidence: 0.0-1.0 based on textual evidence
-5. temporal: Date or date range if applicable
-6. evidence: Quote from document supporting this relationship
-7. notes: Observations, caveats, or ambiguities
-
-{relation_types_section}
-TEMPORAL INFORMATION:
-- Extract start_date and end_date where applicable
-- For ongoing relationships, set ongoing: true
-- Use date_precision: "exact", "month", "year", "decade", or "unknown"
-
-CRITICAL: Only extract relationships explicitly stated or directly implied by the document. Do not infer relationships that require outside knowledge.
-
-DOCUMENT METADATA:
-Document ID: {document_id}
-Document Type: {document_type}
-
-EXTRACTED ENTITIES:
-{entities_json}
-
-OCR TEXT:
-{text}
-
-REQUIRED OUTPUT FORMAT:
-You MUST respond with a valid JSON object in the format shown below.
-- If you find relations, include them in the "relations" array
-- If you find NO relations, return an empty array: "relations": []
-- ALWAYS return valid JSON - never return prose explanations
-- Use "extraction_notes" to explain why no relations were found
-
-Example response with relations:
-{{
-  "relations": [
-    {{
-      "relation_type": "OWNS",
-      "source_entity": "Mario Ceresa",
-      "target_entity": "Central Santa Maria",
-      "confidence": 0.88,
-      "temporal": {{
-        "start_date": "1945-01-01",
-        "end_date": null,
-        "ongoing": true,
-        "date_precision": "year"
-      }},
-      "evidence": "...Don Mario Ceresa, propietario del Central Santa Maria...",
-      "notes": "Ownership stated but acquisition date not specified in this document"
-    }}
-  ],
-  "extraction_notes": "Document is a notarial certification of ownership."
-}}
-
-Example response with NO relations:
-{{
-  "relations": [],
-  "extraction_notes": "Document is a loan fee notification with no property ownership or transaction relationships."
-}}"""
-        return prompt
+    # _build_entity_prompt has been moved to farmer_factory.extract.prompts.few_shot
+    # _build_relation_prompt has been moved to farmer_factory.extract.prompts.few_shot
 
     def _match_entity(
         self, entity_name: str, entities: List[BaseEntity]
@@ -520,217 +151,9 @@ Example response with NO relations:
         )
         return None
 
-    def _apply_temporal_logic(
-        self, relation: ExtractedRelation, document_date: Optional[str]
-    ) -> TemporalInfo:
-        """
-        Apply smart temporal handling based on relation type.
-
-        Args:
-            relation: Extracted relation with temporal info
-            document_date: Document date from entity extraction (fallback)
-
-        Returns:
-            Enriched TemporalInfo with fallbacks applied
-        """
-        temporal = relation.temporal or TemporalInfo()
-
-        # Get relation type sets from domain config
-        temporal_relations = get_temporal_relations()
-        state_relations = get_state_relations()
-
-        # TEMPORAL RELATIONS (events - need dates)
-        if relation.relation_type in temporal_relations:
-            if temporal.start_date:
-                # Claude found a date - use it
-                return temporal
-
-            elif document_date:
-                # Fallback: infer from document date
-                logger.info(
-                    f"Using document date as fallback for {relation.relation_type} relation"
-                )
-                return TemporalInfo(
-                    start_date=document_date,
-                    date_precision="year",
-                    notes="Date inferred from document date",
-                )
-
-            else:
-                # Last resort: mark unknown and will be flagged for review
-                logger.warning(
-                    f"No temporal data for {relation.relation_type} relation"
-                )
-                return TemporalInfo(
-                    date_precision="unknown",
-                    notes="Missing temporal data for event relation",
-                )
-
-        # STATE RELATIONS (conditions - dates optional)
-        elif relation.relation_type in state_relations:
-            if temporal.start_date:
-                return temporal
-            else:
-                # Dates are nice-to-have, not required
-                return TemporalInfo(date_precision="unknown", ongoing=True)
-
-        # Unknown relation type - return as-is
-        return temporal
-
-    def _transform_to_final_relations(
-        self,
-        extraction: RelationExtractionResult,
-        entities: List[BaseEntity],
-        document_id: str,
-        document_date: Optional[str],
-    ) -> List[Relation]:
-        """
-        Transform intermediate relations to final schema.
-
-        Args:
-            extraction: Intermediate extraction result from Claude
-            entities: Previously extracted entities
-            document_id: Document identifier
-            document_date: Document date for temporal fallback
-
-        Returns:
-            List of final Relation objects
-        """
-        from farmer_factory.structure.schema import (
-            Verification,
-            VerificationTier,
-            RelationType,
-        )
-
-        final_relations = []
-
-        # Get temporal relations from domain config for review flagging
-        temporal_relations = get_temporal_relations()
-
-        for rel in extraction.relations:
-            try:
-                relation_type = RelationType(rel.relation_type)
-            except ValueError:
-                logger.warning(
-                    f"Skipping relation with invalid type '{rel.relation_type}' "
-                    f"from {document_id}"
-                )
-                continue
-
-            # Match source and target entities
-            source_id = self._match_entity(rel.source_entity, entities)
-            target_id = self._match_entity(rel.target_entity, entities)
-
-            if not source_id or not target_id:
-                logger.warning(
-                    f"Skipping relation {rel.relation_type} - "
-                    f"unmatched entities: {rel.source_entity} -> {rel.target_entity}"
-                )
-                continue
-
-            # Apply temporal logic
-            temporal_info = self._apply_temporal_logic(rel, document_date)
-
-            # Create verification
-            verification = Verification(
-                tier=VerificationTier.TIER_3_AI,
-                confidence=rel.confidence,
-                verified_by=None,
-                verified_at=None,
-                notes=rel.notes,
-            )
-
-            # Determine if needs review (low confidence or missing temporal data)
-            needs_review = rel.confidence < 0.70 or (
-                relation_type.value in temporal_relations
-                and temporal_info.date_precision == "unknown"
-            )
-
-            # Build notes with review flag if needed
-            final_notes = rel.notes or ""
-            if needs_review:
-                if rel.confidence < 0.70:
-                    final_notes += f" Low confidence ({rel.confidence:.2f}) - requires analyst review."
-                if (
-                    relation_type.value in temporal_relations
-                    and temporal_info.date_precision == "unknown"
-                ):
-                    final_notes += " Missing temporal data for event relation."
-
-            # Create final relation
-            relation = Relation(
-                id=f"{document_id}_rel_{uuid.uuid4().hex[:8]}",
-                type=relation_type,
-                source_id=source_id,
-                target_id=target_id,
-                verification=verification,
-                document_id=document_id,
-                evidence=rel.evidence,
-                notes=final_notes.strip(),
-                # Temporal fields (if supported by Relation model)
-                date=temporal_info.start_date,
-            )
-
-            final_relations.append(relation)
-
-        logger.info(
-            f"Transformed {len(extraction.relations)} intermediate relations → "
-            f"{len(final_relations)} final relations "
-            f"({len(extraction.relations) - len(final_relations)} skipped due to entity matching failures)"
-        )
-
-        return final_relations
-
-    def _parse_relation_response(self, response_text: str) -> RelationExtractionResult:
-        """
-        Parse Claude response into RelationExtractionResult.
-
-        Handles markdown code blocks and validates JSON schema.
-
-        Args:
-            response_text: Raw response from Claude
-
-        Returns:
-            Validated RelationExtractionResult
-
-        Raises:
-            ValueError: If JSON parsing or validation fails
-        """
-        try:
-            # Extract JSON from markdown code blocks if present
-            cleaned_text = response_text.strip()
-
-            # Check for markdown JSON code blocks
-            if "```json" in cleaned_text:
-                start = cleaned_text.find("```json") + 7
-                end = cleaned_text.find("```", start)
-                if end > start:
-                    cleaned_text = cleaned_text[start:end].strip()
-            elif "```" in cleaned_text:
-                # Generic code block
-                start = cleaned_text.find("```") + 3
-                end = cleaned_text.find("```", start)
-                if end > start:
-                    cleaned_text = cleaned_text[start:end].strip()
-
-            # Parse JSON
-            data = json.loads(cleaned_text)
-
-            # Validate with Pydantic model
-            result = RelationExtractionResult(**data)
-            return result
-
-        except json.JSONDecodeError as e:
-            logger.error(
-                f"Failed to parse JSON from Claude relation response: {str(e)}"
-            )
-            logger.debug(f"Response text: {response_text[:500]}...")
-            raise ValueError(f"Invalid JSON in Claude response: {str(e)}")
-
-        except Exception as e:
-            logger.error(f"Failed to validate relation extraction result: {str(e)}")
-            logger.debug(f"Parsed data: {data if 'data' in locals() else 'N/A'}")
-            raise ValueError(f"Invalid relation extraction result schema: {str(e)}")
+    # _apply_temporal_logic has been moved to farmer_factory.extract.parsers
+    # _transform_to_final_relations has been moved to farmer_factory.extract.parsers
+    # _parse_relation_response has been moved to farmer_factory.extract.parsers
 
     def _extract_relations(
         self,
@@ -758,8 +181,8 @@ Example response with NO relations:
         try:
             start_time = time.time()
 
-            # Build prompt
-            prompt = self._build_relation_prompt(
+            # Build prompt using prompts module
+            prompt = build_relation_prompt(
                 text=text, entities=entities, document_id=document_id
             )
 
@@ -774,15 +197,16 @@ Example response with NO relations:
                 api_timeout=settings.api_timeout,
             )
 
-            # Parse response
-            extraction = self._parse_relation_response(response_text)
+            # Parse response using parsers module
+            extraction = parse_relation_response(response_text)
 
-            # Transform to final relations
-            relations = self._transform_to_final_relations(
+            # Transform to final relations using parsers module
+            relations = transform_to_final_relations(
                 extraction=extraction,
                 entities=entities,
                 document_id=document_id,
                 document_date=document_date,
+                match_entity_func=self._match_entity,
             )
 
             processing_time = time.time() - start_time
@@ -799,188 +223,8 @@ Example response with NO relations:
             # Return empty list - document will be flagged as incomplete
             return []
 
-    def _parse_extraction_response(
-        self, response_text: str
-    ) -> StructuredEntityExtractionResult:
-        """
-        Parse Claude response into StructuredEntityExtractionResult.
-
-        Handles markdown code blocks and validates JSON schema.
-
-        Args:
-            response_text: Raw response from Claude
-
-        Returns:
-            Validated StructuredEntityExtractionResult
-
-        Raises:
-            ValueError: If JSON parsing or validation fails
-        """
-        try:
-            # Extract JSON from markdown code blocks if present
-            cleaned_text = response_text.strip()
-
-            # Check for markdown JSON code blocks
-            if "```json" in cleaned_text:
-                # Extract content between ```json and ```
-                start = cleaned_text.find("```json") + 7
-                end = cleaned_text.find("```", start)
-                if end > start:
-                    cleaned_text = cleaned_text[start:end].strip()
-            elif "```" in cleaned_text:
-                # Generic code block
-                start = cleaned_text.find("```") + 3
-                end = cleaned_text.find("```", start)
-                if end > start:
-                    cleaned_text = cleaned_text[start:end].strip()
-
-            # Parse JSON
-            data = json.loads(cleaned_text)
-
-            # Validate with Pydantic model
-            result = StructuredEntityExtractionResult(**data)
-            return result
-
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse JSON from Claude response: {str(e)}")
-            logger.debug(f"Response text: {response_text[:500]}...")
-            raise ValueError(f"Invalid JSON in Claude response: {str(e)}")
-
-        except Exception as e:
-            logger.error(f"Failed to validate extraction result: {str(e)}")
-            logger.debug(f"Parsed data: {data if 'data' in locals() else 'N/A'}")
-            raise ValueError(f"Invalid extraction result schema: {str(e)}")
-
-    def _transform_to_final_entities(
-        self,
-        extraction: StructuredEntityExtractionResult,
-        document_id: str,
-        ocr_confidence: float,
-    ) -> List[BaseEntity]:
-        """
-        Transform structured entities to final schema entities.
-
-        Takes structured PersonExtraction, PropertyExtraction, etc. and creates
-        final Pydantic models with all fields populated.
-
-        Args:
-            extraction: Structured extraction result from Claude
-            document_id: Document identifier
-            ocr_confidence: OCR confidence score
-
-        Returns:
-            List of final entity objects
-        """
-        from farmer_factory.structure.schema import (
-            Person,
-            Property,
-            Organization,
-            Location,
-            VerificationTier,
-            Verification,
-        )
-
-        final_entities = []
-
-        for entity in extraction.entities:
-            # Combined confidence: min of OCR and entity confidence
-            combined_confidence = min(ocr_confidence, entity.confidence)
-
-            # Create verification
-            verification = Verification(
-                tier=VerificationTier.TIER_3_AI,
-                confidence=combined_confidence,
-                verified_by=None,
-                verified_at=None,
-                notes=entity.notes,
-            )
-
-            # Generate unique entity ID
-            short_id = str(uuid.uuid4())[:8]
-            entity_id = f"{document_id}_{entity.entity_type.lower()}_{short_id}"
-
-            # Transform based on entity type
-            if isinstance(entity, PersonExtraction):
-                person = Person(
-                    id=entity_id,
-                    entity_type="PERSON",
-                    name=entity.name,
-                    alternate_names=entity.alternate_names,
-                    birth_date=entity.birth_date,
-                    death_date=entity.death_date,
-                    nationality=entity.nationality,
-                    residence=entity.residence,
-                    profession=entity.profession,
-                    marital_status=entity.marital_status,
-                    mother=entity.mother,
-                    father=entity.father,
-                    spouse=entity.spouse,
-                    children=entity.children,
-                    siblings=entity.siblings,
-                    roles=entity.roles,
-                    verification=verification,
-                    extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}...",
-                )
-                final_entities.append(person)
-
-            elif isinstance(entity, PropertyExtraction):
-                prop = Property(
-                    id=entity_id,
-                    entity_type="PROPERTY",
-                    name=entity.name,
-                    property_type=entity.property_type,
-                    address=entity.address,
-                    description=entity.description,
-                    area=entity.area,
-                    area_unit=entity.area_unit,
-                    registry_number=entity.registry_number,
-                    cadastral_info=entity.cadastral_info,
-                    folio_number=entity.folio_number,
-                    verification=verification,
-                    extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}...",
-                )
-                # Note: location field will be linked in graph building phase
-                final_entities.append(prop)
-
-            elif isinstance(entity, OrganizationExtraction):
-                org = Organization(
-                    id=entity_id,
-                    entity_type="ORGANIZATION",
-                    name=entity.name,
-                    org_type=entity.org_type,
-                    address=entity.address,
-                    verification=verification,
-                    extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}...",
-                )
-                # Note: location field will be linked in graph building phase
-                final_entities.append(org)
-
-            elif isinstance(entity, LocationExtraction):
-                location = Location(
-                    id=entity_id,
-                    entity_type="LOCATION",
-                    name=entity.name,
-                    location_type=entity.location_type,
-                    country=entity.country,
-                    verification=verification,
-                    extracted_from=document_id,
-                    notes=f"Extracted from context: {entity.context[:100] if entity.context else 'N/A'}...",
-                )
-                # Note: parent_location field will be linked in graph building phase
-                final_entities.append(location)
-
-        logger.info(
-            f"Transformed {len(extraction.entities)} structured entities → "
-            f"{len(final_entities)} final entities "
-            f"({len(extraction.dates)} dates, "
-            f"{len(extraction.monetary_values)} monetary values, "
-            f"{len(extraction.registry_refs)} registry refs stored as metadata)"
-        )
-
-        return final_entities
+    # _parse_extraction_response has been moved to farmer_factory.extract.parsers
+    # _transform_to_final_entities has been moved to farmer_factory.extract.parsers
 
     def _extract_entities(
         self, text: str, ocr_confidence: float, document_id: str
@@ -995,8 +239,8 @@ Example response with NO relations:
 
         start_time = time.time()
 
-        # Build prompt
-        prompt = self._build_entity_prompt(
+        # Build prompt using prompts module
+        prompt = build_entity_prompt(
             text=text, document_id=document_id, ocr_quality=ocr_confidence
         )
 
@@ -1009,11 +253,11 @@ Example response with NO relations:
             api_timeout=settings.api_timeout,
         )
 
-        # Parse response
-        extraction = self._parse_extraction_response(response_text)
+        # Parse response using parsers module
+        extraction = parse_entity_response(response_text)
 
-        # Transform to final entities
-        entities = self._transform_to_final_entities(
+        # Transform to final entities using parsers module
+        entities = transform_to_final_entities(
             extraction=extraction,
             document_id=document_id,
             ocr_confidence=ocr_confidence,
