@@ -2,7 +2,7 @@
 
 from typing import List, Dict, Any, Optional, Literal
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class IntermediateEntityType(str, Enum):
@@ -50,6 +50,12 @@ class PersonExtraction(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     context: str = Field(description="Quote from document mentioning this person")
     notes: Optional[str] = None
+
+    @field_validator("alternate_names", "children", "siblings", "roles", mode="before")
+    @classmethod
+    def coerce_none_to_list(cls, v):
+        """Coerce null/None from LLM response to empty list."""
+        return v if v is not None else []
 
 
 class PropertyExtraction(BaseModel):
