@@ -17,7 +17,9 @@ from farmer_factory.extract import (
     OCRService,
     VisionExtractionService,
     LLMExtractionService,
-    SchemaValidator
+    SchemaValidator,
+    translate_text,
+    needs_translation,
 )
 from farmer_factory.structure import (
     KnowledgeGraph,
@@ -203,6 +205,32 @@ def process_case(
                 save_ocr_text(extraction.ocr_result, ocr_text_path)
             except Exception as e:
                 logger.warning(f"Failed to save OCR text: {e}")
+
+            # Translate OCR text if enabled and non-English (local, offline)
+            try:
+                if settings.translation_enabled:
+                    ocr_metadata = extraction.ocr_result.metadata if extraction.ocr_result else {}
+                    detected_lang = ocr_metadata.get('language', 'unknown')
+
+                    if needs_translation(detected_lang):
+                        logger.info(f"    Translating from {detected_lang} via Argos...")
+                        ocr_text = extraction.ocr_result.text if extraction.ocr_result else ""
+                        translated = translate_text(
+                            ocr_text,
+                            source_language=detected_lang,
+                            target_language=settings.translation_target_language,
+                        )
+
+                        if translated:
+                            translated_dir = case_dir / 'ocr_translated'
+                            translated_dir.mkdir(parents=True, exist_ok=True)
+                            translated_path = translated_dir / f"{document_id}.txt"
+                            translated_path.write_text(translated, encoding='utf-8')
+                            logger.info(f"    Translation saved: {translated_path.name}")
+                        else:
+                            logger.warning("    Translation unavailable (missing Argos packages?)")
+            except Exception as e:
+                logger.warning(f"Failed to translate OCR text: {e}")
 
             # Add to graph (with auto-deduplication)
             try:

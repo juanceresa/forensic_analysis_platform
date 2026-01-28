@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     cases_dir: Path = Path("./cases")
     output_dir: Path = Path("./output")
 
+    # Translation
+    translation_enabled: bool = False  # Off by default for compliance/PII safety
+    translation_target_language: str = "en"
+
     # Model Configuration
     # NOTE: Anthropic requires explicit version dates, update these when new versions release
     claude_model: str = "claude-haiku-4-5-20251001"  # Default to Haiku 4.5 (cheap)

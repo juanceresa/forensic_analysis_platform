@@ -11,11 +11,32 @@ interface DocumentViewerProps {
   caseId: string;
 }
 
-type TabType = 'ocr' | 'entities';
+type TabType = 'ocr' | 'translated' | 'entities';
+
+// Language code to display name mapping
+const LANGUAGE_NAMES: Record<string, string> = {
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  ru: 'Russian',
+  zh: 'Chinese',
+  ja: 'Japanese',
+  ko: 'Korean',
+  ar: 'Arabic',
+};
 
 export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('ocr');
   const [zoom, setZoom] = useState(0.25); // Start zoomed out to fit document
+
+  const languageDisplayName = document.detectedLanguage
+    ? LANGUAGE_NAMES[document.detectedLanguage] || document.detectedLanguage.toUpperCase()
+    : null;
+
+  // Translation is pre-generated during processing
+  const hasTranslation = !!document.translatedText;
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -140,8 +161,26 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
                        }`}
             onClick={() => setActiveTab('ocr')}
           >
-            OCR Text
+            OCR {languageDisplayName && <span className="text-xs opacity-60">({languageDisplayName})</span>}
           </button>
+          {hasTranslation && (
+            <button
+              role="tab"
+              aria-selected={activeTab === 'translated'}
+              aria-controls="translated-panel"
+              id="translated-tab"
+              className={`flex-1 px-4 py-3 font-mono text-sm border-b-2 transition-colors
+                         focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset
+                         ${
+                           activeTab === 'translated'
+                             ? 'border-blue-500 text-blue-400'
+                             : 'border-transparent text-slate-400 hover:text-slate-300'
+                         }`}
+              onClick={() => setActiveTab('translated')}
+            >
+              English
+            </button>
+          )}
           <button
             role="tab"
             aria-selected={activeTab === 'entities'}
@@ -172,6 +211,20 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
             >
               <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-300">
                 {document.ocrText}
+              </pre>
+            </div>
+          )}
+
+          {/* Translated Panel */}
+          {activeTab === 'translated' && (
+            <div
+              role="tabpanel"
+              id="translated-panel"
+              aria-labelledby="translated-tab"
+              className="p-6"
+            >
+              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-300">
+                {document.translatedText}
               </pre>
             </div>
           )}

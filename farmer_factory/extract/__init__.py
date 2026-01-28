@@ -4,7 +4,7 @@ Handles OCR (Google Cloud Vision) and LLM-based entity/relation extraction (Anth
 All extracted data starts at TIER_3_AI verification level.
 """
 
-from .ocr import OCRService, OCRResult
+from .ocr import OCRService, OCRResult, normalize_ocr_text
 from .vision import VisionExtractionService, VisionExtractionResult
 from .llm import LLMExtractionService, LLMExtractionResult
 from .pipeline import ExtractionPipeline, ExtractionResult
@@ -40,10 +40,18 @@ from .parsers import (
     transform_to_final_relations,
 )
 
+# Export translator
+from .translator import (
+    TranslationService,
+    translate_text,
+    needs_translation,
+)
+
 __all__ = [
     # Services
     "OCRService",
     "OCRResult",
+    "normalize_ocr_text",
     "VisionExtractionService",
     "VisionExtractionResult",
     "LLMExtractionService",
@@ -75,4 +83,9 @@ __all__ = [
     "parse_relation_response",
     "transform_to_final_entities",
     "transform_to_final_relations",
+
+    # Translator
+    "TranslationService",
+    "translate_text",
+    "needs_translation",
 ]

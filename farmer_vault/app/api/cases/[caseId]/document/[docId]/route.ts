@@ -4,7 +4,8 @@ import * as path from 'path';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const DOC_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+// Doc IDs can contain spaces, periods, alphanumerics, underscores, and hyphens
+const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
 
 export async function GET(
   request: NextRequest,
@@ -80,6 +81,20 @@ export async function GET(
       type = 'Report';
     }
 
+    // Get detected language from OCR metadata
+    const detectedLanguage = extraction.ocr_result?.metadata?.language ||
+      extraction.processing_metadata?.ocr_metadata?.language ||
+      'unknown';
+
+    // Check if translation exists (pre-generated during processing)
+    const translatedPath = path.join(CASES_DIR, caseId, 'ocr_translated', `${extractionDocId}.txt`);
+    let translatedText: string | null = null;
+    try {
+      translatedText = await fs.readFile(translatedPath, 'utf-8');
+    } catch {
+      // No translation available
+    }
+
     const document = {
       id: decodedDocId,
       filename: matchingIntake || `${baseDocName}.pdf`,
@@ -89,7 +104,9 @@ export async function GET(
       confidence: extraction.confidence_scores?.ocr_confidence || 0,
       imagePath: `/api/cases/${caseId}/document/${encodeURIComponent(decodedDocId)}/image`,
       ocrText,
+      translatedText,
       entities: extraction.entities || [],
+      detectedLanguage,
     };
 
     return NextResponse.json(document);

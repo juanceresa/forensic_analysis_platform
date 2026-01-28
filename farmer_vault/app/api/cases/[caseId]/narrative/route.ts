@@ -4,7 +4,8 @@ import { join } from 'path';
 import type { NarrativeResult, NarrativeError } from '@/lib/types';
 
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const NODE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+// Node IDs can contain spaces, periods, alphanumerics, underscores, and hyphens
+const NODE_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 const STATUS_BY_TYPE: Record<string, number> = {

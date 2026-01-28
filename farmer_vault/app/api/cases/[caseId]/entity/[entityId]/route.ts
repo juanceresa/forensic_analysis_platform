@@ -5,7 +5,8 @@ import type { GraphData } from '@/lib/types';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const ENTITY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+// Entity IDs can contain spaces, alphanumerics, underscores, and hyphens
+const ENTITY_ID_PATTERN = /^[A-Za-z0-9_ -]+$/;
 
 export async function GET(
   request: NextRequest,

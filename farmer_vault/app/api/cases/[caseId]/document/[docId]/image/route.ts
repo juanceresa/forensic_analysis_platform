@@ -4,7 +4,8 @@ import * as path from 'path';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-const DOC_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+// Doc IDs can contain spaces, periods, alphanumerics, underscores, and hyphens
+const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
 
 export async function GET(
   request: NextRequest,

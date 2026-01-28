@@ -4,8 +4,72 @@ from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_ocr_text(text: str) -> str:
+    """
+    Normalize OCR text for better readability.
+
+    - Joins hyphenated line breaks (word-\\n -> word)
+    - Collapses multiple newlines into paragraph breaks
+    - Joins mid-sentence line breaks into flowing text
+    - Preserves paragraph structure
+
+    Args:
+        text: Raw OCR text with excessive line breaks
+
+    Returns:
+        Normalized text with proper paragraph formatting
+    """
+    if not text:
+        return text
+
+    # Step 1: Fix hyphenated line breaks (word-\n continuation)
+    text = re.sub(r'-\s*\n\s*', '', text)
+
+    # Step 2: Normalize line endings
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    # Step 3: Collapse 3+ newlines into double newline (paragraph break)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    # Step 4: Process paragraphs - join lines within paragraphs
+    paragraphs = text.split('\n\n')
+    normalized_paragraphs = []
+
+    for para in paragraphs:
+        if not para.strip():
+            continue
+
+        # Split into lines
+        lines = para.split('\n')
+        joined_lines = []
+
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+
+            # If previous line exists and doesn't end with sentence-ending punctuation,
+            # join with space instead of newline
+            if joined_lines:
+                prev_line = joined_lines[-1]
+                # Check if previous line ends mid-sentence
+                if prev_line and not re.search(r'[.!?:;]\s*$', prev_line):
+                    # Join with previous line
+                    joined_lines[-1] = prev_line + ' ' + line
+                else:
+                    joined_lines.append(line)
+            else:
+                joined_lines.append(line)
+
+        if joined_lines:
+            normalized_paragraphs.append('\n'.join(joined_lines))
+
+    return '\n\n'.join(normalized_paragraphs)
 
 
 @dataclass
@@ -172,8 +236,11 @@ class OCRService:
 
         logger.info(f"OCR extracted {len(blocks)} blocks, confidence: {overall_confidence:.2f}")
 
+        # Normalize text for better readability
+        normalized_text = normalize_ocr_text(full_text)
+
         return OCRResult(
-            text=full_text,
+            text=normalized_text,
             confidence=overall_confidence,
             page_confidence=overall_confidence,
             blocks=blocks,

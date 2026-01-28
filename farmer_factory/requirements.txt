@@ -31,6 +31,7 @@ supabase>=2.3.0
 # Utilities
 requests>=2.31.0
 tqdm>=4.66.0  # Progress bars
+argostranslate>=1.9.0  # Local, offline translation
 
 # Development (optional)
 pytest>=7.4.0
