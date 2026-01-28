@@ -3,6 +3,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
+const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const DOC_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export async function GET(
   request: NextRequest,
@@ -11,6 +13,23 @@ export async function GET(
   try {
     const { caseId, docId } = await params;
     const decodedDocId = decodeURIComponent(docId);
+
+    // Validate caseId to prevent path traversal
+    if (!CASE_ID_PATTERN.test(caseId)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
+    const resolvedCaseDir = path.resolve(CASES_DIR, caseId);
+    const resolvedCasesRoot = path.resolve(CASES_DIR);
+    if (!resolvedCaseDir.startsWith(resolvedCasesRoot)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
+    // Validate docId (strip page suffix for validation)
+    const baseDocName = decodedDocId.replace(/_page_\d+$/, '');
+    if (!DOC_ID_PATTERN.test(baseDocName)) {
+      return NextResponse.json({ error: 'Invalid docId' }, { status: 400 });
+    }
 
     // Handle both formats: "docname" and "docname_page_0"
     // If docId already ends with _page_N, use it as-is; otherwise append _page_0
@@ -34,8 +53,7 @@ export async function GET(
       ocrText = extraction.ocr_result?.text || '';
     }
 
-    // Find matching intake file (strip _page_N suffix for matching)
-    const baseDocName = decodedDocId.replace(/_page_\d+$/, '');
+    // Find matching intake file (uses baseDocName already computed above)
     const intakeFiles = await fs.readdir(intakeDir);
     const matchingIntake = intakeFiles.find(f =>
       f.replace(/\.(pdf|jpg|png)$/i, '') === baseDocName
