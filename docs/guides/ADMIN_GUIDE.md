@@ -442,8 +442,8 @@ rsync -av ./cases/CASE-001/ ./backups/$(date +%Y-%m-%d)/CASE-001/
 ### Restore from Backup
 
 ```bash
-# Restore case
-rsync -av ./backups/2026-01-22/CASE-001/ ./cases/CASE-001/
+# Restore case from a previous backup
+rsync -av ./backups/2026-01-15/CASE-001/ ./cases/CASE-001/
 ```
 
 ---
@@ -535,4 +535,4 @@ python -m farmer_factory.cli clean CASE-XXX --confirm
 
 ---
 
-*This guide should be updated as operational procedures evolve. Last reviewed: 2026-01-22*
+*This guide should be updated as operational procedures evolve. Last reviewed: 2026-01-28*

@@ -118,9 +118,9 @@ entity_type_summary = metadata["entity_type_summary"]
 
 The exporter includes two summaries in the metadata:
 
-### Verification Summary
+### Verification Distribution
 
-Counts all entities and relations by verification tier:
+Counts all entities and relations by verification tier (field name: `verification_distribution`):
 
 ```python
 {
