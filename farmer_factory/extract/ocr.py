@@ -149,10 +149,15 @@ class OCRService:
 
         # Metadata
         metadata = {
-            "language": response.full_text_annotation.pages[0].property.detected_languages[0].language_code
-                       if response.full_text_annotation.pages and
-                          response.full_text_annotation.pages[0].property.detected_languages
-                       else "unknown",
+            "language": (
+                response.full_text_annotation.pages[0].property.detected_languages[0].language_code
+                if (
+                    response.full_text_annotation.pages
+                    and response.full_text_annotation.pages[0].property
+                    and response.full_text_annotation.pages[0].property.detected_languages
+                )
+                else "unknown"
+            ),
             "api_version": "google_cloud_vision_v1",
             "image_dimensions": {
                 "height": image.shape[0],

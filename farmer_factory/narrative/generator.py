@@ -415,7 +415,7 @@ class NarrativeGenerator:
             "document": extracted_from.split(",")[0].strip()
             if extracted_from
             else "unknown",
-            "role": entity.get("profession") or entity.get("roles", [None])[0],
+            "role": entity.get("profession") or (entity.get("roles") or [None])[0],
             "connections": [],
         }
 
