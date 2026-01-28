@@ -148,14 +148,19 @@ class OCRService:
         overall_confidence = total_confidence / block_count if block_count > 0 else 0.0
 
         # Metadata
+        detected_languages = (
+            response.full_text_annotation.pages[0].property.detected_languages
+            if (
+                response.full_text_annotation.pages
+                and response.full_text_annotation.pages[0].property
+                and response.full_text_annotation.pages[0].property.detected_languages
+            )
+            else []
+        )
         metadata = {
             "language": (
-                response.full_text_annotation.pages[0].property.detected_languages[0].language_code
-                if (
-                    response.full_text_annotation.pages
-                    and response.full_text_annotation.pages[0].property
-                    and response.full_text_annotation.pages[0].property.detected_languages
-                )
+                detected_languages[0].language_code
+                if detected_languages
                 else "unknown"
             ),
             "api_version": "google_cloud_vision_v1",
