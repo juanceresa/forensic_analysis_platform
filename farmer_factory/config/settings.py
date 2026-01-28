@@ -42,6 +42,7 @@ class Settings(BaseSettings):
 
     # Translation
     translation_enabled: bool = False  # Off by default for compliance/PII safety
+    translation_backend: str = "local"  # "local" (CTranslate2/Argos) or "gcp" (Google Cloud Translation)
     translation_target_language: str = "en"
 
     # Model Configuration

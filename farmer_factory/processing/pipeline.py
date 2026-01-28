@@ -2,6 +2,8 @@
 
 import logging
 import os
+# Work around OpenMP duplicate library issue on macOS (ctranslate2 + torch)
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import cv2
 from pathlib import Path
 from typing import Dict, Any
