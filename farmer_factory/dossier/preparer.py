@@ -826,7 +826,8 @@ Paragraph 2: What happened to the property and current documentation status."""
         """
         # Extract family surname
         full_name = family.primary_claimant.name
-        surname = full_name.split()[-1] if full_name else "Unknown"
+        name_parts = full_name.split() if full_name else []
+        surname = name_parts[-1] if name_parts else "Unknown"
 
         return f"{surname} Family Property Claim"
 

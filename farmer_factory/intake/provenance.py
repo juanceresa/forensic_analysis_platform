@@ -42,6 +42,10 @@ class ProvenanceTracker:
         Returns:
             Provenance dict with hashes, timestamps, metadata
         """
+        # Validate input
+        if not pdf_parts:
+            raise ValueError("pdf_parts cannot be empty")
+
         # Extract base filename from first part
         base_name = pdf_parts[0].stem
         if base_name.endswith('.1pdf'):
