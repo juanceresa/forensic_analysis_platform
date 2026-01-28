@@ -24,6 +24,22 @@ from .models import (
 # Export API client for direct use if needed
 from .api_client import ClaudeAPIClient
 
+# Export prompt builders for customization
+from .prompts import (
+    build_entity_prompt,
+    build_relation_prompt,
+    build_entity_prompt_zero_shot,
+    build_relation_prompt_zero_shot,
+)
+
+# Export parsers for testing
+from .parsers import (
+    parse_entity_response,
+    parse_relation_response,
+    transform_to_final_entities,
+    transform_to_final_relations,
+)
+
 __all__ = [
     # Services
     "OCRService",
@@ -47,4 +63,16 @@ __all__ = [
 
     # API Client
     "ClaudeAPIClient",
+
+    # Prompts
+    "build_entity_prompt",
+    "build_relation_prompt",
+    "build_entity_prompt_zero_shot",
+    "build_relation_prompt_zero_shot",
+
+    # Parsers
+    "parse_entity_response",
+    "parse_relation_response",
+    "transform_to_final_entities",
+    "transform_to_final_relations",
 ]
