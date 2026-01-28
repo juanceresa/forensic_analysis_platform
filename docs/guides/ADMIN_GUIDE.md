@@ -482,52 +482,24 @@ rsync -av ./backups/2026-01-15/CASE-001/ ./cases/CASE-001/
 
 ---
 
-## Translation Setup (Offline, Argos/CTranslate2)
+## Translation Setup (GCP Cloud Translation)
 
-The platform supports offline translation of non-English OCR text (e.g., Spanish → English)
-using CTranslate2 with Argos Translate model files. No network calls are made during translation.
-
-### Why Not Just `pip install argostranslate`?
-
-The Argos Python API (`argostranslate`) pulls in stanza and sentencepiece, which cause
-segfaults and OpenMP conflicts on macOS. We bypass the Argos API and call CTranslate2
-(the actual translation engine) directly with a pure-Python BPE tokenizer (`subword-nmt`).
+The platform translates non-English OCR text (e.g., Spanish → English) using
+Google Cloud Translation API (v2). Uses the same GCP credentials as OCR.
 
 ### Dependencies
 
 ```bash
-pip install ctranslate2 subword-nmt
+pip install google-cloud-translate
 ```
 
-### Install Language Model
+### Prerequisites
 
-`argospm install` may fail due to SSL certificate issues on macOS. Download manually:
+GCP credentials must be configured (same as OCR setup):
 
 ```bash
-# 1. Download the model (~270MB)
-curl -L -o /tmp/translate-es_en-1_9.argosmodel \
-  https://argos-net.com/v1/translate-es_en-1_9.argosmodel
-
-# 2. Install via Python API (argospm CLI doesn't handle local files)
-python -c "from argostranslate import package; package.install_from_path('/tmp/translate-es_en-1_9.argosmodel')"
+gcloud auth application-default login
 ```
-
-Model installs to `~/.local/share/argos-translate/packages/translate-es_en-1_9/`.
-
-**Other language pairs:** Browse the package index at
-`https://raw.githubusercontent.com/argosopentech/argospm-index/main/index.json`
-and download from `https://argos-net.com/v1/<package-name>.argosmodel`.
-
-### macOS SSL Fix (Optional)
-
-If `argospm install` gives `SSL: CERTIFICATE_VERIFY_FAILED`, Python's certificate
-store is empty. Fix:
-
-```bash
-/Applications/Python\ 3.XX/Install\ Certificates.command
-```
-
-(Replace `3.XX` with your Python version.)
 
 ### Enable Translation
 
@@ -549,39 +521,19 @@ The frontend shows an "English" tab when a translation exists.
 ### Verify Installation
 
 ```bash
-KMP_DUPLICATE_LIB_OK=TRUE python -c "
+python -c "
 from farmer_factory.extract.translator import translate_text
 print(translate_text('Hola, esto es una prueba.', source_language='es'))
 "
-# Expected: "Hey , this is a test ."
+# Expected: "Hello, this is a test."
 ```
 
-**Note:** The first call takes ~30 seconds (model loading). Subsequent calls are sub-second.
+### Cost
 
-### Architecture
-
-| Layer | Package | Role |
-|-------|---------|------|
-| Model files | Argos `.argosmodel` | Pre-trained neural translation weights |
-| Inference | `ctranslate2` | Runs the neural network on CPU |
-| Tokenizer | `subword-nmt` | BPE text tokenization (pure Python) |
-
-We do **not** use the `argostranslate` Python API at runtime — only for installing model
-packages. This avoids stanza, sentencepiece, and PyTorch dependency conflicts.
-
-### Future: Migration to GCP Cloud Translation
-
-If translation quality or volume becomes a concern, the translator can be swapped to
-Google Cloud Translation API with minimal changes:
-
-- **Quality:** GCP uses Google's production NMT models, which are significantly more
-  accurate for legal/forensic documents than Argos's open-source models.
-- **Cost:** 500k characters/month free, then $20/million characters. A 300-document
-  case is roughly $5 total.
-- **Privacy:** Same posture as OCR — documents already go to Google Cloud Vision.
-- **Migration effort:** Rewrite `TranslationService` internals in `translator.py`.
-  The `translate_text()` interface and pipeline integration stay unchanged.
-  Already have GCP credentials configured for OCR.
+- **Free tier:** 500k characters/month
+- **Paid:** $20/million characters
+- **Typical case:** A 300-document case is roughly $5 total
+- **Privacy:** Same posture as OCR — documents already go to Google Cloud Vision
 
 ---
 
