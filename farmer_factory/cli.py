@@ -127,6 +127,94 @@ def create_case(case_id: str, name: str, family: str, domain: str):
     click.echo(f"\n✓ Case {case_id} created successfully (domain: {domain})")
 
 
+@cli.command("detect-groups")
+@click.argument("case_id")
+@click.option("--force", is_flag=True, help="Overwrite existing document_groups.yaml")
+def detect_groups(case_id: str, force: bool):
+    """Detect multi-part documents and generate groupings for review.
+
+    Scans intake/ folder for filename patterns that suggest multi-part documents
+    (e.g., escritura_125_1.pdf, escritura_125_2.pdf) and generates a draft
+    document_groups.yaml for analyst review.
+
+    Example:
+        python cli.py detect-groups TEST-CERESA
+
+    After running:
+        1. Review cases/TEST-CERESA/document_groups.yaml
+        2. Edit group names and verify groupings are correct
+        3. Change status from DRAFT to CONFIRMED
+        4. Run: python cli.py process TEST-CERESA
+    """
+    from farmer_factory.intake.document_groups import (
+        detect_groups as _detect_groups,
+        generate_draft_yaml,
+        load_document_groups,
+    )
+
+    case_dir = Path("cases") / case_id
+    intake_dir = case_dir / "intake"
+
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+
+    if not intake_dir.exists():
+        raise click.ClickException(f"Intake directory not found: {intake_dir}")
+
+    # Check for existing file
+    yaml_path = case_dir / "document_groups.yaml"
+    if yaml_path.exists() and not force:
+        existing = load_document_groups(case_dir)
+        if existing and existing.is_confirmed():
+            raise click.ClickException(
+                f"document_groups.yaml already exists and is CONFIRMED.\n"
+                f"Use --force to overwrite (this will reset to DRAFT)."
+            )
+        elif existing:
+            click.echo(f"⚠️  Existing DRAFT file will be overwritten.")
+
+    # Get PDF files
+    pdf_files = sorted([f.name for f in intake_dir.glob("*.pdf")])
+
+    if not pdf_files:
+        raise click.ClickException(f"No PDF files found in {intake_dir}/")
+
+    click.echo(f"\nScanning {len(pdf_files)} PDF files in {intake_dir}/...")
+
+    # Detect groups
+    groups, standalone = _detect_groups(pdf_files)
+
+    # Generate YAML
+    yaml_path = generate_draft_yaml(case_dir, groups, standalone)
+
+    # Report results
+    click.echo(f"\n{'=' * 60}")
+    click.echo("Document Group Detection Results")
+    click.echo(f"{'=' * 60}")
+
+    if groups:
+        click.echo(f"\n📁 Detected {len(groups)} document group(s):\n")
+        for base_name, files in sorted(groups.items()):
+            click.echo(f"  {base_name}:")
+            for f in files:
+                click.echo(f"    - {f}")
+    else:
+        click.echo("\n📄 No multi-part documents detected.")
+
+    if standalone:
+        click.echo(f"\n📄 {len(standalone)} standalone file(s)")
+
+    click.echo(f"\n✓ Draft written to: {yaml_path}")
+    click.echo("\n" + "=" * 60)
+    click.echo("NEXT STEPS:")
+    click.echo("=" * 60)
+    click.echo(f"\n  1. Review: {yaml_path}")
+    click.echo("  2. Edit group names to be descriptive")
+    click.echo("  3. Verify groupings are correct")
+    click.echo("  4. Change 'status: DRAFT' to 'status: CONFIRMED'")
+    click.echo(f"  5. Run: python cli.py process {case_id}")
+
+
 @cli.command()
 @click.argument("case_id")
 @click.option("--verbose", is_flag=True, help="Verbose output")
@@ -158,6 +246,27 @@ def process(
 
     # Set up domain configuration
     setup_domain(domain)
+
+    # Check for document groups configuration
+    case_dir = Path("cases") / case_id
+    from farmer_factory.intake.document_groups import load_document_groups
+
+    doc_groups = load_document_groups(case_dir)
+    if doc_groups and not doc_groups.is_confirmed():
+        click.echo("\n❌ Document groups are in DRAFT status.")
+        click.echo(f"\nPlease review and confirm: {case_dir / 'document_groups.yaml'}")
+        click.echo("\nTo proceed:")
+        click.echo("  1. Open the file and verify groupings are correct")
+        click.echo("  2. Change 'status: DRAFT' to 'status: CONFIRMED'")
+        click.echo(f"  3. Re-run: python cli.py process {case_id}")
+        click.echo("\nOr delete document_groups.yaml to process without groupings.")
+        raise click.ClickException("Document groups not confirmed")
+
+    if doc_groups and doc_groups.is_confirmed():
+        logger.info(
+            f"Using document groups: {len(doc_groups.groups)} groups, "
+            f"{len(doc_groups.standalone)} standalone"
+        )
 
     if single_file:
         logger.info(f"Processing case: {case_id}, file: {single_file}")

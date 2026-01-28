@@ -1,7 +1,8 @@
 """Graph builder for constructing knowledge graph from extraction results."""
 
 from datetime import datetime
-from typing import List, Dict, Any, TYPE_CHECKING
+from pathlib import Path
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import logging
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.structure.resolver import DedupeEntityResolver
@@ -10,6 +11,7 @@ from farmer_factory.structure.postprocessor import GraphPostProcessor
 
 if TYPE_CHECKING:
     from farmer_factory.extract import ExtractionResult
+    from farmer_factory.intake.document_groups import DocumentGroupsConfig
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +29,69 @@ class GraphBuilder:
         """
         self.graph = knowledge_graph
         self.resolver = resolver
+        self.document_groups: Optional["DocumentGroupsConfig"] = None
+        self._file_to_group_id: Dict[str, str] = {}  # Maps filename to group doc ID
         self.processing_stats: Dict[str, int] = {
             "documents_processed": 0,
             "entities_extracted": 0,
             "entities_merged": 0,
-            "relations_added": 0
+            "relations_added": 0,
+            "document_groups_used": 0,
         }
+
+    def set_document_groups(self, config: "DocumentGroupsConfig") -> None:
+        """
+        Set document groupings configuration.
+
+        Args:
+            config: DocumentGroupsConfig with confirmed groupings
+        """
+        self.document_groups = config
+
+        # Build file-to-group mapping for quick lookups
+        self._file_to_group_id = {}
+        for group in config.groups:
+            group_doc_id = f"doc_{group.id}"
+            for filename in group.files:
+                self._file_to_group_id[filename] = group_doc_id
+                # Also map without extension for flexibility
+                stem = Path(filename).stem
+                self._file_to_group_id[stem] = group_doc_id
+
+        logger.info(
+            f"Document groups configured: {len(config.groups)} groups, "
+            f"{len(self._file_to_group_id)} file mappings"
+        )
+
+    def _get_document_id_for_file(self, file_ref: str) -> str:
+        """
+        Get the document ID for a file, using group ID if part of a group.
+
+        Args:
+            file_ref: Filename or document reference
+
+        Returns:
+            Document ID (group ID if grouped, original ID otherwise)
+        """
+        if not self.document_groups:
+            return file_ref
+
+        # Try exact match first
+        if file_ref in self._file_to_group_id:
+            return self._file_to_group_id[file_ref]
+
+        # Try stem (without extension)
+        stem = Path(file_ref).stem
+        if stem in self._file_to_group_id:
+            return self._file_to_group_id[stem]
+
+        # Try common variations
+        for suffix in ["_page_0", "_page_1", "_page_2"]:
+            base = file_ref.replace(suffix, "")
+            if base in self._file_to_group_id:
+                return self._file_to_group_id[base]
+
+        return file_ref
 
     def add_extraction(self, extraction: "ExtractionResult") -> None:
         """
@@ -56,8 +115,20 @@ class GraphBuilder:
         # Track ID remappings when entities are merged
         id_remapping: Dict[str, str] = {}
 
+        # Remap extracted_from to group document ID if applicable
+        group_doc_id = None
+        if extraction.entities:
+            original_ref = extraction.entities[0].extracted_from
+            group_doc_id = self._get_document_id_for_file(original_ref)
+
         # Process entities
         for entity in extraction.entities:
+            # Update extracted_from to reference group document if applicable
+            if group_doc_id and group_doc_id != entity.extracted_from:
+                # Create updated entity with remapped extracted_from
+                entity_dict = entity.model_dump()
+                entity_dict["extracted_from"] = group_doc_id
+                entity = entity.__class__(**entity_dict)
             self.processing_stats["entities_extracted"] += 1
 
             # Check if similar entity exists
@@ -119,6 +190,9 @@ class GraphBuilder:
         """
         Create a DOCUMENT entity for the source document.
 
+        If the file is part of a document group, creates/updates a unified
+        DOCUMENT entity for the group instead of individual file entities.
+
         Args:
             extraction: ExtractionResult containing document metadata
         """
@@ -126,29 +200,70 @@ class GraphBuilder:
         metadata = extraction.processing_metadata or {}
         ocr_metadata = metadata.get("ocr_metadata", {})
 
-        # Get document ID from the first entity's extracted_from field, or construct from metadata
-        doc_id = None
+        # Get original file reference from the first entity's extracted_from field
+        original_file_ref = None
         if extraction.entities:
-            doc_id = extraction.entities[0].extracted_from
+            original_file_ref = extraction.entities[0].extracted_from
 
-        if not doc_id:
-            # Fallback: try to construct from metadata
-            doc_id = metadata.get("document_id", f"doc_{self.processing_stats['documents_processed']}")
+        if not original_file_ref:
+            original_file_ref = metadata.get(
+                "document_id", f"doc_{self.processing_stats['documents_processed']}"
+            )
 
-        # Check if document already exists (avoid duplicates for multi-page docs)
-        if self.graph.get_entity(doc_id):
-            logger.debug(f"Document entity already exists: {doc_id}")
+        # Determine the actual document ID (may be group ID)
+        doc_id = self._get_document_id_for_file(original_file_ref)
+        is_grouped = doc_id != original_file_ref
+
+        # Check if document already exists (avoid duplicates for multi-page/grouped docs)
+        existing_doc = self.graph.get_entity(doc_id)
+        if existing_doc:
+            # For grouped documents, update source_files list
+            if is_grouped and "source_files" in existing_doc:
+                if original_file_ref not in existing_doc["source_files"]:
+                    existing_doc["source_files"].append(original_file_ref)
+                    existing_doc["page_count"] = len(existing_doc["source_files"])
+                    self.graph.graph.nodes[doc_id].update(existing_doc)
+                    logger.debug(f"Updated grouped document {doc_id} with file {original_file_ref}")
+            else:
+                logger.debug(f"Document entity already exists: {doc_id}")
             return
 
-        # Determine document type from ID pattern or metadata
-        doc_type = self._infer_document_type(doc_id)
+        # Get group metadata if available
+        group_name = None
+        group_doc_type = None
+        group_date = None
+        source_files = [original_file_ref]
 
-        # Extract date from OCR metadata if available
-        doc_date = metadata.get("llm_metadata", {}).get("document_date")
+        if is_grouped and self.document_groups:
+            for group in self.document_groups.groups:
+                if f"doc_{group.id}" == doc_id:
+                    group_name = group.name
+                    group_doc_type = group.document_type
+                    group_date = group.date
+                    source_files = group.files.copy()
+                    self.processing_stats["document_groups_used"] += 1
+                    break
+
+        # Determine document type from group config, ID pattern, or metadata
+        doc_type = group_doc_type or self._infer_document_type(doc_id)
+
+        # Extract date from group config, OCR metadata, or LLM metadata
+        doc_date = group_date or metadata.get("llm_metadata", {}).get("document_date")
 
         # Calculate confidence from extraction
         confidence_scores = extraction.confidence_scores or {}
         confidence = confidence_scores.get("combined_confidence", 0.8)
+
+        # Build title
+        if group_name:
+            title = group_name
+        else:
+            title = self._extract_title_from_id(doc_id)
+
+        # Build notes
+        notes = "Document entity auto-created from extraction"
+        if is_grouped:
+            notes = f"Unified document from {len(source_files)} files"
 
         # Create DOCUMENT entity
         doc_entity = Document(
@@ -156,20 +271,25 @@ class GraphBuilder:
             verification=Verification(
                 tier=VerificationTier.TIER_3_AI,
                 confidence=confidence,
-                notes="Document entity auto-created from extraction"
+                notes=notes,
             ),
             extracted_from=doc_id,
-            title=self._extract_title_from_id(doc_id),
+            title=title,
             document_type=doc_type,
             date=doc_date,
-            file_path=doc_id,  # Use doc_id as file reference
-            page_count=1,
+            file_path=source_files[0] if source_files else doc_id,
+            page_count=len(source_files),
             ocr_text=extraction.ocr_result.text if extraction.ocr_result else None,
         )
 
         self.graph.add_entity(doc_entity)
+
+        # Store source_files as additional node attribute for grouped docs
+        if is_grouped and len(source_files) > 1:
+            self.graph.graph.nodes[doc_id]["source_files"] = source_files
+
         self.processing_stats["entities_extracted"] += 1
-        logger.info(f"Created DOCUMENT entity: {doc_id}")
+        logger.info(f"Created DOCUMENT entity: {doc_id}" + (" (grouped)" if is_grouped else ""))
 
     def _infer_document_type(self, doc_id: str) -> str:
         """Infer document type from document ID patterns."""

@@ -1,7 +1,7 @@
 # Farmer House Forensic Intelligence Platform — Implementation Roadmap
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.7.0
+> **Version:** 1.8.0
 > **Last Updated:** 2026-01-27
 > **Status:** MVP1 Planning (with dependencies and acceptance criteria)
 
@@ -886,12 +886,14 @@ farmer_factory/
 │   ├── ocr_postprocess.py    [ ]
 │   ├── entity_extractor.py   [ ]
 │   ├── relation_extractor.py [ ]
-│   └── summarizer.py         [ ]
+│   ├── summarizer.py         [ ]
+│   └── chunker.py            [✓] # NEW - Document text chunking (5000-char, 10% overlap)
 ├── structure/
-│   ├── schema.py             [✓] # Complete
-│   ├── graph_builder.py      [✓] # Complete
-│   ├── resolver.py           [ ] # NEW - Dedupe-based entity resolution
-│   ├── models/               [ ] # NEW - Trained dedupe models (*.pkl)
+│   ├── schema.py             [✓] # Complete (includes LocationNature, OrganizationNature enums)
+│   ├── graph_builder.py      [✓] # Complete (integrates postprocessor)
+│   ├── resolver.py           [✓] # Complete - Dedupe-based entity resolution
+│   ├── postprocessor.py      [✓] # NEW - Graph post-processing (transitive redundancy, validation)
+│   ├── models/               [ ] # Trained dedupe models (*.pkl)
 │   └── ~~gap_detector.py~~   [x] # DEFERRED to analyst workflow
 ├── narrative/                [✓] # NEW - Narrative generation module
 │   ├── __init__.py           [✓]
@@ -944,6 +946,19 @@ farmer_factory/
     ├── retry.py              [ ] # NEW - Retry with backoff
     ├── cost_tracker.py       [ ] # NEW - API cost logging
     └── supabase_uploader.py  [ ] # NEW - Upload to Supabase Storage
+
+tests/
+├── extract/
+│   └── test_chunker.py       [✓] # Document chunking tests (9 tests)
+├── structure/
+│   └── test_postprocessor.py [✓] # Post-processing tests (9 tests)
+├── golden/                   [✓] # Golden standard evaluation
+│   ├── __init__.py
+│   ├── data/
+│   │   ├── sample_escritura.txt
+│   │   └── expected_extraction.json
+│   └── test_golden_evaluation.py  # Extraction quality tests (7 tests)
+└── ...                       # Existing test modules
 ```
 
 ### Vault (Next.js)
@@ -1185,6 +1200,140 @@ success_definition:
 ### Risks
 - MEDIUM: Config complexity becomes unwieldy → Mitigation: Start simple, add features as needed
 - LOW: Breaking changes to MVP → Mitigation: Domain config should produce identical behavior for Cuban case
+
+---
+
+## Phase 9A: Academic KG Improvements
+
+### Status: ✅ COMPLETE (2026-01-27)
+
+### Overview
+Knowledge graph optimizations inspired by the Chilean dictatorship KG paper (arXiv:2408.11975). Implements research-backed improvements for document processing, graph quality, and extraction evaluation.
+
+**Implementation Plan:** `docs/plans/2026-01-27-academic-kg-improvements.md`
+
+### Tasks
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 9A.1 | `extract/chunker.py` | ✅ | Document text chunking (5000-char, 10% overlap) |
+| 9A.2 | `extract/llm.py` | ✅ | Chunking integration for long documents |
+| 9A.3 | `structure/postprocessor.py` | ✅ | Transitive redundancy removal |
+| 9A.4 | `structure/postprocessor.py` | ✅ | Location hierarchy validation with cycle detection |
+| 9A.5 | `structure/builder.py` | ✅ | Postprocessor integration |
+| 9A.6 | `structure/schema.py` | ✅ | LocationNature, OrganizationNature enums |
+| 9A.7 | `tests/golden/` | ✅ | Golden standard evaluation dataset |
+
+### Implementation Details
+
+**Document Chunking (Chilean KG Paper Optimal Parameters):**
+- Chunk size: 5000 characters
+- Overlap ratio: 10%
+- Sentence boundary detection for clean splits
+- Metadata tracking (chunk index, original positions)
+- Entity merging across chunks with deduplication
+
+**Graph Post-Processing:**
+- Transitive redundancy removal for LOCATED_IN relations
+- Self-loop removal
+- Dry-run mode for impact analysis
+- Location hierarchy validation (detects cycles, hierarchy violations)
+
+**Entity Disambiguation Enums:**
+```python
+class LocationNature(str, Enum):
+    ADMINISTRATIVE = "ADMINISTRATIVE"  # Political/jurisdictional
+    GEOGRAPHIC = "GEOGRAPHIC"          # Physical features
+    PROPERTY = "PROPERTY"              # Named estates/fincas
+
+class OrganizationNature(str, Enum):
+    GOVERNMENT = "GOVERNMENT"
+    BUSINESS = "BUSINESS"
+    RELIGIOUS = "RELIGIOUS"
+    PROFESSIONAL = "PROFESSIONAL"
+```
+
+**Golden Standard Evaluation:**
+- Sample notarial document (Escritura Publica)
+- Expected extraction output with entities/relations
+- 7 tests for extraction quality metrics
+
+### Files Created
+```
+farmer_factory/
+├── extract/
+│   └── chunker.py              ✅ TextChunker class
+└── structure/
+    └── postprocessor.py        ✅ GraphPostProcessor class
+
+tests/
+├── extract/
+│   └── test_chunker.py         ✅ 9 tests
+├── structure/
+│   └── test_postprocessor.py   ✅ 9 tests
+└── golden/
+    ├── __init__.py             ✅
+    ├── data/
+    │   ├── sample_escritura.txt
+    │   └── expected_extraction.json
+    └── test_golden_evaluation.py  ✅ 7 tests
+```
+
+### Test Coverage
+- 25 new tests added (all passing)
+- Chunker: boundary detection, overlap, reconstruction
+- Postprocessor: transitive removal, self-loops, cycle detection, hierarchy validation
+- Golden: extraction quality evaluation framework
+
+### Next Steps
+- EVENT entity type implementation (see design doc)
+- Extraction fine-tuning based on golden test results
+
+---
+
+## Phase 9B: Document Grouping
+
+### Status: ✅ COMPLETE (2026-01-27)
+
+### Overview
+Multi-part document handling for cases where a single logical document is split across multiple PDF files (e.g., `escritura_125_1.pdf`, `escritura_125_2.pdf`).
+
+### Workflow
+```
+1. Analyst adds PDFs to intake/
+2. CLI auto-detects groupings: detect-groups CASE-ID
+3. Analyst reviews document_groups.yaml (DRAFT)
+4. Analyst confirms: status: CONFIRMED
+5. Process creates unified DOCUMENT entities per group
+```
+
+### Tasks
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 9B.1 | `intake/document_groups.py` | ✅ | Pattern detection, YAML generation |
+| 9B.2 | `cli.py detect-groups` | ✅ | CLI command with reporting |
+| 9B.3 | `cli.py process` | ✅ | DRAFT status blocking |
+| 9B.4 | `structure/builder.py` | ✅ | Unified DOCUMENT entities |
+| 9B.5 | Tests | ✅ | 21 tests for grouping logic |
+
+### Detection Patterns
+- `foo_1.pdf, foo_2.pdf` (numbered suffix)
+- `foo_a.pdf, foo_b.pdf` (letter suffix)
+- `foo (1).pdf, foo (2).pdf` (parenthesis)
+- `foo-1.pdf, foo-2.pdf` (hyphen)
+- `fooP1.pdf, fooP2.pdf` (page indicator)
+
+### Safety Rails
+- `process` refuses if `document_groups.yaml` is DRAFT
+- Validation catches missing/unaccounted files
+- Backward compatible (no YAML = all standalone)
+
+### Files Created
+```
+farmer_factory/intake/document_groups.py   # Core logic
+tests/intake/test_document_groups.py       # 21 tests
+```
 
 ---
 

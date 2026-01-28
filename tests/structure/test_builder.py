@@ -26,7 +26,8 @@ def test_builder_initialization():
         "documents_processed": 0,
         "entities_extracted": 0,
         "entities_merged": 0,
-        "relations_added": 0
+        "relations_added": 0,
+        "document_groups_used": 0,
     }
 
 
