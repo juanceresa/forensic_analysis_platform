@@ -2,8 +2,6 @@
 
 import logging
 import os
-# Work around OpenMP duplicate library issue on macOS (ctranslate2 + torch)
-os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import cv2
 from pathlib import Path
 from typing import Dict, Any
@@ -224,7 +222,7 @@ def process_case(
                     detected_lang = ocr_metadata.get('language', 'unknown')
 
                     if needs_translation(detected_lang):
-                        logger.info(f"    Translating from {detected_lang} via Argos...")
+                        logger.info(f"    Translating from {detected_lang} via GCP...")
                         ocr_text = extraction.ocr_result.text if extraction.ocr_result else ""
                         translated = translate_text(
                             ocr_text,
@@ -239,7 +237,7 @@ def process_case(
                             translated_path.write_text(translated, encoding='utf-8')
                             logger.info(f"    Translation saved: {translated_path.name}")
                         else:
-                            logger.warning("    Translation unavailable (missing Argos packages?)")
+                            logger.warning("    Translation unavailable (missing GCP credentials?)")
             except Exception as e:
                 logger.warning(f"Failed to translate OCR text: {e}")
 

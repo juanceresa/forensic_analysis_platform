@@ -32,7 +32,7 @@ extract/
 ├── ocr.py                 # Google Cloud Vision OCR + text normalization
 ├── vision.py              # Vision API extraction (stub)
 ├── validator.py           # Schema validation
-├── translator.py          # Translation service (local CTranslate2 or GCP)
+├── translator.py          # Translation service (GCP Cloud Translation)
 ├── pipeline.py            # Extraction pipeline orchestration
 └── prompts/               # Prompt builders (package)
     ├── __init__.py        # Public exports
@@ -248,17 +248,9 @@ hints = get_relation_extraction_hints()
 
 ## Translation (`translator.py`)
 
-Translates non-English OCR text to English during processing. Two backends available:
+Translates non-English OCR text to English during processing using Google Cloud Translation API (v2).
 
-| Backend | Setting | Pros | Cons |
-|---------|---------|------|------|
-| **Local** (default) | `TRANSLATION_BACKEND=local` | Free, offline, no PII exposure | Lower quality, 30s model load |
-| **GCP** | `TRANSLATION_BACKEND=gcp` | Higher quality, fast | 500k chars/month free, then $20/M chars |
-
-### Architecture
-
-- **Local:** CTranslate2 engine + subword-nmt BPE tokenizer + Argos model files. Bypasses the Argos Python API (stanza/sentencepiece cause segfaults on macOS).
-- **GCP:** Google Cloud Translation API v2. Same credential setup as OCR.
+Free tier: 500k characters/month, then $20/million characters. Uses same GCP credentials as OCR.
 
 ### Usage
 
@@ -301,12 +293,14 @@ python -m pytest tests/extract/test_llm.py::test_entity_extraction -v
 
 ## Version History
 
+**v1.5.1 (2026-01-28):**
+- Removed local Argos/CTranslate2 translation backend (poor quality on legal text)
+- GCP Cloud Translation is now the only backend
+
 **v1.5.0 (2026-01-28):**
-- Added `translator.py` with dual-backend translation (local CTranslate2 + GCP)
-- Local backend bypasses Argos Python API, uses CTranslate2 + subword-nmt directly
+- Added `translator.py` with GCP Cloud Translation
 - Added OCR text normalization (`normalize_ocr_text`) in `ocr.py`
 - Translation integrated into processing pipeline with feature flag
-- Language code prefix fallback (e.g., `es-419` → `es`)
 
 **v1.4.0 (2026-01-27):**
 - **Zero-shot prompts as default** (more effective and ~50% cheaper)
