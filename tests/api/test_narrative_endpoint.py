@@ -71,6 +71,40 @@ def test_endpoint_handles_missing_params():
     assert result["type"] == "bad_request"
 
 
+def test_endpoint_rejects_invalid_case_id():
+    """Test endpoint rejects path traversal attempts in case_id."""
+    request_data = {
+        "clicked_node_id": "person_001",
+        "session_id": "sess_123"
+    }
+
+    # Test path traversal attempt
+    result = generate_narrative_endpoint(
+        case_id="../etc/passwd",
+        request_data=request_data
+    )
+
+    assert result["status_code"] == 400
+    assert result["type"] == "bad_request"
+    assert "Invalid case_id" in result["error"]
+
+
+def test_endpoint_rejects_case_id_with_slashes():
+    """Test endpoint rejects case IDs with directory separators."""
+    request_data = {
+        "clicked_node_id": "person_001",
+        "session_id": "sess_123"
+    }
+
+    result = generate_narrative_endpoint(
+        case_id="case/admin",
+        request_data=request_data
+    )
+
+    assert result["status_code"] == 400
+    assert result["type"] == "bad_request"
+
+
 def test_endpoint_handles_cost_limit_exceeded(mock_graph, mock_generator):
     """Test endpoint handles cost limit errors."""
     from farmer_factory.narrative.exceptions import SessionCostLimitExceeded

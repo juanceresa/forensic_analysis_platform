@@ -12,6 +12,7 @@ from typing import Any
 
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.structure.schema import VerificationTier
+from farmer_factory.utils import validate_case_id
 
 from .models import (
     DossierData,
@@ -64,7 +65,14 @@ class DossierPreparer:
         Args:
             case_id: Case identifier
             case_path: Path to case directory (defaults to cases/{case_id})
+
+        Raises:
+            ValueError: If case_id is invalid (prevents path traversal)
         """
+        # Validate case_id to prevent path traversal
+        if not validate_case_id(case_id):
+            raise ValueError(f"Invalid case_id: {case_id}")
+
         self.case_id = case_id
         self.case_path = case_path or Path(f"cases/{case_id}")
         self._extractions_cache: dict[str, dict] = {}

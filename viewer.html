@@ -227,20 +227,35 @@
                         showPanel(node);
                     });
 
+                // HTML escape function to prevent XSS
+                function escapeHtml(text) {
+                    if (text === null || text === undefined) return '';
+                    const str = String(text);
+                    const div = document.createElement('div');
+                    div.textContent = str;
+                    return div.innerHTML;
+                }
+
                 // Panel display
                 function showPanel(node) {
                     const panel = document.getElementById('panel');
                     const content = document.getElementById('panel-content');
 
+                    // Validate and sanitize entity_type (only allow expected values)
+                    const validEntityTypes = ['PERSON', 'LOCATION', 'PROPERTY', 'ORGANIZATION', 'DOCUMENT'];
+                    const entityType = validEntityTypes.includes(node.entity_type) ? node.entity_type : 'UNKNOWN';
+                    const entityTypeClass = entityType.toLowerCase().replace(/[^a-z]/g, '');
+
                     let html = `
-                        <span class="entity-type type-${node.entity_type.toLowerCase()}">${node.entity_type}</span>
+                        <span class="entity-type type-${entityTypeClass}">${escapeHtml(entityType)}</span>
                         <br>
                     `;
 
-                    // Verification badge
-                    const tier = node.verification?.tier || 'TIER_3_AI';
-                    const tierClass = tier.toLowerCase().replace(/_/g, '-');
-                    html += `<span class="badge badge-${tierClass}">${tier.replace('TIER_', 'Tier ')}</span>`;
+                    // Verification badge - validate tier value
+                    const validTiers = ['TIER_3_AI', 'TIER_2_ANALYST', 'TIER_2_INSTITUTIONAL', 'TIER_1_CERTIFIED'];
+                    const tier = validTiers.includes(node.verification?.tier) ? node.verification.tier : 'TIER_3_AI';
+                    const tierClass = tier.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+                    html += `<span class="badge badge-${tierClass}">${escapeHtml(tier.replace('TIER_', 'Tier '))}</span>`;
                     html += `<br><br>`;
 
                     // Entity fields
@@ -252,8 +267,8 @@
                         if (value && value !== '' && value.length > 0) {
                             html += `
                                 <div class="field">
-                                    <div class="field-label">${key.replace(/_/g, ' ')}</div>
-                                    <div class="field-value">${formatValue(value)}</div>
+                                    <div class="field-label">${escapeHtml(key.replace(/_/g, ' '))}</div>
+                                    <div class="field-value">${escapeHtml(formatValue(value))}</div>
                                 </div>
                             `;
                         }
@@ -262,9 +277,12 @@
                     // Verification details
                     if (node.verification) {
                         html += `<br><div class="field-label">Verification Details</div>`;
-                        html += `<div class="field-value">Confidence: ${(node.verification.confidence * 100).toFixed(0)}%</div>`;
+                        const confidence = typeof node.verification.confidence === 'number' 
+                            ? (node.verification.confidence * 100).toFixed(0) 
+                            : '0';
+                        html += `<div class="field-value">Confidence: ${escapeHtml(confidence)}%</div>`;
                         if (node.verification.verified_by) {
-                            html += `<div class="field-value">Verified by: ${node.verification.verified_by}</div>`;
+                            html += `<div class="field-value">Verified by: ${escapeHtml(node.verification.verified_by)}</div>`;
                         }
                     }
 
@@ -274,12 +292,12 @@
 
                 function formatValue(value) {
                     if (Array.isArray(value)) {
-                        return value.join(', ');
+                        return value.map(v => String(v)).join(', ');
                     }
                     if (typeof value === 'object' && value !== null) {
                         return JSON.stringify(value, null, 2);
                     }
-                    return value;
+                    return String(value);
                 }
 
                 // Close panel on background click
