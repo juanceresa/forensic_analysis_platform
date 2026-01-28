@@ -5,34 +5,19 @@ from typing import List, Dict, Any, Optional
 from difflib import SequenceMatcher
 import logging
 import time
-import uuid
 
 from farmer_factory.structure.schema import BaseEntity, Relation
-from farmer_factory.extract.models import (
-    PersonExtraction,
-    PropertyExtraction,
-    OrganizationExtraction,
-    LocationExtraction,
-    StructuredEntityExtractionResult,
-    TemporalInfo,
-    ExtractedRelation,
-    RelationExtractionResult,
-)
 from farmer_factory.extract.api_client import ClaudeAPIClient
 from farmer_factory.extract.chunker import TextChunker
-from farmer_factory.domains import domain_registry
 from farmer_factory.extract.prompts import (
     build_entity_prompt,
     build_relation_prompt,
-    get_temporal_relations,
-    get_state_relations,
 )
 from farmer_factory.extract.parsers import (
     parse_entity_response,
     parse_relation_response,
     transform_to_final_entities,
     transform_to_final_relations,
-    apply_temporal_logic,
 )
 
 # Chunk threshold from Chilean KG paper (arXiv:2408.11975)
