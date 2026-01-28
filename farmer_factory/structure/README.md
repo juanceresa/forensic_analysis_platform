@@ -178,7 +178,7 @@ else:
 Interactive training session:
 
 ```bash
-python cli.py train-deduplication CASE-ID --entity-type PERSON
+python -m farmer_factory.cli train-deduplication CASE-ID --entity-type PERSON
 ```
 
 Trains using active learning:
@@ -459,8 +459,8 @@ python -m pytest tests/structure/test_builder.py -v
 python -m pytest tests/structure/test_graph.py -v
 
 # Integration test
-python cli.py process TEST-CERESA --force-typed
-python cli.py train-deduplication TEST-CERESA --entity-type PERSON
+python -m farmer_factory.cli process TEST-CERESA --force-typed
+python -m farmer_factory.cli train-deduplication TEST-CERESA --entity-type PERSON
 ```
 
 ---

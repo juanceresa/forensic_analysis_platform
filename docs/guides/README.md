@@ -1,6 +1,6 @@
 # Operational Guides
 
-> **Last Updated:** 2026-01-25
+> **Last Updated:** 2026-01-28
 
 User guides for operating the Civic Table platform.
 
@@ -13,14 +13,15 @@ User guides for operating the Civic Table platform.
   - Creating cases via CLI
   - Processing documents
   - Managing user access
-  - Uploading to Supabase
+  - Troubleshooting common issues
 
 ### Analyst Guide
 - **ANALYST_GUIDE.md** - Analyst workflow and verification
+  - Document intake and grouping
   - Reviewing AI-extracted entities
   - Promoting TIER_3_AI → TIER_2_ANALYST
   - Quality assurance procedures
-  - Working with the Vault UI
+  - Generating client dossiers
 
 ---
 
