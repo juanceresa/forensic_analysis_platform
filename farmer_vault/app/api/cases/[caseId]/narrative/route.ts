@@ -3,6 +3,10 @@ import { spawn } from 'child_process';
 import { join } from 'path';
 import type { NarrativeResult, NarrativeError } from '@/lib/types';
 
+const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const NODE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 const STATUS_BY_TYPE: Record<string, number> = {
   cost_limit: 402,
   insufficient_data: 422,
@@ -19,12 +23,32 @@ export async function POST(
     const body = await request.json();
     const { clicked_node_id, session_id, max_cost } = body;
 
+    // Validate caseId to prevent path traversal and injection
+    if (!CASE_ID_PATTERN.test(caseId)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
     // Validate required fields
     if (!clicked_node_id || !session_id) {
       return NextResponse.json(
         { error: 'Missing clicked_node_id or session_id' },
         { status: 400 }
       );
+    }
+
+    // Validate clicked_node_id format
+    if (!NODE_ID_PATTERN.test(clicked_node_id)) {
+      return NextResponse.json({ error: 'Invalid clicked_node_id' }, { status: 400 });
+    }
+
+    // Validate session_id format
+    if (!SESSION_ID_PATTERN.test(session_id)) {
+      return NextResponse.json({ error: 'Invalid session_id' }, { status: 400 });
+    }
+
+    // Validate max_cost if provided
+    if (max_cost !== undefined && (typeof max_cost !== 'number' || max_cost < 0 || max_cost > 100)) {
+      return NextResponse.json({ error: 'Invalid max_cost' }, { status: 400 });
     }
 
     // Call Python script

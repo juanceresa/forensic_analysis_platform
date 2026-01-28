@@ -4,6 +4,8 @@ import * as path from 'path';
 import type { GraphData } from '@/lib/types';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
+const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const ENTITY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export async function GET(
   request: NextRequest,
@@ -12,12 +14,29 @@ export async function GET(
   try {
     const { caseId, entityId } = await params;
 
+    // Validate caseId to prevent path traversal
+    if (!CASE_ID_PATTERN.test(caseId)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
+    const resolvedCaseDir = path.resolve(CASES_DIR, caseId);
+    const resolvedCasesRoot = path.resolve(CASES_DIR);
+    if (!resolvedCaseDir.startsWith(resolvedCasesRoot)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
+    // Validate entityId
+    const decodedEntityId = decodeURIComponent(entityId);
+    if (!ENTITY_ID_PATTERN.test(decodedEntityId)) {
+      return NextResponse.json({ error: 'Invalid entityId' }, { status: 400 });
+    }
+
     const graphDataPath = path.join(CASES_DIR, caseId, 'output', 'graph_data.json');
     const graphDataContent = await fs.readFile(graphDataPath, 'utf-8');
     const graphData: GraphData = JSON.parse(graphDataContent);
 
     // Find the entity
-    const entity = graphData.nodes.find(n => n.id === decodeURIComponent(entityId));
+    const entity = graphData.nodes.find(n => n.id === decodedEntityId);
 
     if (!entity) {
       return NextResponse.json(
@@ -26,8 +45,8 @@ export async function GET(
       );
     }
 
-    // Find source documents (from extracted_from field)
-    const sourceDocIds = entity.extracted_from.split(',').map(s => s.trim());
+    // Find source documents (from extracted_from field) with null-safety
+    const sourceDocIds = entity.extracted_from?.split(',').map(s => s.trim()) || [];
     const sourceDocuments = sourceDocIds.map(docId => ({
       id: docId,
       filename: `${docId}.pdf`, // Simplified for now

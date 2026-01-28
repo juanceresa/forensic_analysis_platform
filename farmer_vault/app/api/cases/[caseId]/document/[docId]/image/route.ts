@@ -3,6 +3,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
+const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+const DOC_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export async function GET(
   request: NextRequest,
@@ -12,8 +14,24 @@ export async function GET(
     const { caseId, docId } = await params;
     const decodedDocId = decodeURIComponent(docId);
 
+    // Validate caseId to prevent path traversal
+    if (!CASE_ID_PATTERN.test(caseId)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
+    const resolvedCaseDir = path.resolve(CASES_DIR, caseId);
+    const resolvedCasesRoot = path.resolve(CASES_DIR);
+    if (!resolvedCaseDir.startsWith(resolvedCasesRoot)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
     // Strip _page_N suffix to get base document name
     const baseDocName = decodedDocId.replace(/_page_\d+$/, '');
+
+    // Validate docId to prevent path traversal
+    if (!DOC_ID_PATTERN.test(baseDocName)) {
+      return NextResponse.json({ error: 'Invalid docId' }, { status: 400 });
+    }
 
     const intakeDir = path.join(CASES_DIR, caseId, 'intake');
 
