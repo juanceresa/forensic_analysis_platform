@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
+const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 export async function GET(
   request: NextRequest,
@@ -10,6 +11,17 @@ export async function GET(
 ) {
   try {
     const { caseId } = await params;
+
+    // Validate caseId to prevent traversal
+    if (!CASE_ID_PATTERN.test(caseId)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
+
+    const resolvedCaseDir = path.resolve(CASES_DIR, caseId);
+    const resolvedCasesRoot = path.resolve(CASES_DIR);
+    if (!resolvedCaseDir.startsWith(resolvedCasesRoot)) {
+      return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
+    }
 
     const extractionsDir = path.join(CASES_DIR, caseId, 'extractions');
     const intakeDir = path.join(CASES_DIR, caseId, 'intake');
@@ -24,14 +36,16 @@ export async function GET(
         const content = await fs.readFile(extractionPath, 'utf-8');
         const extraction = JSON.parse(content);
 
-        // Extract document ID (filename without _page_0.json)
-        const docId = filename.replace('_page_0.json', '');
+        // Extract document ID (strip page suffixes and extension)
+        const baseName = filename.replace(/\.json$/i, '');
+        const docId = baseName.replace(/_page_\d+$/i, '');
 
         // Try to find matching intake file
         const intakeFiles = await fs.readdir(intakeDir);
-        const matchingIntake = intakeFiles.find(f =>
-          f.replace(/\.(pdf|jpg|png)$/i, '') === docId
-        );
+        const matchingIntake = intakeFiles.find((f) => {
+          const intakeBase = f.replace(/\.(pdf|jpg|png)$/i, '');
+          return intakeBase === docId;
+        });
 
         // Extract date from processing metadata or filename
         let date: string | null = null;

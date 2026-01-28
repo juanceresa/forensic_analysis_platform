@@ -13,11 +13,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VisionExtractionResult:
     """Result from vision-based entity extraction."""
-    entities: List[BaseEntity]   # Extracted entities (Pydantic models)
-    relations: List[Relation]    # Extracted relations
-    confidence: float            # Overall extraction confidence
-    reasoning: str               # Claude's reasoning for extractions
-    metadata: Dict[str, Any]     # Vision model metadata
+
+    entities: List[BaseEntity]  # Extracted entities (Pydantic models)
+    relations: List[Relation]  # Extracted relations
+    confidence: float  # Overall extraction confidence
+    reasoning: str  # Claude's reasoning for extractions
+    metadata: Dict[str, Any]  # Vision model metadata
 
 
 class VisionExtractionService:
@@ -34,9 +35,7 @@ class VisionExtractionService:
         self.api_key = api_key
 
     def extract_from_image(
-        self,
-        image: np.ndarray,
-        document_id: str
+        self, image: np.ndarray, document_id: str
     ) -> VisionExtractionResult:
         """
         Extract entities directly from handwritten image using mocked Claude Vision API.
@@ -53,7 +52,11 @@ class VisionExtractionService:
             Real implementation would call Anthropic Claude Vision API.
         """
         from farmer_factory.structure.schema import (
-            Person, Property, EntityType, VerificationTier, Verification
+            Person,
+            Property,
+            VerificationTier,
+            Verification,
+            Relation,
         )
 
         # MOCKED: Simulate vision-based entity extraction
@@ -78,13 +81,13 @@ class VisionExtractionService:
             confidence=base_confidence,
             verified_by=None,
             verified_at=None,
-            notes=None
+            notes=None,
         )
 
         # Mock Person entity
         person = Person(
             id=f"{document_id}_person_1",
-            entity_type=EntityType.PERSON,
+            entity_type="PERSON",
             name="Juan Pérez García",
             alternate_names=["J. Pérez"],
             birth_date="1920-03-15",
@@ -93,36 +96,34 @@ class VisionExtractionService:
             roles=["owner"],
             verification=verification,
             extracted_from=document_id,
-            notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
+            notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)",
         )
 
         # Mock Property entity
         property_entity = Property(
             id=f"{document_id}_property_1",
-            entity_type=EntityType.PROPERTY,
+            entity_type="PROPERTY",
             name="Casa en Miramar",
             property_type="residential",
             location_id=None,
-            area_sq_meters=250.0,
+            area=250.0,
             registry_number="REG-1958-0042",
             verification=verification,
             extracted_from=document_id,
-            notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)"
+            notes="⚠️ MOCK DATA - Simulated extraction for testing (no API configured)",
         )
 
         entities = [person, property_entity]
 
         # Mock relations
-        from farmer_factory.structure.schema import Relation, RelationType
-
         relation = Relation(
             id=f"{document_id}_rel_1",
-            type=RelationType.OWNS,
+            type="OWNS",
             source_id=person.id,
             target_id=property_entity.id,
             verification=verification,
             document_id=document_id,
-            notes="⚠️ MOCK DATA - Simulated relation for testing (no API configured)"
+            notes="⚠️ MOCK DATA - Simulated relation for testing (no API configured)",
         )
 
         relations = [relation]
@@ -144,11 +145,8 @@ class VisionExtractionService:
             "model": "claude-vision-mocked",
             "api_version": "mocked_v1",
             "processing_time_ms": 1500,
-            "image_dimensions": {
-                "height": image.shape[0],
-                "width": image.shape[1]
-            },
-            "image_quality_score": contrast_score
+            "image_dimensions": {"height": image.shape[0], "width": image.shape[1]},
+            "image_quality_score": contrast_score,
         }
 
         return VisionExtractionResult(
@@ -156,5 +154,5 @@ class VisionExtractionService:
             relations=relations,
             confidence=base_confidence,
             reasoning=reasoning,
-            metadata=metadata
+            metadata=metadata,
         )
