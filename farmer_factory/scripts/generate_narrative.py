@@ -21,6 +21,7 @@ from farmer_factory.narrative.exceptions import (
     SessionCostLimitExceeded,
     InsufficientGraphData
 )
+from farmer_factory.utils import validate_case_id
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,6 +39,10 @@ def main():
     args = parser.parse_args()
 
     try:
+        # Validate case_id to prevent path traversal
+        if not validate_case_id(args.case_id):
+            raise ValueError(f"Invalid case_id: {args.case_id}")
+
         # Load graph
         graph_path = Path(f"cases/{args.case_id}/output/graph_data.json")
         if not graph_path.exists():

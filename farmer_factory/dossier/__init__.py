@@ -30,6 +30,7 @@ from .models import (
     VerificationStats,
     STANDARD_DISCLAIMER,
 )
+from farmer_factory.utils import validate_case_id
 
 __all__ = [
     "generate_dossier",
@@ -66,7 +67,14 @@ def generate_dossier(
 
     Returns:
         Path to generated PDF (or .tex if dry_run=True)
+
+    Raises:
+        ValueError: If case_id is invalid (prevents path traversal)
     """
+    # Validate case_id to prevent path traversal
+    if not validate_case_id(case_id):
+        raise ValueError(f"Invalid case_id: {case_id}")
+
     # Import here to avoid circular imports
     from .preparer import DossierPreparer
     from .renderer import DossierRenderer

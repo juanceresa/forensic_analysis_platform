@@ -10,6 +10,7 @@ from farmer_factory.narrative.exceptions import (
     SessionCostLimitExceeded,
     InsufficientGraphData
 )
+from farmer_factory.utils import validate_case_id
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +62,10 @@ def generate_narrative_endpoint(
     """
     # Generate narrative
     try:
+        # Validate case_id to prevent path traversal
+        if not validate_case_id(case_id):
+            raise ValueError(f"Invalid case_id: {case_id}")
+
         # Validate request
         clicked_node_id = request_data.get("clicked_node_id")
         session_id = request_data.get("session_id")

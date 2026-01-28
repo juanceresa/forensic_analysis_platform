@@ -1194,3 +1194,113 @@ export async function GET(
 ---
 
 *This document defines the security posture for the Farmer House Forensic Intelligence Platform. All implementation must adhere to these guidelines. Security is not optional.*
+
+---
+
+## Security Review Findings (2026-01-28)
+
+This section documents findings from the comprehensive security review conducted on the codebase.
+
+### Vulnerabilities Identified and Fixed
+
+#### 1. Path Traversal Vulnerability in Python Backend (FIXED)
+
+**Severity:** HIGH
+
+**Description:**
+Multiple Python modules constructed file paths by directly interpolating user-supplied `case_id` values without validation. This could allow an attacker to access files outside the intended `cases/` directory by supplying malicious case IDs like `../etc/passwd`.
+
+**Affected Files:**
+- `farmer_factory/api/narrative.py`
+- `farmer_factory/scripts/generate_narrative.py`
+- `farmer_factory/dossier/__init__.py`
+- `farmer_factory/dossier/preparer.py`
+
+**Fix Applied:**
+Created `farmer_factory/utils/__init__.py` with validation functions:
+- `validate_case_id(case_id)` - Returns True/False for valid alphanumeric case IDs
+- `get_safe_case_path(case_id, base_dir)` - Returns validated Path or raises ValueError
+- `CASE_ID_PATTERN` - Regex pattern `^[A-Za-z0-9_-]+$` for validation
+
+All affected modules now validate case_id before constructing paths:
+
+```python
+from farmer_factory.utils import validate_case_id
+
+if not validate_case_id(case_id):
+    raise ValueError(f"Invalid case_id: {case_id}")
+```
+
+**Note:** The TypeScript API routes in `farmer_vault/` already had this protection via `CASE_ID_PATTERN` regex validation and `path.resolve()` checks. The Python backend now has equivalent defense-in-depth protection.
+
+#### 2. DOM-based XSS Vulnerability in viewer.html (FIXED)
+
+**Severity:** MEDIUM
+
+**Description:**
+The `viewer.html` file used `innerHTML` to render entity data from `graph_data.json` without HTML escaping. If an attacker could inject malicious content into the graph data (e.g., through a compromised LLM extraction), it could execute arbitrary JavaScript.
+
+**Location:** `viewer.html` - `showPanel()` function
+
+**Fix Applied:**
+- Added `escapeHtml()` function using DOM-based encoding
+- All user-controlled values are now escaped before rendering
+- Entity types and verification tiers are validated against allowlists
+- CSS class names are sanitized to only allow alphanumeric characters
+
+```javascript
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    const str = String(text);
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+```
+
+### Security Patterns Already Present
+
+The codebase already implements several security best practices:
+
+1. **TypeScript API Route Input Validation:**
+   - All routes validate `caseId`, `docId`, `entityId` with regex patterns
+   - Path resolution checks prevent directory traversal
+   - Example from `farmer_vault/app/api/cases/[caseId]/graph/route.ts`
+
+2. **Parameterized Claude API Calls:**
+   - The `ClaudeAPIClient` uses the official Anthropic SDK
+   - No string interpolation in API parameters
+
+3. **Subprocess Safety:**
+   - `compiler.py` validates LaTeX engine against a fixed allowlist
+   - No shell=True or user-controlled command arguments
+
+4. **No SQL Injection Vectors:**
+   - No raw SQL with string interpolation found
+   - Future Supabase integration should use parameterized queries
+
+5. **Secrets Management:**
+   - API keys loaded from environment variables
+   - `.env.example` documents required secrets without values
+   - No hardcoded credentials in codebase
+
+### Recommendations for Future Development
+
+#### Immediate (Before Production)
+
+1. **Implement Authentication:** Deploy Clerk authentication as documented in this file
+2. **Add Rate Limiting:** Implement rate limiting on all API endpoints
+3. **Enable Security Headers:** Add CSP, HSTS, X-Frame-Options headers to Next.js config
+4. **Audit Logging:** Implement audit logs for document access
+
+#### Short-term
+
+1. **Input Validation Schema:** Consider using Zod for runtime validation of API inputs
+2. **Dependency Auditing:** Set up automated dependency scanning (Dependabot/Snyk)
+3. **Penetration Testing:** Conduct third-party security assessment before launch
+
+#### Long-term
+
+1. **SOC 2 Compliance:** Document and implement controls for certification
+2. **Bug Bounty Program:** Consider HackerOne program post-launch
+3. **Security Training:** Ensure all developers complete secure coding training
