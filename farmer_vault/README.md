@@ -78,8 +78,10 @@ graph_data.json    →    /api/cases/[caseId]/*    →    Page Components
 |------|-------------|-------|
 | `TIER_3_AI` | AI-extracted, not verified | Grey |
 | `TIER_2_ANALYST` | Analyst verified | Amber |
-| `TIER_1_CERTIFIED` | Certified | Blue |
-| `TIER_4_SOURCE` | Source document | Purple |
+| `TIER_2_INSTITUTIONAL` | Farmer House verified | Gold with FH badge |
+| `TIER_1_CERTIFIED` | Legally certified | Blue |
+
+**Note:** `TIER_4_SOURCE` is a frontend-only display tier used for source document entities in the UI.
 
 ## Tech Stack
 

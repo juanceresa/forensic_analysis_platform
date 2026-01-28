@@ -2,7 +2,7 @@
 
 > **Document Classification:** Internal Engineering Reference
 > **Version:** 1.1.0
-> **Last Updated:** 2025-01-21
+> **Last Updated:** 2026-01-21
 > **Status:** PLANNING PHASE — MVP1 (with OCR baseline established)
 
 ---
@@ -239,7 +239,8 @@ In MVP1:
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   SUPABASE STORAGE UPLOAD                           │
 │                                                                     │
-│   • CLI command: python cli.py upload CASE-001                     │
+│   • CLI command: python -m farmer_factory.cli upload CASE-001      │
+│     (Note: upload command is planned but not yet implemented)       │
 │   • Uploads graph_data.json to Supabase Storage bucket             │
 │   • Path: case-graphs/CASE-001/graph_data.json                     │
 │   • RLS ensures only authorized users can access                   │

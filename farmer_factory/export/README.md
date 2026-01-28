@@ -33,7 +33,21 @@ The exported `graph_data.json` follows this structure:
     "entity_count": 150,
     "relation_count": 220,
     "document_count": 12,
-    "processing_stats": {}
+    "processing_stats": {},
+    "verification_distribution": {
+      "TIER_3_AI": 280,
+      "TIER_2_ANALYST": 45,
+      "TIER_2_INSTITUTIONAL": 10,
+      "TIER_1_CERTIFIED": 5
+    },
+    "entity_type_summary": {
+      "PERSON": 50,
+      "PROPERTY": 40,
+      "ORGANIZATION": 20,
+      "LOCATION": 30,
+      "DOCUMENT": 10
+    },
+    "date_range": null
   },
   "nodes": [
     {
@@ -48,7 +62,7 @@ The exported `graph_data.json` follows this structure:
       ...
     }
   ],
-  "edges": [
+  "links": [
     {
       "source": "person_123",
       "target": "property_456",
@@ -60,23 +74,11 @@ The exported `graph_data.json` follows this structure:
       },
       ...
     }
-  ],
-  "verification_summary": {
-    "TIER_3_AI": 280,
-    "TIER_2_ANALYST": 45,
-    "TIER_2_INSTITUTIONAL": 10,
-    "TIER_1_CERTIFIED": 5
-  },
-  "entity_type_summary": {
-    "PERSON": 50,
-    "PROPERTY": 40,
-    "ORGANIZATION": 20,
-    "LOCATION": 30,
-    "DOCUMENT": 10
-  },
-  "date_range": null
+  ]
 }
 ```
+
+**Note:** The export format uses `links` (not `edges`) and includes `verification_distribution` and `entity_type_summary` under `metadata`.
 
 ## Usage
 
@@ -107,18 +109,18 @@ data = exporter.export_to_dict(factory_version="1.0.0")
 # Access components
 metadata = data["metadata"]
 nodes = data["nodes"]
-edges = data["edges"]
-verification_summary = data["verification_summary"]
-entity_type_summary = data["entity_type_summary"]
+links = data["links"]
+verification_distribution = metadata["verification_distribution"]
+entity_type_summary = metadata["entity_type_summary"]
 ```
 
 ## Summaries
 
-The exporter generates two summaries:
+The exporter includes two summaries in the metadata:
 
-### Verification Summary
+### Verification Distribution
 
-Counts all entities and relations by verification tier:
+Counts all entities and relations by verification tier (field name: `verification_distribution`):
 
 ```python
 {

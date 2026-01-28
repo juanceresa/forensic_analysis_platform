@@ -1,6 +1,6 @@
 # Architecture Documentation
 
-> **Last Updated:** 2026-01-25
+> **Last Updated:** 2026-01-28
 
 This directory contains high-level architecture and design documentation for the Civic Table platform.
 
@@ -12,6 +12,7 @@ This directory contains high-level architecture and design documentation for the
 - **ARCHITECTURE.md** - System design, Air Gap architecture, zones A & B
 - **SECURITY.md** - Authentication, authorization, audit logging
 - **TESTING.md** - Testing strategy, quality assurance, test coverage
+- **DOMAIN_CONFIGURATION.md** - Multi-domain support and configuration system
 
 ### Domain Architecture
 - **POSTURING.md** - Organizational strategy, Farmer House vs Civic Table
@@ -25,6 +26,7 @@ This directory contains high-level architecture and design documentation for the
 - Entity extraction: `farmer_factory/extract/PROMPTS.md`
 - Graph schema: `farmer_factory/structure/SCHEMA.md`
 - Image preprocessing: `farmer_factory/prepare/PREPROCESSING.md`
+- Domain configuration: `farmer_factory/domains/README.md`
 
 **For Claude Code instructions:**
 - Master file: `.claude/CLAUDE.md`

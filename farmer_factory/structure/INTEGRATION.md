@@ -7,7 +7,7 @@ Complete end-to-end integration with prepare and extract modules.
 ```python
 from farmer_factory.prepare import PreprocessingPipeline
 from farmer_factory.extract import ExtractionPipeline, OCRService, VisionExtractionService, LLMExtractionService, SchemaValidator
-from farmer_factory.structure import KnowledgeGraph, EntityResolver, GraphBuilder, GraphExporter
+from farmer_factory.structure import KnowledgeGraph, DedupeEntityResolver, GraphBuilder, GraphExporter
 from pathlib import Path
 import cv2
 
@@ -22,7 +22,7 @@ extract_pipeline = ExtractionPipeline(
 
 # Initialize graph builder
 graph = KnowledgeGraph(case_id="case_001")
-resolver = EntityResolver(similarity_threshold=0.85)
+resolver = DedupeEntityResolver(threshold=0.5)
 builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
 
 # Process multiple documents
@@ -50,7 +50,9 @@ print(f"Added {builder.processing_stats['relations_added']} relations")
 ## Key Features
 
 **Entity Deduplication:**
-- Fuzzy name matching (configurable threshold, default 0.85)
+- ML-based entity resolution using dedupe library
+- Multi-attribute matching (name + birth_date + residence + profession)
+- Configurable threshold (default 0.5)
 - Automatic merge when similarity detected
 - Conflict resolution with provenance tracking
 
@@ -67,8 +69,8 @@ print(f"Added {builder.processing_stats['relations_added']} relations")
 
 ## Tests
 
-All 55 tests passing:
-- EntityResolver: 12 tests (fuzzy matching, merging, conflicts)
-- GraphBuilder: 5 tests (initialization, extraction, batch)
-- GraphExporter: 9 tests (date normalization, JSON export, file save)
-- Existing: 29 tests (schema, graph operations)
+Run structure module tests:
+
+```bash
+python -m pytest tests/structure/ -v
+```
