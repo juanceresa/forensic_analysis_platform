@@ -106,7 +106,13 @@ function EntitySection({
 
 export function EntityBrowser({ entities, totalCount, documentCount, caseId }: EntityBrowserProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState<keyof GroupedEntities | null>(null);
   const entityTypes: (keyof GroupedEntities)[] = ['PERSON', 'PROPERTY', 'ORGANIZATION', 'LOCATION', 'DOCUMENT'];
+
+  // Only show types that have entities
+  const availableTypes = useMemo(() => {
+    return entityTypes.filter(type => (entities[type] || []).length > 0);
+  }, [entities]);
 
   // Filter entities by search term across all groups
   // Always normalize to ensure all entity types exist (API may omit empty types)
@@ -145,12 +151,47 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
                        text-slate-100 placeholder-slate-500 font-mono text-sm
                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
-          {searchTerm && (
-            <p className="mt-2 text-sm text-slate-500">
-              Showing {filteredCount} of {totalCount} entities
-            </p>
-          )}
         </div>
+
+        {/* Type filter chips */}
+        {availableTypes.length > 1 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500 font-mono mr-1">Filter:</span>
+            <button
+              onClick={() => setSelectedType(null)}
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors
+                focus-visible:ring-2 focus-visible:ring-blue-500
+                ${
+                  selectedType === null
+                    ? 'bg-blue-600 border-blue-500 text-white'
+                    : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                }`}
+            >
+              All
+            </button>
+            {availableTypes.map(type => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors
+                  focus-visible:ring-2 focus-visible:ring-blue-500
+                  ${
+                    selectedType === type
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                  }`}
+              >
+                {ENTITY_TYPE_CONFIG[type].label} ({(entities[type] || []).length})
+              </button>
+            ))}
+          </div>
+        )}
+
+        {(searchTerm || selectedType) && (
+          <p className="mt-2 text-sm text-slate-500">
+            Showing {filteredCount} of {totalCount} entities
+          </p>
+        )}
       </header>
 
       {totalCount === 0 ? (
@@ -159,16 +200,16 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
         </div>
       ) : filteredCount === 0 ? (
         <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
-          <p className="text-slate-500 font-mono text-sm">No entities match your search</p>
+          <p className="text-slate-500 font-mono text-sm">No entities match your filters</p>
           <button
-            onClick={() => setSearchTerm('')}
+            onClick={() => { setSearchTerm(''); setSelectedType(null); }}
             className="mt-2 text-sm text-blue-400 hover:text-blue-300"
           >
-            Clear search
+            Clear filters
           </button>
         </div>
       ) : (
-        entityTypes.map(type => (
+        (selectedType ? [selectedType] : entityTypes).map(type => (
           <EntitySection
             key={type}
             type={type}

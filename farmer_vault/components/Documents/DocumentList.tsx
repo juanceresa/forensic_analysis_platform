@@ -135,9 +135,38 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
           />
         </div>
 
-        {/* Type filter chips */}
-        {documentTypes.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+        {/* Sort controls */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-slate-500 font-mono mr-2">Sort by:</span>
+          <button
+            onClick={() => { setSortBy('date'); setSelectedType(null); }}
+            className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
+              focus-visible:ring-2 focus-visible:ring-blue-500
+              ${
+                sortBy === 'date'
+                  ? 'bg-slate-800 border-slate-600 text-slate-100'
+                  : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+              }`}
+          >
+            By Date
+          </button>
+          <button
+            onClick={() => setSortBy('type')}
+            className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
+              focus-visible:ring-2 focus-visible:ring-blue-500
+              ${
+                sortBy === 'type'
+                  ? 'bg-slate-800 border-slate-600 text-slate-100'
+                  : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+              }`}
+          >
+            By Type
+          </button>
+        </div>
+
+        {/* Type filter chips (only when sorting by type) */}
+        {sortBy === 'type' && documentTypes.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-sm text-slate-500 font-mono mr-1">Filter:</span>
             <button
               onClick={() => setSelectedType(null)}
@@ -168,35 +197,6 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
             ))}
           </div>
         )}
-
-        {/* Sort controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500 font-mono mr-2">Sort by:</span>
-          <button
-            onClick={() => setSortBy('date')}
-            className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
-              focus-visible:ring-2 focus-visible:ring-blue-500
-              ${
-                sortBy === 'date'
-                  ? 'bg-slate-800 border-slate-600 text-slate-100'
-                  : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
-              }`}
-          >
-            By Date
-          </button>
-          <button
-            onClick={() => setSortBy('type')}
-            className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
-              focus-visible:ring-2 focus-visible:ring-blue-500
-              ${
-                sortBy === 'type'
-                  ? 'bg-slate-800 border-slate-600 text-slate-100'
-                  : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
-              }`}
-          >
-            By Type
-          </button>
-        </div>
       </header>
 
       {/* Document grid */}
