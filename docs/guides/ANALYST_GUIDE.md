@@ -1,7 +1,7 @@
 # Analyst Verification Guide — Civic Table Platform
 
 > **Document Classification:** Internal Operations Manual
-> **Version:** 1.2.0
+> **Version:** 1.3.0
 > **Created:** 2025-01-22
 > **Last Updated:** 2026-01-27
 > **Audience:** Civic Table Analysts
@@ -37,6 +37,140 @@ This guide covers verification procedures for promoting entities from **TIER_3_A
 | `TIER_1_CERTIFIED` | Legally Certified | Not your responsibility (external legal bodies) |
 
 **Your Goal:** Convert as many TIER_3_AI entities as possible to TIER_2_ANALYST while maintaining high accuracy.
+
+---
+
+## Document Intake Workflow
+
+Before verification can begin, documents must be loaded and processed. This section covers your role in preparing documents for processing.
+
+### Step 1: Load Documents into Intake
+
+1. **Receive documents from client:**
+   - Usually via Google Drive or secure file share
+   - Documents are scanned PDFs of historical records
+
+2. **Copy PDFs to case intake folder:**
+   ```
+   cases/CASE-ID/intake/
+   ├── escritura_125_1.pdf
+   ├── escritura_125_2.pdf
+   ├── testamento.pdf
+   └── ...all PDFs here...
+   ```
+
+3. **Verify all expected documents are present**
+   - Check against client's document list
+   - Note any missing items
+
+---
+
+### Step 2: Detect Document Groups
+
+**Why this matters:** Clients often scan multi-page documents as separate PDFs (e.g., `deed_1.pdf`, `deed_2.pdf`, `deed_3.pdf`). These need to be treated as ONE logical document for proper evidence tracking.
+
+**Run detection:**
+```bash
+python3 -m farmer_factory.cli detect-groups CASE-ID
+```
+
+**What happens:**
+- Scans filenames for patterns like `name_1.pdf`, `name_2.pdf`
+- Generates `cases/CASE-ID/document_groups.yaml` with suggested groupings
+- Status is set to `DRAFT` (blocks processing until you confirm)
+
+**Example output:**
+```
+Detected 2 document group(s):
+
+  escritura_125:
+    - escritura_125_1.pdf
+    - escritura_125_2.pdf
+    - escritura_125_3.pdf
+
+  testamento:
+    - testamento_a.pdf
+    - testamento_b.pdf
+
+4 standalone file(s)
+
+Written to: cases/CASE-ID/document_groups.yaml (DRAFT)
+```
+
+---
+
+### Step 3: Review & Confirm Groupings
+
+**Open the generated YAML file:**
+```yaml
+status: DRAFT  # ← Change to CONFIRMED when done
+
+groups:
+  - id: escritura_125
+    name: "escritura_125"  # ← Edit to be descriptive
+    # document_type:  # ← Optional: notarial_deed, registry_certificate
+    # date:  # ← Optional: YYYY-MM-DD
+    files:
+      - escritura_125_1.pdf
+      - escritura_125_2.pdf
+      - escritura_125_3.pdf
+
+standalone:
+  - random_letter.pdf
+```
+
+**Your review tasks:**
+
+| Task | What to Check |
+|------|---------------|
+| **Verify groupings** | Are these files really parts of ONE document? |
+| **Fix wrong groups** | Move files to `standalone` if wrongly grouped |
+| **Add missing groups** | Manually add groups the auto-detect missed |
+| **Edit names** | Change `"escritura_125"` to `"Escritura Pública No. 125"` |
+| **Add metadata** | Add `document_type` and `date` if known |
+| **Confirm** | Change `status: DRAFT` to `status: CONFIRMED` |
+
+**Why confirmation is required:**
+- Processing will be **blocked** if status is DRAFT
+- This prevents accidental wrong groupings from corrupting the graph
+- You are the quality gate
+
+---
+
+### Step 4: Process Documents
+
+Once groupings are confirmed (or if no groupings needed):
+
+```bash
+python3 -m farmer_factory.cli process CASE-ID --force-typed --domain cuban_property
+```
+
+**What happens:**
+- Each PDF is OCR'd and extracted separately
+- Grouped files become ONE unified DOCUMENT entity
+- All entities from grouped files reference the same document ID
+- Graph is built with proper provenance
+
+**After processing:**
+- Review graph in Vault
+- Begin verification workflow (next section)
+
+---
+
+### No Groupings Needed?
+
+If auto-detect finds no groups and all files are standalone:
+- You can delete `document_groups.yaml` entirely
+- Or change status to `CONFIRMED` with empty groups
+- Processing will proceed treating each PDF as separate document
+
+```yaml
+status: CONFIRMED
+groups: []
+standalone:
+  - doc1.pdf
+  - doc2.pdf
+```
 
 ---
 

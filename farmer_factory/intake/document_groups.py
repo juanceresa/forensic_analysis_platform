@@ -24,6 +24,10 @@ logger = logging.getLogger(__name__)
 # Patterns for detecting multi-part documents
 # Each pattern captures (base_name, sequence_indicator)
 GROUPING_PATTERNS = [
+    # foo.1pdf.pdf, foo.2pdf.pdf (common scan naming)
+    re.compile(r"^(.+?)\.(\d+)pdf\.pdf$", re.IGNORECASE),
+    # foo 1.pdf, foo 2.pdf (space before number)
+    re.compile(r"^(.+?)\s+(\d+)\.pdf$", re.IGNORECASE),
     # foo_1.pdf, foo_2.pdf, foo_3.pdf
     re.compile(r"^(.+?)_(\d+)\.pdf$", re.IGNORECASE),
     # foo_a.pdf, foo_b.pdf, foo_c.pdf
