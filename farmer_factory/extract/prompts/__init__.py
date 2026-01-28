@@ -25,10 +25,10 @@ __all__ = [
     "get_temporal_relations",
     "get_state_relations",
     "ocr_quality_description",
-    # Few-shot prompts (current)
-    "build_entity_prompt",
-    "build_relation_prompt",
-    # Zero-shot prompts (cost-optimized)
+    # Zero-shot prompts (default - more effective and cost-efficient)
     "build_entity_prompt_zero_shot",
     "build_relation_prompt_zero_shot",
+    # Few-shot prompts (kept for reference, not used by default)
+    "build_entity_prompt",
+    "build_relation_prompt",
 ]

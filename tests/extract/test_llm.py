@@ -70,26 +70,6 @@ def test_llm_service_initialization():
     assert service_with_key is not None
 
 
-def test_llm_service_prompt_mode():
-    """Test LLMExtractionService supports prompt_mode parameter."""
-    # Default is few_shot
-    service_default = LLMExtractionService()
-    assert service_default.prompt_mode == "few_shot"
-
-    # Explicit few_shot
-    service_few = LLMExtractionService(prompt_mode="few_shot")
-    assert service_few.prompt_mode == "few_shot"
-
-    # Zero-shot
-    service_zero = LLMExtractionService(prompt_mode="zero_shot")
-    assert service_zero.prompt_mode == "zero_shot"
-
-    # Invalid mode raises error
-    import pytest
-    with pytest.raises(ValueError):
-        LLMExtractionService(prompt_mode="invalid")
-
-
 def test_extract_from_ocr_text():
     """Test LLM extraction from OCR text (mocked)."""
 

@@ -1,8 +1,8 @@
 # Extract Module
 
-> **Version:** 1.3.0
+> **Version:** 1.4.0
 > **Last Updated:** 2026-01-27
-> **Status:** Domain-aware extraction
+> **Status:** Zero-shot extraction (domain-aware)
 
 Entity and relation extraction from OCR text using Claude API with domain-specific configuration.
 
@@ -12,10 +12,11 @@ Entity and relation extraction from OCR text using Claude API with domain-specif
 
 This module handles:
 - OCR text processing (Google Cloud Vision)
-- Structured entity extraction (Claude API with domain-specific prompts)
+- Structured entity extraction (Claude API with zero-shot prompts)
 - Relation extraction with domain-configured extraction hints
 - Schema validation with Pydantic against domain-defined types
 - **Domain-aware processing** - entity/relation types loaded from domain config
+- **Zero-shot prompts** - More effective and ~50% cheaper than few-shot
 
 ---
 
@@ -26,10 +27,17 @@ extract/
 ├── models.py              # Pydantic models for extraction schemas
 ├── api_client.py          # Claude API client with retry logic
 ├── llm.py                 # LLM extraction service (main interface)
+├── parsers.py             # Response parsing and entity transformation
+├── chunker.py             # Document text chunking for long documents
 ├── ocr.py                 # Google Cloud Vision OCR
 ├── vision.py              # Vision API extraction (stub)
 ├── validator.py           # Schema validation
-└── pipeline.py            # Extraction pipeline orchestration
+├── pipeline.py            # Extraction pipeline orchestration
+└── prompts/               # Prompt builders (package)
+    ├── __init__.py        # Public exports
+    ├── helpers.py         # Domain-aware helper functions
+    ├── zero_shot.py       # Zero-shot prompts (default)
+    └── few_shot.py        # Few-shot prompts (kept for reference)
 ```
 
 ---
@@ -81,7 +89,7 @@ response = client.call_with_retry(
 
 ### 3. LLM Extraction Service (`llm.py`)
 
-Main interface for entity and relation extraction:
+Main interface for entity and relation extraction. Uses **zero-shot prompts** by default (more effective and ~50% cheaper than few-shot based on A/B testing).
 
 ```python
 from farmer_factory.extract import LLMExtractionService
@@ -109,6 +117,25 @@ relations = service.extract_relations(
   for temporal fallbacks when needed
 - Invalid relation types are skipped without dropping valid relations
 - Extraction results are validated via `SchemaValidator` before returning
+
+### 4. Response Parsers (`parsers.py`)
+
+Handles parsing of Claude API responses and transformation to final entities:
+
+```python
+from farmer_factory.extract.parsers import (
+    parse_entity_response,      # JSON → StructuredEntityExtractionResult
+    parse_relation_response,    # JSON → RelationExtractionResult
+    transform_to_final_entities,  # Intermediate → BaseEntity list
+    transform_to_final_relations, # Intermediate → Relation list
+)
+```
+
+**Features:**
+- Graceful error handling (returns empty results with notes, never raises)
+- JSON extraction from markdown code blocks
+- Validation against Pydantic models
+- Entity name matching for relation linkage (exact, alternate names, fuzzy)
 
 ---
 
@@ -243,6 +270,15 @@ python -m pytest tests/extract/test_llm.py::test_entity_extraction -v
 ---
 
 ## Version History
+
+**v1.4.0 (2026-01-27):**
+- **Zero-shot prompts as default** (more effective and ~50% cheaper)
+- Refactored prompts into package (`prompts/`) with helpers, few_shot, zero_shot modules
+- Extracted parsing logic to `parsers.py`
+- Removed `prompt_mode` parameter (zero-shot only)
+- Fixed null coercion bugs for list fields and `TemporalInfo.ongoing`
+- Added manifest generation to processing pipeline
+- Added `generate-manifest` CLI command for existing cases
 
 **v1.3.0 (2026-01-27):**
 - Added domain-aware extraction

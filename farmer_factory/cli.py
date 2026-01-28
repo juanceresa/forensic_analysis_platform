@@ -734,5 +734,59 @@ def list_domains():
             click.echo(f"  {domain_code}: (failed to load)")
 
 
+@cli.command("generate-manifest")
+@click.argument("case_id")
+def generate_manifest(case_id: str):
+    """Generate manifest.json from existing processed files.
+
+    Use this for cases that were processed before manifest generation was added.
+    Scans the ocr/ directory to discover processed documents.
+
+    Example:
+        python cli.py generate-manifest TEST-CERESA
+    """
+    from farmer_factory.intake import ManifestManager
+
+    case_dir = Path("cases") / case_id
+
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+
+    ocr_dir = case_dir / "ocr"
+    if not ocr_dir.exists():
+        raise click.ClickException(f"No OCR directory found. Run 'process' first.")
+
+    # Discover documents from OCR files
+    ocr_files = sorted(ocr_dir.glob("*.txt"))
+    if not ocr_files:
+        raise click.ClickException(f"No OCR text files found in {ocr_dir}")
+
+    click.echo(f"\nGenerating manifest for: {case_id}")
+    click.echo(f"Found {len(ocr_files)} processed documents")
+
+    manifest = ManifestManager(case_id)
+
+    for ocr_file in ocr_files:
+        document_id = ocr_file.stem
+        # Derive original filename (best guess - add .pdf extension)
+        filename = document_id.replace("_page_0", "") + ".pdf"
+
+        manifest.add_document(
+            document_id=document_id,
+            filename=filename,
+            status="success",
+            part_count=1,
+            page_count=1,  # Each OCR file is one page
+        )
+
+    manifest_path = case_dir / "manifest.json"
+    manifest.save_manifest(manifest_path)
+
+    summary = manifest.get_summary()
+    click.echo(f"\n✓ Manifest saved: {manifest_path}")
+    click.echo(f"  Documents: {summary['total_documents']}")
+    click.echo(f"  Successful: {summary['successful']}")
+
+
 if __name__ == "__main__":
     cli()

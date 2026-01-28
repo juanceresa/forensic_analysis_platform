@@ -1,9 +1,9 @@
 # Farmer House Forensic Intelligence Platform — LLM Prompts Specification
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.2.0
-> **Last Updated:** 2026-01-25
-> **Status:** MVP1 Prompts (with structured entity extraction)
+> **Version:** 1.3.0
+> **Last Updated:** 2026-01-27
+> **Status:** Zero-shot prompts (production)
 
 ---
 
@@ -12,6 +12,26 @@
 This document defines all LLM prompts used in Zone A (The Factory) for entity extraction, relation extraction, and document summarization. All prompts are designed for use with Anthropic's Claude API.
 
 **Critical Principle:** All prompts extract **Forensic Facts** — what the document says. They do NOT make legal conclusions, claim assessments, or strategic recommendations.
+
+---
+
+## Prompt Strategy: Zero-Shot (Default)
+
+As of v1.4.0, the extraction module uses **zero-shot prompts** exclusively:
+
+- **More effective:** A/B testing showed zero-shot extracted 6x more entities
+- **~50% cheaper:** Shorter prompts = fewer input tokens
+- **Based on research:** Chilean KG paper (arXiv:2408.11975) methodology
+
+The few-shot prompts are kept in `farmer_factory/extract/prompts/few_shot.py` for reference but are not used by the extraction service.
+
+**Prompt files:**
+```
+farmer_factory/extract/prompts/
+├── helpers.py      # Domain-aware helper functions
+├── zero_shot.py    # Zero-shot prompts (used by LLMExtractionService)
+└── few_shot.py     # Few-shot prompts (kept for reference)
+```
 
 ---
 

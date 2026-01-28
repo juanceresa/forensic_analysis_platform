@@ -887,7 +887,13 @@ farmer_factory/
 │   ├── entity_extractor.py   [ ]
 │   ├── relation_extractor.py [ ]
 │   ├── summarizer.py         [ ]
-│   └── chunker.py            [✓] # NEW - Document text chunking (5000-char, 10% overlap)
+│   ├── chunker.py            [✓] # Document text chunking (5000-char, 10% overlap)
+│   ├── parsers.py            [✓] # NEW - Response parsing and entity transformation
+│   └── prompts/              [✓] # NEW - Prompt builders package
+│       ├── __init__.py       [✓]
+│       ├── helpers.py        [✓] # Domain-aware helpers
+│       ├── zero_shot.py      [✓] # Zero-shot prompts (default)
+│       └── few_shot.py       [✓] # Few-shot prompts (reference only)
 ├── structure/
 │   ├── schema.py             [✓] # Complete (includes LocationNature, OrganizationNature enums)
 │   ├── graph_builder.py      [✓] # Complete (integrates postprocessor)
@@ -1203,7 +1209,60 @@ success_definition:
 
 ---
 
-## Phase 9A: Academic KG Improvements
+## Phase 9A.1: LLM Extraction Refactor
+
+### Status: ✅ COMPLETE (2026-01-27)
+
+### Overview
+Refactored the 1557-line `llm.py` into smaller modules and implemented zero-shot prompts based on Chilean KG paper methodology (arXiv:2408.11975). A/B testing showed zero-shot extracts more entities while being ~50% cheaper.
+
+### Tasks
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 9A.1.1 | `prompts/__init__.py` | ✅ | Package initialization |
+| 9A.1.2 | `prompts/helpers.py` | ✅ | Domain-aware helper functions |
+| 9A.1.3 | `prompts/few_shot.py` | ✅ | Original few-shot prompts (kept for reference) |
+| 9A.1.4 | `prompts/zero_shot.py` | ✅ | Zero-shot prompts (~50% shorter) |
+| 9A.1.5 | `parsers.py` | ✅ | Response parsing and entity transformation |
+| 9A.1.6 | `llm.py` refactor | ✅ | Reduced from 1557 to ~750 lines |
+| 9A.1.7 | `models.py` fix | ✅ | Null coercion for list fields and TemporalInfo.ongoing |
+| 9A.1.8 | Zero-shot as default | ✅ | Removed prompt_mode parameter |
+| 9A.1.9 | Manifest generation | ✅ | Added to processing pipeline |
+| 9A.1.10 | CLI generate-manifest | ✅ | For existing processed cases |
+
+### Key Results
+- **Zero-shot extracted 6x more entities** than few-shot in A/B testing
+- **~50% cost reduction** from shorter prompts
+- **Cleaner architecture** with separation of concerns
+- **Fixed null coercion bugs** that caused validation errors
+
+### Files Created/Modified
+```
+farmer_factory/extract/
+├── prompts/
+│   ├── __init__.py       ✅ NEW
+│   ├── helpers.py        ✅ NEW
+│   ├── few_shot.py       ✅ NEW
+│   └── zero_shot.py      ✅ NEW
+├── parsers.py            ✅ NEW
+├── llm.py                ✅ MODIFIED (refactored)
+├── models.py             ✅ MODIFIED (null coercion)
+└── __init__.py           ✅ MODIFIED (exports)
+
+farmer_factory/processing/
+└── pipeline.py           ✅ MODIFIED (manifest generation)
+
+farmer_factory/cli.py     ✅ MODIFIED (generate-manifest command)
+
+tests/extract/
+├── test_prompts.py       ✅ NEW (10 tests)
+└── test_llm.py           ✅ MODIFIED
+```
+
+---
+
+## Phase 9A.2: Academic KG Improvements
 
 ### Status: ✅ COMPLETE (2026-01-27)
 
@@ -1216,13 +1275,13 @@ Knowledge graph optimizations inspired by the Chilean dictatorship KG paper (arX
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| 9A.1 | `extract/chunker.py` | ✅ | Document text chunking (5000-char, 10% overlap) |
-| 9A.2 | `extract/llm.py` | ✅ | Chunking integration for long documents |
-| 9A.3 | `structure/postprocessor.py` | ✅ | Transitive redundancy removal |
-| 9A.4 | `structure/postprocessor.py` | ✅ | Location hierarchy validation with cycle detection |
-| 9A.5 | `structure/builder.py` | ✅ | Postprocessor integration |
-| 9A.6 | `structure/schema.py` | ✅ | LocationNature, OrganizationNature enums |
-| 9A.7 | `tests/golden/` | ✅ | Golden standard evaluation dataset |
+| 9A.2.1 | `extract/chunker.py` | ✅ | Document text chunking (5000-char, 10% overlap) |
+| 9A.2.2 | `extract/llm.py` | ✅ | Chunking integration for long documents |
+| 9A.2.3 | `structure/postprocessor.py` | ✅ | Transitive redundancy removal |
+| 9A.2.4 | `structure/postprocessor.py` | ✅ | Location hierarchy validation with cycle detection |
+| 9A.2.5 | `structure/builder.py` | ✅ | Postprocessor integration |
+| 9A.2.6 | `structure/schema.py` | ✅ | LocationNature, OrganizationNature enums |
+| 9A.2.7 | `tests/golden/` | ✅ | Golden standard evaluation dataset |
 
 ### Implementation Details
 

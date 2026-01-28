@@ -138,6 +138,12 @@ class TemporalInfo(BaseModel):
     ongoing: bool = False
     date_precision: Literal["exact", "month", "year", "decade", "unknown"] = "unknown"
 
+    @field_validator("ongoing", mode="before")
+    @classmethod
+    def coerce_none_to_false(cls, v):
+        """Coerce null/None from LLM response to False."""
+        return v if v is not None else False
+
 
 class ExtractedRelation(BaseModel):
     """Single relation extracted from document (intermediate format)."""

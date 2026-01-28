@@ -25,6 +25,7 @@ from farmer_factory.structure import (
     GraphBuilder,
     GraphExporter
 )
+from farmer_factory.intake import ManifestManager
 from farmer_factory.config.settings import settings
 from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, setup_logging
 from .exceptions import ProcessingError
@@ -82,6 +83,9 @@ def process_case(
 
     setup_logging(case_dir / 'processing.log')
     logger.info(f"Starting processing for case: {case_id}")
+
+    # Initialize manifest tracker
+    manifest = ManifestManager(case_id)
 
     # 2. Initialize pipelines once (reuse across all documents)
     logger.info("Initializing pipelines...")
@@ -208,6 +212,15 @@ def process_case(
 
             logger.info(f"  Page {page_idx}/{len(page_images)} ✓")
 
+        # Track document in manifest
+        manifest.add_document(
+            document_id=pdf_path.stem,
+            filename=pdf_path.name,
+            status="success",
+            part_count=1,  # TODO: Track multi-part documents from document_groups
+            page_count=len(page_images),
+        )
+
     # 5. Export graph
     logger.info("Exporting graph...")
     try:
@@ -215,6 +228,10 @@ def process_case(
         exporter.save(output_dir / 'graph_data.json', factory_version="1.0.0")
     except Exception as e:
         raise ProcessingError(f"Failed to export graph: {e}")
+
+    # 5a. Save manifest
+    manifest.save_manifest(case_dir / 'manifest.json')
+    logger.info(f"Manifest saved: {case_dir / 'manifest.json'}")
 
     # 5b. Validate export output
     if not skip_validation:

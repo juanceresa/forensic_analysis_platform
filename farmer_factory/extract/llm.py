@@ -10,8 +10,6 @@ from farmer_factory.structure.schema import BaseEntity, Relation
 from farmer_factory.extract.api_client import ClaudeAPIClient
 from farmer_factory.extract.chunker import TextChunker
 from farmer_factory.extract.prompts import (
-    build_entity_prompt,
-    build_relation_prompt,
     build_entity_prompt_zero_shot,
     build_relation_prompt_zero_shot,
 )
@@ -45,21 +43,16 @@ class LLMExtractionResult:
 class LLMExtractionService:
     """Wrapper for Claude text API for entity extraction from OCR text."""
 
-    def __init__(self, api_key: Optional[str] = None, prompt_mode: str = "few_shot"):
+    def __init__(self, api_key: Optional[str] = None):
         """
         Initialize LLM extraction service.
 
         Args:
             api_key: Optional Anthropic API key.
                     If None, loads from environment variable.
-            prompt_mode: "few_shot" (default) or "zero_shot" for cost-optimized prompts
         """
         self.api_key = api_key
         self.api_client = ClaudeAPIClient(api_key=api_key)
-        self.prompt_mode = prompt_mode
-
-        if prompt_mode not in ("few_shot", "zero_shot"):
-            raise ValueError(f"Invalid prompt_mode: {prompt_mode}. Must be 'few_shot' or 'zero_shot'")
 
     # _build_entity_prompt has been moved to farmer_factory.extract.prompts.few_shot
     # _build_relation_prompt has been moved to farmer_factory.extract.prompts.few_shot
@@ -173,15 +166,10 @@ class LLMExtractionService:
         try:
             start_time = time.time()
 
-            # Choose prompt based on mode
-            if self.prompt_mode == "zero_shot":
-                prompt = build_relation_prompt_zero_shot(
-                    text=text, entities=entities, document_id=document_id
-                )
-            else:
-                prompt = build_relation_prompt(
-                    text=text, entities=entities, document_id=document_id
-                )
+            # Build zero-shot prompt (more effective and cost-efficient)
+            prompt = build_relation_prompt_zero_shot(
+                text=text, entities=entities, document_id=document_id
+            )
 
             # Call Claude API with retry logic
             logger.info(
@@ -236,15 +224,10 @@ class LLMExtractionService:
 
         start_time = time.time()
 
-        # Choose prompt based on mode
-        if self.prompt_mode == "zero_shot":
-            prompt = build_entity_prompt_zero_shot(
-                text=text, document_id=document_id, ocr_quality=ocr_confidence
-            )
-        else:
-            prompt = build_entity_prompt(
-                text=text, document_id=document_id, ocr_quality=ocr_confidence
-            )
+        # Build zero-shot prompt (more effective and cost-efficient)
+        prompt = build_entity_prompt_zero_shot(
+            text=text, document_id=document_id, ocr_quality=ocr_confidence
+        )
 
         # Call Claude API
         logger.info(f"Calling Claude API for entity extraction from {document_id}...")
@@ -369,7 +352,7 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
             metadata = {
                 "model": settings.claude_model,
                 "api_version": "anthropic_v1",
-                "prompt_mode": self.prompt_mode,
+                "prompt_mode": "zero_shot",
                 "ocr_confidence": ocr_confidence,
                 "entity_count": len(entities),
                 "relation_count": len(relations),
@@ -492,7 +475,7 @@ All entities tagged as TIER_3_AI (unverified AI extraction).
         metadata = {
             "model": settings.claude_model,
             "api_version": "anthropic_v1",
-            "prompt_mode": self.prompt_mode,
+            "prompt_mode": "zero_shot",
             "ocr_confidence": ocr_confidence,
             "entity_count": len(merged_entities),
             "relation_count": len(relations),
@@ -790,7 +773,7 @@ All entities tagged as TIER_3_AI (unverified AI extraction).
         metadata = {
             "model": "claude-llm-mocked",
             "api_version": "mocked_v1",
-            "prompt_mode": self.prompt_mode,
+            "prompt_mode": "zero_shot",
             "processing_time_ms": 800,
             "ocr_confidence": ocr_confidence,
             "llm_confidence": llm_base_confidence,
