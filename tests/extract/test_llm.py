@@ -70,6 +70,26 @@ def test_llm_service_initialization():
     assert service_with_key is not None
 
 
+def test_llm_service_prompt_mode():
+    """Test LLMExtractionService supports prompt_mode parameter."""
+    # Default is few_shot
+    service_default = LLMExtractionService()
+    assert service_default.prompt_mode == "few_shot"
+
+    # Explicit few_shot
+    service_few = LLMExtractionService(prompt_mode="few_shot")
+    assert service_few.prompt_mode == "few_shot"
+
+    # Zero-shot
+    service_zero = LLMExtractionService(prompt_mode="zero_shot")
+    assert service_zero.prompt_mode == "zero_shot"
+
+    # Invalid mode raises error
+    import pytest
+    with pytest.raises(ValueError):
+        LLMExtractionService(prompt_mode="invalid")
+
+
 def test_extract_from_ocr_text():
     """Test LLM extraction from OCR text (mocked)."""
 
@@ -165,8 +185,7 @@ def test_build_relation_prompt():
         Verification,
         VerificationTier,
     )
-
-    service = LLMExtractionService()
+    from farmer_factory.extract.prompts import build_relation_prompt
 
     person = Person(
         id="test_person_1",
@@ -176,7 +195,7 @@ def test_build_relation_prompt():
         extracted_from="test_doc",
     )
 
-    prompt = service._build_relation_prompt(
+    prompt = build_relation_prompt(
         text="Mario Ceresa es propietario del Central Santa Maria",
         entities=[person],
         document_id="test_doc",
@@ -249,6 +268,7 @@ def test_transform_relations_skips_invalid_types():
         ExtractedRelation,
         RelationExtractionResult,
     )
+    from farmer_factory.extract.parsers import transform_to_final_relations
     from farmer_factory.structure.schema import (
         Person,
         EntityType,
@@ -295,11 +315,12 @@ def test_transform_relations_skips_invalid_types():
         ]
     )
 
-    relations = service._transform_to_final_relations(
+    relations = transform_to_final_relations(
         extraction=extraction,
         entities=[person, prop],
         document_id="test_doc",
         document_date=None,
+        match_entity_func=service._match_entity,
     )
 
     assert len(relations) == 1
@@ -312,6 +333,7 @@ def test_transform_relations_uses_document_date_fallback():
         ExtractedRelation,
         RelationExtractionResult,
     )
+    from farmer_factory.extract.parsers import transform_to_final_relations
     from farmer_factory.structure.schema import (
         Person,
         EntityType,
@@ -350,11 +372,12 @@ def test_transform_relations_uses_document_date_fallback():
         ]
     )
 
-    relations = service._transform_to_final_relations(
+    relations = transform_to_final_relations(
         extraction=extraction,
         entities=[person, prop],
         document_id="test_doc",
         document_date="1958-03-15",
+        match_entity_func=service._match_entity,
     )
 
     assert len(relations) == 1
@@ -415,9 +438,8 @@ def test_match_entity_no_match():
 
 def test_apply_temporal_logic_owns():
     """Test temporal logic for OWNS relation (state relation)."""
-    from farmer_factory.extract.llm import ExtractedRelation
-
-    service = LLMExtractionService()
+    from farmer_factory.extract.models import ExtractedRelation
+    from farmer_factory.extract.parsers import apply_temporal_logic
 
     # OWNS is a state relation (if no dates, assume ongoing)
     relation = ExtractedRelation(
@@ -429,7 +451,7 @@ def test_apply_temporal_logic_owns():
         evidence="Some evidence",
     )
 
-    result = service._apply_temporal_logic(relation, document_date=None)
+    result = apply_temporal_logic(relation, document_date=None)
 
     # Should set ongoing=True for state relation with no dates
     assert result.ongoing is True
@@ -437,9 +459,8 @@ def test_apply_temporal_logic_owns():
 
 def test_apply_temporal_logic_sold():
     """Test temporal logic for SOLD relation (event relation)."""
-    from farmer_factory.extract.llm import ExtractedRelation
-
-    service = LLMExtractionService()
+    from farmer_factory.extract.models import ExtractedRelation
+    from farmer_factory.extract.parsers import apply_temporal_logic
 
     # SOLD is an event relation (if no dates, don't assume ongoing)
     relation = ExtractedRelation(
@@ -452,7 +473,7 @@ def test_apply_temporal_logic_sold():
     )
 
     # Without document_date, temporal relations should return basic temporal info
-    result = service._apply_temporal_logic(relation, document_date=None)
+    result = apply_temporal_logic(relation, document_date=None)
 
     # Should NOT set ongoing=True for event relation without dates
     assert result.ongoing is None or result.ongoing is False
@@ -460,7 +481,7 @@ def test_apply_temporal_logic_sold():
 
 def test_parse_relation_response_valid_json():
     """Test parsing valid JSON relation response."""
-    service = LLMExtractionService()
+    from farmer_factory.extract.parsers import parse_relation_response
 
     response_text = """
     {
@@ -484,7 +505,7 @@ def test_parse_relation_response_valid_json():
     }
     """
 
-    result = service._parse_relation_response(response_text)
+    result = parse_relation_response(response_text)
 
     assert result is not None
     assert len(result.relations) == 1
@@ -495,7 +516,7 @@ def test_parse_relation_response_valid_json():
 
 def test_parse_relation_response_markdown_json():
     """Test parsing JSON wrapped in markdown code block."""
-    service = LLMExtractionService()
+    from farmer_factory.extract.parsers import parse_relation_response
 
     response_text = """
     ```json
@@ -506,7 +527,7 @@ def test_parse_relation_response_markdown_json():
     ```
     """
 
-    result = service._parse_relation_response(response_text)
+    result = parse_relation_response(response_text)
 
     assert result is not None
     assert len(result.relations) == 0
@@ -515,7 +536,7 @@ def test_parse_relation_response_markdown_json():
 
 def test_parse_relation_response_empty_relations():
     """Test parsing response with no relations."""
-    service = LLMExtractionService()
+    from farmer_factory.extract.parsers import parse_relation_response
 
     response_text = """
     {
@@ -524,7 +545,7 @@ def test_parse_relation_response_empty_relations():
     }
     """
 
-    result = service._parse_relation_response(response_text)
+    result = parse_relation_response(response_text)
 
     assert result is not None
     assert len(result.relations) == 0
@@ -540,11 +561,12 @@ def test_transform_to_final_relations():
         VerificationTier,
         RelationType,
     )
-    from farmer_factory.extract.llm import (
+    from farmer_factory.extract.models import (
         ExtractedRelation,
         TemporalInfo,
         RelationExtractionResult,
     )
+    from farmer_factory.extract.parsers import transform_to_final_relations
 
     service = LLMExtractionService()
 
@@ -582,8 +604,9 @@ def test_transform_to_final_relations():
         relations=[extracted], extraction_notes="Test extraction"
     )
 
-    result = service._transform_to_final_relations(
-        extraction_result, entities, "test_doc", "1945-01-01"
+    result = transform_to_final_relations(
+        extraction_result, entities, "test_doc", "1945-01-01",
+        match_entity_func=service._match_entity
     )
 
     assert len(result) == 1
@@ -605,7 +628,8 @@ def test_transform_skips_unmatched_entities():
         Verification,
         VerificationTier,
     )
-    from farmer_factory.extract.llm import ExtractedRelation, RelationExtractionResult
+    from farmer_factory.extract.models import ExtractedRelation, RelationExtractionResult
+    from farmer_factory.extract.parsers import transform_to_final_relations
 
     service = LLMExtractionService()
 
@@ -633,8 +657,9 @@ def test_transform_skips_unmatched_entities():
         relations=[extracted], extraction_notes="Test extraction"
     )
 
-    result = service._transform_to_final_relations(
-        extraction_result, entities, "test_doc", None
+    result = transform_to_final_relations(
+        extraction_result, entities, "test_doc", None,
+        match_entity_func=service._match_entity
     )
 
     # Should skip relation with unmatched entity
