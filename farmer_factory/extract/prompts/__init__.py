@@ -12,6 +12,10 @@ from .few_shot import (
     build_entity_prompt,
     build_relation_prompt,
 )
+from .zero_shot import (
+    build_entity_prompt_zero_shot,
+    build_relation_prompt_zero_shot,
+)
 
 __all__ = [
     # Helpers
@@ -21,7 +25,10 @@ __all__ = [
     "get_temporal_relations",
     "get_state_relations",
     "ocr_quality_description",
-    # Prompts
+    # Few-shot prompts (current)
     "build_entity_prompt",
     "build_relation_prompt",
+    # Zero-shot prompts (cost-optimized)
+    "build_entity_prompt_zero_shot",
+    "build_relation_prompt_zero_shot",
 ]
