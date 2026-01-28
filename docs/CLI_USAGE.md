@@ -240,6 +240,50 @@ Removes all processed outputs while keeping source PDFs intact.
 
 ---
 
+### Detect Document Groups
+
+```bash
+python -m farmer_factory.cli detect-groups CASE-CERESA
+```
+
+**Options:**
+- `CASE_ID` (required): Case identifier
+- `--force` (optional): Regenerate even if groups already confirmed
+
+Scans intake PDFs for multi-part document patterns and generates `document_groups.yaml` for review. See Analyst Guide for workflow details.
+
+---
+
+### Generate Manifest
+
+```bash
+python -m farmer_factory.cli generate-manifest CASE-CERESA
+```
+
+**Options:**
+- `CASE_ID` (required): Case identifier
+
+Generates a manifest for a processed case that doesn't have one (useful for cases processed before manifests were implemented).
+
+---
+
+### Retry Failed Relations
+
+```bash
+python -m farmer_factory.cli retry-relations CASE-CERESA
+
+# With verbose output
+python -m farmer_factory.cli retry-relations CASE-CERESA --verbose
+```
+
+**Options:**
+- `CASE_ID` (required): Case identifier
+- `--verbose` (optional): Enable debug output
+
+Re-extracts relations for documents where relation extraction previously failed.
+
+---
+
 ## Troubleshooting
 
 ### "poppler not found"

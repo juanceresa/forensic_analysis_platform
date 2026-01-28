@@ -1,6 +1,6 @@
 # Documentation Index
 
-> **Last Updated:** 2026-01-25
+> **Last Updated:** 2026-01-28
 
 Complete documentation map for the Civic Table platform.
 

@@ -2,7 +2,7 @@
 
 > **Document Classification:** Internal Operations Manual
 > **Version:** 1.0.0
-> **Created:** 2025-01-22
+> **Created:** 2026-01-22
 > **Audience:** Platform Administrators
 
 ---
@@ -33,11 +33,11 @@ This guide covers all operational procedures for administering the Civic Table p
 
 1. **Create case directory structure:**
    ```bash
-   cd farmer_factory
-   python cli.py create-case \
+   python -m farmer_factory.cli create-case \
      --id CASE-001 \
      --name "Ceresa Family Archive" \
-     --family "Ceresa"
+     --family "Ceresa" \
+     --domain cuban_property
    ```
 
    This creates:
@@ -87,84 +87,56 @@ This guide covers all operational procedures for administering the Civic Table p
 **Prerequisites:**
 - Case exists in system
 - PDFs in `cases/CASE-ID/intake/`
-- Google Cloud Vision credentials configured
-- Anthropic API key configured
+- Google Cloud Vision credentials configured (GOOGLE_APPLICATION_CREDENTIALS)
+- Anthropic API key configured (ANTHROPIC_API_KEY)
 
 **Steps:**
 
-1. **Run preprocessing pipeline:**
+1. **Detect document groups (if needed):**
    ```bash
-   python cli.py process CASE-001 --stage preprocessing
+   python -m farmer_factory.cli detect-groups CASE-001
    ```
 
    **What this does:**
-   - Converts PDFs to images (300 DPI)
-   - Deskews rotated scans
-   - Enhances contrast
-   - Binarizes for OCR
-   - Detects text regions
+   - Scans intake PDFs for multi-part patterns (e.g., deed.pdf, deed.1pdf.pdf)
+   - Generates `document_groups.yaml` for review
+   - Must be confirmed before processing (see Analyst Guide)
 
-   **Expected time:** ~3 minutes per document
-
-2. **Run OCR:**
+2. **Run full processing pipeline:**
    ```bash
-   python cli.py process CASE-001 --stage ocr
+   python -m farmer_factory.cli process CASE-001
    ```
 
    **What this does:**
-   - Runs Google Cloud Vision on typed text
-   - Routes handwritten docs to Claude Vision API
-   - Generates confidence scores
-   - Saves OCR text to `cases/CASE-001/ocr/`
+   - Converts PDFs to images (300 DPI grayscale)
+   - Preprocesses images (deskew, denoise)
+   - Runs OCR via Google Cloud Vision
+   - Extracts entities and relations via Claude API
+   - Builds knowledge graph with deduplication
+   - Exports to `graph_data.json`
 
-   **Expected time:** ~2 minutes per document
+   **Options:**
+   - `--verbose` - Enable debug logging
+   - `--force-typed` - Skip handwritten triage (OCR all pages)
+   - `--skip-validation` - Skip graph validation
+   - `--file document.pdf` - Process single PDF only
 
-3. **Run entity extraction:**
+   **Expected time:** ~3-5 minutes per document
+
+3. **Validate output:**
    ```bash
-   python cli.py process CASE-001 --stage extraction
-   ```
-
-   **What this does:**
-   - Extracts entities (PERSON, PROPERTY, ORGANIZATION, etc.)
-   - Extracts relations (OWNS, CONFISCATES, etc.)
-   - Assigns TIER_3_AI verification status
-   - Logs confidence scores
-
-   **Expected time:** ~1 minute per document
-
-4. **Build graph:**
-   ```bash
-   python cli.py process CASE-001 --stage graph
-   ```
-
-   **What this does:**
-   - Constructs NetworkX graph
-   - Deduplicates entities ("Mario Ceresa" = "M. Ceresa")
-   - Detects gaps in ownership chains
-   - Generates graph_data.json
-
-   **Expected time:** ~5 minutes
-
-5. **Validate output:**
-   ```bash
-   python cli.py validate CASE-001
+   python -m farmer_factory.cli validate CASE-001
    ```
 
    **What this does:**
    - Validates graph_data.json against schema
-   - Checks for orphan nodes
-   - Verifies confidence scores
-   - Reports errors/warnings
-
-**Or run all stages at once:**
-```bash
-python cli.py process CASE-001 --all
-```
+   - Checks entity/relation types against domain config
+   - Reports validation errors
 
 **Expected Result:**
 - `cases/CASE-001/output/graph_data.json` exists
 - Validation passes
-- Audit log shows all steps completed
+- Processing stats logged to console
 
 ---
 
@@ -172,11 +144,13 @@ python cli.py process CASE-001 --all
 
 **When:** After successful processing and validation
 
-**Steps:**
+> **Note:** The `upload` command is planned but not yet implemented. Currently, graphs are served directly from the local file system.
+
+**Future Steps (Once Implemented):**
 
 1. **Upload to Supabase Storage:**
    ```bash
-   python cli.py upload CASE-001
+   python -m farmer_factory.cli upload CASE-001
    ```
 
    **What this does:**
@@ -335,16 +309,13 @@ python cli.py process CASE-001 --all
 ### Problem: Processing Fails on Document
 
 **Symptoms:**
-- `python cli.py process CASE-001` exits with error
-- Audit log shows failure
+- `python -m farmer_factory.cli process CASE-001` exits with error
+- Processing stops mid-pipeline
 
 **Diagnosis:**
 ```bash
-# Check audit log
-cat cases/CASE-001/output/audit.jsonl | tail -20
-
-# Check specific document
-python cli.py process CASE-001 --document DOC-042 --verbose
+# Check specific document with verbose output
+python -m farmer_factory.cli process CASE-001 --file problem_document.pdf --verbose
 ```
 
 **Common Causes:**
@@ -352,20 +323,19 @@ python cli.py process CASE-001 --document DOC-042 --verbose
 1. **Corrupt PDF:**
    - Try opening PDF manually
    - Re-scan if needed
-   - Skip document: `python cli.py process CASE-001 --skip DOC-042`
 
 2. **OCR API Rate Limit:**
    - Wait 60 seconds
-   - Retry: `python cli.py retry CASE-001`
+   - Re-run processing
 
 3. **Claude API Timeout:**
    - Check Anthropic status page
-   - Retry with longer timeout: `--timeout 120`
+   - Retry failed relations: `python -m farmer_factory.cli retry-relations CASE-001`
 
 4. **Low Confidence Score:**
-   - Review OCR output: `cat cases/CASE-001/ocr/DOC-042.txt`
+   - Review extraction JSONs in `cases/CASE-001/extractions/`
    - Flag for manual review
-   - Continue processing
+   - Continue processing other documents
 
 ---
 
@@ -399,8 +369,8 @@ SELECT * FROM case_access WHERE user_id = (
    - Verify user's clerk_id matches
 
 3. **Case not uploaded:**
-   - Check Supabase Storage for graph file
-   - Re-upload: `python cli.py upload CASE-001`
+   - Check that graph_data.json exists locally
+   - For now, use local file serving (upload not yet implemented)
 
 ---
 
@@ -418,10 +388,8 @@ SELECT * FROM case_access WHERE user_id = (
 **Fixes:**
 
 1. **404 - File not found:**
-   ```bash
-   # Verify upload
-   python cli.py upload CASE-001 --force
-   ```
+   - Verify `cases/CASE-001/output/graph_data.json` exists
+   - Re-run processing if needed
 
 2. **403 - Permission denied:**
    - Check case_access table
@@ -429,8 +397,8 @@ SELECT * FROM case_access WHERE user_id = (
 
 3. **500 - Server error:**
    - Check Vercel logs
-   - Check Supabase logs
-   - Look for JSON parse errors
+   - Check for JSON parse errors in graph_data.json
+   - Validate with: `python -m farmer_factory.cli validate CASE-001`
 
 ---
 
@@ -475,10 +443,7 @@ rsync -av ./cases/CASE-001/ ./backups/$(date +%Y-%m-%d)/CASE-001/
 
 ```bash
 # Restore case
-rsync -av ./backups/2025-01-22/CASE-001/ ./cases/CASE-001/
-
-# Re-upload to Supabase
-python cli.py upload CASE-001 --force
+rsync -av ./backups/2026-01-22/CASE-001/ ./cases/CASE-001/
 ```
 
 ---
@@ -521,28 +486,37 @@ python cli.py upload CASE-001 --force
 
 ```bash
 # Case creation
-python cli.py create-case --id CASE-XXX --name "Name" --family "Family"
+python -m farmer_factory.cli create-case --id CASE-XXX --name "Name" --family "Family" --domain cuban_property
 
-# Process case (all stages)
-python cli.py process CASE-XXX --all
+# Detect document groups
+python -m farmer_factory.cli detect-groups CASE-XXX
 
-# Process single stage
-python cli.py process CASE-XXX --stage [preprocessing|ocr|extraction|graph]
+# Process case
+python -m farmer_factory.cli process CASE-XXX
+
+# Process with options
+python -m farmer_factory.cli process CASE-XXX --verbose --force-typed
 
 # Validate output
-python cli.py validate CASE-XXX
+python -m farmer_factory.cli validate CASE-XXX
 
-# Upload to Supabase
-python cli.py upload CASE-XXX
+# Retry failed relations
+python -m farmer_factory.cli retry-relations CASE-XXX --verbose
 
-# Retry failed jobs
-python cli.py retry CASE-XXX
+# List cases
+python -m farmer_factory.cli list-cases
 
-# View audit log
-cat cases/CASE-XXX/output/audit.jsonl
+# List entities in a case
+python -m farmer_factory.cli list-entities CASE-XXX --type PERSON
 
-# Check API costs
-cat output/cost_log.jsonl | jq '. | select(.timestamp > "2025-01-22") | .cost_usd' | paste -sd+ | bc
+# List available domains
+python -m farmer_factory.cli list-domains
+
+# Generate dossier PDF
+python -m farmer_factory.cli generate-dossier CASE-XXX --property-id "ID" --family-member-id "ID"
+
+# Clean case outputs
+python -m farmer_factory.cli clean CASE-XXX --confirm
 ```
 
 ---
@@ -561,4 +535,4 @@ cat output/cost_log.jsonl | jq '. | select(.timestamp > "2025-01-22") | .cost_us
 
 ---
 
-*This guide should be updated as operational procedures evolve. Last reviewed: 2025-01-22*
+*This guide should be updated as operational procedures evolve. Last reviewed: 2026-01-22*
