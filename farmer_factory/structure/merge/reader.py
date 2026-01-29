@@ -10,11 +10,11 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 
-from .merge_models import (
+from .models import (
     CrossTypeRelationsFile,
     EntityGroupFile,
 )
-from .merge_writer import ENTITY_TYPE_FILES
+from .writer import ENTITY_TYPE_FILES
 
 logger = logging.getLogger(__name__)
 

@@ -333,10 +333,10 @@ Pydantic models for merge authority YAML files:
 
 Status is two-level: file-level (`DRAFT`/`CONFIRMED`) + per-entry status.
 
-#### Merge Writer (`merge_writer.py`)
+#### Merge Writer (`merge/writer.py`)
 
 ```python
-from farmer_factory.structure.merge_writer import write_entity_groups, add_analyst_merge
+from farmer_factory.structure.merge.writer import write_entity_groups, add_analyst_merge
 
 # Auto-generate DRAFT merge groups from dedupe clusters
 write_entity_groups(case_dir, "PERSON", clusters, singletons)
@@ -347,20 +347,20 @@ add_analyst_merge(case_dir, "PERSON", "person_a", "Alice", "person_b", "Alise")
 
 **Key behavior:** Preserves existing CONFIRMED entries when writing new DRAFT groups.
 
-#### Merge Reader (`merge_reader.py`)
+#### Merge Reader (`merge/reader.py`)
 
 ```python
-from farmer_factory.structure.merge_reader import get_confirmed_merges
+from farmer_factory.structure.merge.reader import get_confirmed_merges
 
 # Get merge map: member_id → canonical_id
 merge_map = get_confirmed_merges(case_dir)  # Only CONFIRMED
 merge_map = get_confirmed_merges(case_dir, include_drafts=True)  # All
 ```
 
-#### Merge Engine (`merge_engine.py`)
+#### Merge Engine (`merge/engine.py`)
 
 ```python
-from farmer_factory.structure.merge_engine import apply_merges
+from farmer_factory.structure.merge.engine import apply_merges
 
 # Apply confirmed merges to graph_data.json (no OCR, no LLM)
 apply_merges(case_dir)  # Only CONFIRMED

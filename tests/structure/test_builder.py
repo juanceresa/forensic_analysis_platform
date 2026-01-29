@@ -1,9 +1,9 @@
 """Unit tests for Graph Builder."""
 
 import pytest
-from farmer_factory.structure.builder import GraphBuilder
+from farmer_factory.structure.core.builder import GraphBuilder
 from farmer_factory.structure import KnowledgeGraph
-from farmer_factory.structure.resolver import DedupeEntityResolver
+from farmer_factory.structure.dedupe.resolver import DedupeEntityResolver
 from farmer_factory.extract import ExtractionResult
 from farmer_factory.structure.schema import (
     Person, Property, EntityType, Verification, VerificationTier,

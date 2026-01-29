@@ -500,7 +500,7 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int, domai
     from farmer_factory.domains import domain_registry
 
     try:
-        from farmer_factory.structure.train_dedupe import train_dedupe_model
+        from farmer_factory.structure.dedupe.train import train_dedupe_model
     except ModuleNotFoundError:
         from structure.train_dedupe import train_dedupe_model
 
@@ -907,7 +907,7 @@ def apply_merges(case_id: str, include_drafts: bool, domain: str):
     """
     setup_domain(domain)
 
-    from farmer_factory.structure.merge_engine import apply_merges as _apply_merges
+    from farmer_factory.structure.merge.engine import apply_merges as _apply_merges
 
     case_dir = Path("cases") / case_id
     graph_path = case_dir / "output" / "graph_data.json"
@@ -954,8 +954,8 @@ def merge_entities(case_id: str, entity_a: str, entity_b: str, domain: str):
     setup_domain(domain)
 
     import json
-    from farmer_factory.structure.merge_writer import add_analyst_merge
-    from farmer_factory.structure.merge_engine import apply_merges as _apply_merges
+    from farmer_factory.structure.merge.writer import add_analyst_merge
+    from farmer_factory.structure.merge.engine import apply_merges as _apply_merges
 
     case_dir = Path("cases") / case_id
     graph_path = case_dir / "output" / "graph_data.json"

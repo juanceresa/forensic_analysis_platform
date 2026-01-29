@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from farmer_factory.structure.graph import KnowledgeGraph
-from farmer_factory.structure.exporter import GraphExporter as StructureGraphExporter
+from farmer_factory.structure.core.exporter import GraphExporter as StructureGraphExporter
 
 
 class GraphExporter:

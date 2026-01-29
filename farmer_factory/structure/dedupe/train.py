@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, Any, List
-from .dedupe_config import FIELD_CONFIG
+from .config import FIELD_CONFIG
 
 logger = logging.getLogger(__name__)
 

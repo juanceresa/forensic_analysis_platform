@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from farmer_factory.structure.resolver import DedupeEntityResolver
+from farmer_factory.structure.dedupe.resolver import DedupeEntityResolver
 from farmer_factory.structure.schema import Person, Location, Property, Organization, Verification, EntityType
 from datetime import datetime
 

@@ -10,12 +10,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from .merge_reader import (
+from .reader import (
     get_all_entity_groups,
     get_confirmed_merges,
     read_cross_type_relations,
 )
-from .merge_writer import _compute_extractions_hash
+from .writer import _compute_extractions_hash
 
 logger = logging.getLogger(__name__)
 

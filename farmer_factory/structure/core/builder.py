@@ -4,10 +4,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 import logging
-from farmer_factory.structure.graph import KnowledgeGraph
-from farmer_factory.structure.resolver import DedupeEntityResolver
-from farmer_factory.structure.schema import Document, Verification, VerificationTier
-from farmer_factory.structure.postprocessor import GraphPostProcessor
+from ..graph import KnowledgeGraph
+from ..dedupe.resolver import DedupeEntityResolver
+from ..schema import Document, Verification, VerificationTier
+from .postprocessor import GraphPostProcessor
 
 if TYPE_CHECKING:
     from farmer_factory.extract import ExtractionResult

@@ -5,8 +5,8 @@ import pytest
 import yaml
 from pathlib import Path
 
-from farmer_factory.structure.merge_engine import apply_merges
-from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
+from farmer_factory.structure.merge.engine import apply_merges
+from farmer_factory.structure.merge.writer import write_entity_groups, write_cross_type_relations
 
 
 @pytest.fixture

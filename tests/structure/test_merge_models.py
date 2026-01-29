@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from farmer_factory.structure.merge_models import (
+from farmer_factory.structure.merge.models import (
     CrossTypeRelation,
     CrossTypeRelationsFile,
     EntityGroupFile,

@@ -4,8 +4,8 @@ import pytest
 import yaml
 from pathlib import Path
 
-from farmer_factory.structure.merge_models import EntityGroupFile, MergeGroup, MergeGroupMember
-from farmer_factory.structure.merge_writer import (
+from farmer_factory.structure.merge.models import EntityGroupFile, MergeGroup, MergeGroupMember
+from farmer_factory.structure.merge.writer import (
     write_entity_groups,
     write_cross_type_relations,
     add_analyst_merge,

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 from pathlib import Path
 from collections import Counter
-from farmer_factory.structure.graph import KnowledgeGraph
+from ..graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 

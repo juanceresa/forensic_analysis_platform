@@ -4,7 +4,7 @@ import pytest
 import tempfile
 import json
 from pathlib import Path
-from farmer_factory.structure.exporter import GraphExporter
+from farmer_factory.structure.core.exporter import GraphExporter
 from farmer_factory.structure import KnowledgeGraph
 from farmer_factory.structure.schema import (
     Person, Property, EntityType, Verification, VerificationTier,

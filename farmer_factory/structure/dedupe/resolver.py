@@ -4,9 +4,9 @@ import logging
 import dedupe
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-from .dedupe_config import FIELD_CONFIG
-from .schema import BaseEntity, EntityType
-from .graph import KnowledgeGraph
+from .config import FIELD_CONFIG
+from ..schema import BaseEntity, EntityType
+from ..graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 

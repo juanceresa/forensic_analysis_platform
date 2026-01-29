@@ -272,8 +272,8 @@ def process_case(
 
     # 5a. Generate/update entity merge files (DRAFT)
     try:
-        from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
-        from farmer_factory.structure.merge_engine import apply_merges
+        from farmer_factory.structure.merge.writer import write_entity_groups, write_cross_type_relations
+        from farmer_factory.structure.merge.engine import apply_merges
 
         # Collect dedupe clusters from the resolver's partition results
         # For now, generate merge files from the graph's merged entities
@@ -447,7 +447,7 @@ def rebuild_graph(
         _generate_merge_files(case_dir, graph, builder)
         if entity_groups_dir.exists() and any(entity_groups_dir.iterdir()):
             try:
-                from farmer_factory.structure.merge_engine import apply_merges
+                from farmer_factory.structure.merge.engine import apply_merges
                 apply_merges(case_dir, include_drafts=False,
                             output_path=output_dir / "graph_data.json")
                 logger.info("Applied confirmed merges to graph")
@@ -504,7 +504,7 @@ def _generate_merge_files(
     and writes them as DRAFT entity_groups/*.yaml files.
     """
     from collections import defaultdict
-    from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
+    from farmer_factory.structure.merge.writer import write_entity_groups, write_cross_type_relations
 
     # Build clusters from builder's merge_log
     # merge_log entries: (absorbed_id, absorbed_name, canonical_id, canonical_name, confidence)

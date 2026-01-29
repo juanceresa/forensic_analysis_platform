@@ -4,13 +4,13 @@ import pytest
 import yaml
 from pathlib import Path
 
-from farmer_factory.structure.merge_reader import (
+from farmer_factory.structure.merge.reader import (
     read_entity_groups,
     read_cross_type_relations,
     get_confirmed_merges,
     get_all_entity_groups,
 )
-from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
+from farmer_factory.structure.merge.writer import write_entity_groups, write_cross_type_relations
 
 
 @pytest.fixture

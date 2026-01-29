@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 
-from .merge_models import (
+from .models import (
     CrossTypeRelation,
     CrossTypeRelationsFile,
     EntityGroupFile,
@@ -143,23 +143,26 @@ def write_entity_groups(
         if eid not in confirmed_member_ids
     ]
 
-    # Build relations list
+    # Build relations list (deduplicated)
     draft_relations: list[SameTypeRelation] = []
     if relations:
         confirmed_rel_keys = {
             (r.source_id, r.target_id, r.relation_type) for r in confirmed_relations
         }
+        seen_rel_keys: set[tuple[str, str, str]] = set()
         for rel_dict in relations:
             key = (rel_dict["source_id"], rel_dict["target_id"], rel_dict["relation_type"])
-            if key not in confirmed_rel_keys:
-                draft_relations.append(SameTypeRelation(
-                    source_id=rel_dict["source_id"],
-                    target_id=rel_dict["target_id"],
-                    relation_type=rel_dict["relation_type"],
-                    date=rel_dict.get("date"),
-                    source="extraction",
-                    status="DRAFT",
-                ))
+            if key in seen_rel_keys or key in confirmed_rel_keys:
+                continue
+            seen_rel_keys.add(key)
+            draft_relations.append(SameTypeRelation(
+                source_id=rel_dict["source_id"],
+                target_id=rel_dict["target_id"],
+                relation_type=rel_dict["relation_type"],
+                date=rel_dict.get("date"),
+                source="extraction",
+                status="DRAFT",
+            ))
 
     all_groups = confirmed_groups + draft_groups
     all_relations = confirmed_relations + draft_relations
@@ -218,8 +221,22 @@ def write_cross_type_relations(
         (r.source_id, r.target_id, r.relation_type) for r in confirmed_relations
     }
 
-    draft_relations = []
+    # Deduplicate incoming relations by (source_id, target_id, relation_type),
+    # keeping the first occurrence (which preserves date/name from earliest extraction)
+    seen_keys: set[tuple[str, str, str]] = set()
+    deduped_relations: list[dict] = []
     for rel_dict in relations:
+        key = (rel_dict["source_id"], rel_dict["target_id"], rel_dict["relation_type"])
+        if key not in seen_keys:
+            seen_keys.add(key)
+            deduped_relations.append(rel_dict)
+
+    dupes_removed = len(relations) - len(deduped_relations)
+    if dupes_removed:
+        logger.info(f"Deduplicated {dupes_removed} cross-type relations")
+
+    draft_relations = []
+    for rel_dict in deduped_relations:
         key = (rel_dict["source_id"], rel_dict["target_id"], rel_dict["relation_type"])
         if key not in confirmed_keys:
             draft_relations.append(CrossTypeRelation(

@@ -12,7 +12,7 @@ from typing import Dict, Set, Tuple, List, TYPE_CHECKING
 import networkx as nx
 
 if TYPE_CHECKING:
-    from farmer_factory.structure.graph import KnowledgeGraph
+    from ..graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 

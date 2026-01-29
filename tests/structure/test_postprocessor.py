@@ -1,7 +1,7 @@
 """Tests for graph post-processing."""
 
 import pytest
-from farmer_factory.structure.postprocessor import GraphPostProcessor
+from farmer_factory.structure.core.postprocessor import GraphPostProcessor
 from farmer_factory.structure.graph import KnowledgeGraph
 from farmer_factory.structure.schema import (
     Location,

@@ -20,9 +20,9 @@ from .schema import (
     GraphExport,
 )
 from .graph import KnowledgeGraph
-from .resolver import DedupeEntityResolver
-from .builder import GraphBuilder
-from .exporter import GraphExporter
+from .dedupe.resolver import DedupeEntityResolver
+from .core.builder import GraphBuilder
+from .core.exporter import GraphExporter
 
 # Backward compatibility alias (deprecated, use DedupeEntityResolver)
 EntityResolver = DedupeEntityResolver
