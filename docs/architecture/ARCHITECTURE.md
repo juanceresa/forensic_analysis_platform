@@ -528,12 +528,22 @@ farmer_vault/
 │           └── documents/
 │               └── page.tsx   # Document list
 ├── components/
-│   ├── KnowledgeGraph.tsx     # Force-directed graph
-│   ├── DossierPanel.tsx       # Right-side detail view
-│   ├── NodeBadge.tsx          # Verification tier indicator
-│   ├── SourceViewer.tsx       # Document image + OCR overlay
-│   ├── TimelineView.tsx       # Chronological events
-│   └── GapAlert.tsx           # Missing evidence warnings
+│   ├── Dashboard/             # Dashboard-specific components
+│   │   └── Header.tsx         # Dashboard header with graph stats
+│   ├── Documents/             # Document browser components
+│   ├── Entities/              # Entity browser and detail components
+│   │   └── EntityDetail.tsx   # Full entity view (metadata, sources, connections)
+│   ├── Graph/                 # Knowledge graph components
+│   │   ├── KnowledgeGraph.tsx # Force-directed graph (react-force-graph-2d)
+│   │   ├── GraphView.tsx      # Graph page with integrated sidebar
+│   │   ├── EntitySidebar.tsx  # Slide-in entity detail panel
+│   │   ├── GraphSettingsPanel.tsx # Graph customization controls
+│   │   └── NodeBadge.tsx      # Entity type indicator
+│   ├── Narrative/             # Timeline/narrative components
+│   └── shared/                # Shared UI primitives
+│       ├── Card.tsx, Header.tsx, Sidebar.tsx
+│       ├── VerificationBadge.tsx
+│       └── ErrorBoundary.tsx, ErrorState.tsx, LoadingState.tsx
 ├── lib/
 │   ├── types.ts               # TypeScript types matching JSON schema
 │   ├── verification.ts        # Tier display logic
@@ -607,19 +617,20 @@ Every processing step is logged:
 
 **Structure:**
 ```
-output/
+cases/
 └── CASE-ID/
-    ├── audit/
-    │   ├── master_audit.jsonl          # Append-only log of all actions
-    │   └── document_logs/
-    │       ├── DOC-001_audit.json      # Per-document processing log
-    │       ├── DOC-002_audit.json
-    │       └── ...
-    ├── processed/
-    │   └── graph_data.json
-    └── artifacts/
-        ├── images/                     # Preprocessed images
-        └── ocr/                        # Raw OCR outputs
+    ├── intake/                         # Original uploaded documents
+    ├── preprocessed/                   # Preprocessed images for OCR
+    ├── ocr/                            # OCR text output
+    ├── ocr_translated/                 # Translated OCR text
+    ├── extractions/                    # LLM entity extractions
+    ├── output/
+    │   ├── graph_data.json             # Knowledge graph
+    │   └── *_dossier.pdf               # Generated dossiers
+    ├── metadata.json                   # Case metadata
+    ├── manifest.json                   # Processing manifest
+    ├── document_groups.yaml            # Multi-part document grouping
+    └── processing.log                  # Processing logs
 ```
 
 **Format:** JSON Lines (.jsonl) for master audit (one JSON object per line, append-only)

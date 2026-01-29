@@ -45,15 +45,18 @@ The Vault implements a **document-first navigation architecture** with multiple 
 - `TimelinePeriod` - Expandable timeline periods with document cards
 - `GraphView` - Wrapper for knowledge graph with navigation
 
-### Graph
+### Graph (`components/Graph/`)
 - `KnowledgeGraph` - Force-directed visualization (react-force-graph-2d)
+- `GraphView` - Full graph page wrapper with sidebar
 - `GraphSettingsPanel` - Real-time graph customization (layout, colors, filters)
-- `DossierPanel` - Entity details and relations
+- `EntitySidebar` - Slide-in panel that fetches and renders EntityDetail for selected nodes
+- `NodeBadge` - Entity type indicator on graph nodes
 
-### Shared
+### Shared (`components/shared/`)
 - `Card` - Styled container component
-- `Badge` - Verification tier badges
-- `shared/index.ts` - Common UI components
+- `VerificationBadge` - Verification tier badges
+- `ErrorBoundary`, `ErrorState`, `LoadingState` - Error/loading UI
+- `Header`, `Sidebar` - Layout navigation components
 
 ## Data Flow
 

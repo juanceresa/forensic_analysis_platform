@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import type { GraphData, BaseNode } from '@/lib/types';
-import { Header } from '@/components/Header';
-import { KnowledgeGraph } from '@/components/KnowledgeGraph';
-import { EntitySidebar } from '@/components/EntitySidebar';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { GraphSettingsPanel } from '@/components/GraphSettingsPanel';
+import { Header } from '@/components/Dashboard/Header';
+import { KnowledgeGraph } from '@/components/Graph/KnowledgeGraph';
+import { EntitySidebar } from '@/components/Graph/EntitySidebar';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { GraphSettingsPanel } from '@/components/Graph/GraphSettingsPanel';
 import { useGraphSettings } from '@/hooks/useGraphSettings';
-
-type TabType = 'details' | 'narrative';
 
 interface DashboardClientProps {
   initialData: GraphData;
@@ -18,18 +16,8 @@ interface DashboardClientProps {
 
 export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('details');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { settings, updateSetting, resetSettings } = useGraphSettings();
-
-  const selectedNode = initialData.nodes.find((n) => n.id === selectedNodeId) || null;
-
-  // DEBUG: Log node selection
-  console.log('DashboardClient render:', {
-    selectedNodeId,
-    selectedNode: selectedNode ? selectedNode.id : 'null',
-    totalNodes: initialData.nodes.length,
-  });
 
   return (
     <ErrorBoundary>
@@ -43,9 +31,7 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
               data={initialData}
               selectedNodeId={selectedNodeId}
               onNodeClick={(node: BaseNode) => {
-                console.log('Node clicked:', node.id, node.name || node.id);
                 setSelectedNodeId(node.id);
-                setActiveTab('details'); // Reset to details on new selection
               }}
               onBackgroundClick={() => {
                 setSelectedNodeId(null);
@@ -59,12 +45,9 @@ export function DashboardClient({ initialData, caseId }: DashboardClientProps) {
             />
           </div>
 
-          {/* Right: Tabbed Sidebar (500px fixed) */}
+          {/* Right: Entity Sidebar (500px fixed) */}
           <EntitySidebar
-            selectedNode={selectedNode}
-            graphData={initialData}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
+            selectedNodeId={selectedNodeId}
             caseId={caseId}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}

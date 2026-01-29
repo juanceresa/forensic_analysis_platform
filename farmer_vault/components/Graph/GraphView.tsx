@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { KnowledgeGraph } from '@/components/KnowledgeGraph';
-import { GraphSettingsPanel } from '@/components/GraphSettingsPanel';
+import { KnowledgeGraph } from './KnowledgeGraph';
+import { EntitySidebar } from './EntitySidebar';
+import { GraphSettingsPanel } from './GraphSettingsPanel';
 import { useGraphSettings } from '@/hooks/useGraphSettings';
 import type { GraphData, BaseNode } from '@/lib/types';
 
@@ -20,12 +20,12 @@ const ENTITY_TYPE_COLORS: Record<string, { color: string; label: string }> = {
 };
 
 export function GraphView({ caseId }: GraphViewProps) {
-  const router = useRouter();
   const { settings, updateSetting, resetSettings, isLoaded } = useGraphSettings();
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     async function fetchGraphData() {
@@ -45,8 +45,7 @@ export function GraphView({ caseId }: GraphViewProps) {
   }, [caseId]);
 
   const handleNodeClick = (node: BaseNode) => {
-    // Navigate to entity detail page
-    router.push(`/case/${caseId}/entity/${encodeURIComponent(node.id)}`);
+    setSelectedNodeId(node.id);
   };
 
   const handleBackgroundClick = () => {
@@ -89,38 +88,51 @@ export function GraphView({ caseId }: GraphViewProps) {
         </div>
       </header>
 
-      {/* Graph Canvas */}
-      <div className="flex-1 relative overflow-hidden">
-        <KnowledgeGraph
-          data={graphData}
-          selectedNodeId={selectedNodeId}
-          onNodeClick={handleNodeClick}
-          onBackgroundClick={handleBackgroundClick}
-          settings={settings}
-        />
+      {/* Graph + Sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Graph Canvas */}
+        <div className="flex-1 min-w-0 relative flex flex-col">
+          <div className="flex-1 relative overflow-hidden">
+            <KnowledgeGraph
+              data={graphData}
+              selectedNodeId={selectedNodeId}
+              onNodeClick={handleNodeClick}
+              onBackgroundClick={handleBackgroundClick}
+              settings={settings}
+            />
 
-        {/* Settings Panel (overlaid) */}
-        <GraphSettingsPanel
-          settings={settings}
-          onUpdateSetting={updateSetting}
-          onReset={resetSettings}
+            {/* Settings Panel (overlaid) */}
+            <GraphSettingsPanel
+              settings={settings}
+              onUpdateSetting={updateSetting}
+              onReset={resetSettings}
+            />
+          </div>
+
+          {/* Legend Footer */}
+          <footer className="shrink-0 px-6 py-3 border-t border-slate-800 bg-slate-900/50">
+            <div className="flex items-center gap-6 justify-center">
+              {Object.entries(ENTITY_TYPE_COLORS).map(([type, config]) => (
+                <div key={type} className="flex items-center gap-2">
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: config.color }}
+                  />
+                  <span className="text-xs text-slate-400 font-mono">{config.label}</span>
+                </div>
+              ))}
+            </div>
+          </footer>
+        </div>
+
+        {/* Entity Sidebar */}
+        <EntitySidebar
+          selectedNodeId={selectedNodeId}
+          caseId={caseId}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         />
       </div>
-
-      {/* Legend Footer */}
-      <footer className="shrink-0 px-6 py-3 border-t border-slate-800 bg-slate-900/50">
-        <div className="flex items-center gap-6 justify-center">
-          {Object.entries(ENTITY_TYPE_COLORS).map(([type, config]) => (
-            <div key={type} className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: config.color }}
-              />
-              <span className="text-xs text-slate-400 font-mono">{config.label}</span>
-            </div>
-          ))}
-        </div>
-      </footer>
     </div>
   );
 }

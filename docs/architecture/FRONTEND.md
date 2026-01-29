@@ -363,7 +363,7 @@ Data visibility controls:
 
 **Implementation:**
 ```typescript
-// components/KnowledgeGraph.tsx
+// components/Graph/KnowledgeGraph.tsx
 
 // Filter data based on settings
 const filteredData: GraphData = useMemo(() => {
@@ -690,7 +690,7 @@ code, .data-field, .node-label { font-family: var(--font-mono); }
 The centerpiece visualization using `react-force-graph-2d`.
 
 ```typescript
-// components/KnowledgeGraph.tsx
+// components/Graph/KnowledgeGraph.tsx
 
 import ForceGraph2D from 'react-force-graph-2d';
 import { useCallback, useRef, useMemo } from 'react';
@@ -811,7 +811,7 @@ export function KnowledgeGraph({
 
 ### 2. Graph Settings Panel
 
-**Implementation:** `components/GraphSettingsPanel.tsx`
+**Implementation:** `components/Graph/GraphSettingsPanel.tsx`
 
 Three-tab floating panel with gear icon toggle:
 
@@ -877,147 +877,42 @@ export function GraphSettingsPanel({
 - Color pickers for entity colors
 - Reset button to restore defaults
 
-### 3. Dossier Panel
+### 3. Entity Sidebar
 
-Right-side detail panel shown when a node is selected.
+Right-side slide-in panel shown when a graph node is selected. Fetches entity data from the API and renders the `EntityDetail` component inline.
 
-```typescript
-// components/DossierPanel.tsx
-
-import { BaseNode, GraphData } from '@/lib/types';
-import { NodeBadge } from './NodeBadge';
-import { SourceList } from './SourceList';
-import { RelatedEntities } from './RelatedEntities';
-
-interface DossierPanelProps {
-  node: BaseNode | null;
-  graphData: GraphData;
-  onNodeSelect: (nodeId: string) => void;
-}
-
-export function DossierPanel({ node, graphData, onNodeSelect }: DossierPanelProps) {
-  if (!node) {
-    return (
-      <div className="vault-panel h-full flex items-center justify-center text-slate-500">
-        <p className="text-center">
-          Select a node in the graph<br />
-          to view details
-        </p>
-      </div>
-    );
-  }
-
-  // Find related links and entities
-  const relatedLinks = graphData.links.filter(
-    l => l.source === node.id || l.target === node.id
-  );
-
-  const relatedNodeIds = new Set(
-    relatedLinks.flatMap(l => [l.source, l.target]).filter(id => id !== node.id)
-  );
-
-  const relatedNodes = graphData.nodes.filter(n => relatedNodeIds.has(n.id));
-
-  // Find source documents
-  const extractedFromIds = (node.extracted_from || '')
-    .split(',')
-    .map(id => id.trim())
-    .filter(Boolean);
-  const extractedFromSet = new Set(extractedFromIds);
-  const sourceDocuments = graphData.nodes.filter(
-    n => n.entity_type === 'DOCUMENT' && extractedFromSet.has(n.id)
-  );
-
-  return (
-    <div className="vault-panel h-full overflow-y-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-start justify-between">
-          <h2 className="text-xl font-semibold text-slate-50">
-            {node.name}
-          </h2>
-          <NodeBadge tier={node.verification.tier} />
-        </div>
-        <p className="text-sm text-slate-400 font-mono">
-          {node.entity_type} • {node.id}
-        </p>
-      </div>
-
-      {/* Verification Info */}
-      <section className="vault-card">
-        <h3 className="text-sm font-semibold text-slate-300 mb-2">
-          Verification
-        </h3>
-        <div className="space-y-1 text-sm">
-          <p className="text-slate-400">
-            Confidence: <span className="text-slate-200 font-mono">
-              {(node.verification.confidence * 100).toFixed(0)}%
-            </span>
-          </p>
-          {node.verification.notes && (
-            <p className="text-slate-500 italic">
-              {node.verification.notes}
-            </p>
-          )}
-        </div>
-
-        {/* TIER_3 Disclaimer */}
-        {node.verification.tier === 'TIER_3_AI' && (
-          <div className="mt-3 p-2 bg-slate-800 rounded border border-slate-700">
-            <p className="text-xs text-slate-500">
-              ⚠️ AI-extracted data. Not verified by human analyst.
-              Confidence scores indicate extraction reliability, not factual accuracy.
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* Entity Data */}
-      <section className="vault-card">
-        <h3 className="text-sm font-semibold text-slate-300 mb-2">
-          Details
-        </h3>
-        <EntityDataDisplay data={node} type={node.entity_type} />
-      </section>
-
-      {/* Source Documents */}
-      {sourceDocuments.length > 0 && (
-        <section className="vault-card">
-          <h3 className="text-sm font-semibold text-slate-300 mb-2">
-            Source Documents ({sourceDocuments.length})
-          </h3>
-          <SourceList
-            documents={sourceDocuments}
-            onDocumentClick={(docId) => onNodeSelect(docId)}
-          />
-        </section>
-      )}
-
-      {/* Related Entities */}
-      {relatedNodes.length > 0 && (
-        <section className="vault-card">
-          <h3 className="text-sm font-semibold text-slate-300 mb-2">
-            Related Entities ({relatedNodes.length})
-          </h3>
-          <RelatedEntities
-            nodes={relatedNodes}
-            links={relatedLinks}
-            currentNodeId={node.id}
-            onNodeClick={onNodeSelect}
-          />
-        </section>
-      )}
-    </div>
-  );
-}
 ```
+┌────────────────────────────────────┬──────────────┐
+│ KnowledgeGraph (flex-1)            │ EntitySidebar│
+│                                    │ (500px)      │
+│  Click node → fetch entity data    │ Entity header│
+│  Click bg   → clear selection      │ Metadata     │
+│                                    │ Source docs  │
+│                                    │ Connections  │
+└────────────────────────────────────┴──────────────┘
+```
+
+**Location:** `components/Graph/EntitySidebar.tsx`
+
+**Props:**
+- `selectedNodeId: string | null` — which node is selected
+- `caseId: string` — case context for API fetch
+- `isCollapsed: boolean` — sidebar width toggle
+- `onToggleCollapse: () => void` — collapse/expand callback
+
+**Behavior:**
+- When `selectedNodeId` changes, fetches `/api/cases/{caseId}/entity/{entityId}`
+- Renders `EntityDetail` with the fetched entity, source documents, and connections
+- Collapsible to 48px rail with expand button
+- Shows loading spinner during fetch, error state on failure
+- Empty state prompts user to select a node
 
 ### 4. Node Badge
 
 Verification tier indicator.
 
 ```typescript
-// components/NodeBadge.tsx
+// components/Graph/NodeBadge.tsx
 
 import { VerificationTier } from '@/lib/types';
 
