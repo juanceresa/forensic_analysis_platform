@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "farmer-factory"
+version = "0.1.0"
+description = "Forensic document analysis platform"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+include = ["farmer_factory*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

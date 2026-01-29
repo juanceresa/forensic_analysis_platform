@@ -125,7 +125,9 @@ class CrossTypeRelation(BaseModel):
     """A relation between entities of different types (e.g., person OWNS property)."""
 
     source_id: str
+    source_name: str = ""
     target_id: str
+    target_name: str = ""
     relation_type: str
     date: Optional[str] = None
     source: SourceType = "dedupe"

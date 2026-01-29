@@ -31,6 +31,8 @@ class GraphBuilder:
         self.resolver = resolver
         self.document_groups: Optional["DocumentGroupsConfig"] = None
         self._file_to_group_id: Dict[str, str] = {}  # Maps filename to group doc ID
+        # Records (absorbed_id, absorbed_name, canonical_id, canonical_name, confidence)
+        self.merge_log: List[tuple] = []
         self.processing_stats: Dict[str, int] = {
             "documents_processed": 0,
             "entities_extracted": 0,
@@ -149,6 +151,17 @@ class GraphBuilder:
 
                 # Track that this entity's ID was remapped
                 id_remapping[entity.id] = similar_id
+
+                # Record merge decision for entity group files
+                canonical_name = existing_data.get("name", "")
+                if isinstance(canonical_name, list):
+                    canonical_name = canonical_name[0] if canonical_name else ""
+                absorbed_name = entity.name if hasattr(entity, "name") else ""
+                self.merge_log.append((
+                    entity.id, str(absorbed_name),
+                    similar_id, str(canonical_name),
+                    match_confidence,
+                ))
 
                 self.processing_stats["entities_merged"] += 1
                 logger.info(f"Merged entity {entity.id} into {similar_id}")

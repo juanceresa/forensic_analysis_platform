@@ -1,8 +1,8 @@
 # CLAUDE.md — Instructions for Claude Code
 
-> **Version:** 2.6.0
-> **Last Updated:** 2026-01-27
-> **Status:** Master instructions file (Academic KG improvements complete)
+> **Version:** 2.8.0
+> **Last Updated:** 2026-01-29
+> **Status:** Master instructions file (Entity merge authority + frontend document grouping complete)
 
 ---
 
@@ -208,6 +208,16 @@ python -m farmer_factory.cli process CASE-ID --domain cuban_property --force-typ
 ### Train entity deduplication
 ```bash
 python -m farmer_factory.cli train-deduplication CASE-ID --domain cuban_property --entity-type PERSON
+python -m farmer_factory.cli train-deduplication CASE-ID --entity-type LOCATION
+python -m farmer_factory.cli train-deduplication CASE-ID --entity-type PROPERTY
+python -m farmer_factory.cli train-deduplication CASE-ID --entity-type ORGANIZATION
+```
+
+### Rebuild graph from existing extractions (no OCR/LLM cost)
+```bash
+# After retraining dedupe models, rebuild graph without re-running OCR or LLM
+python -m farmer_factory.cli rebuild-graph CASE-ID
+# Clears stale entity_groups/, regenerates DRAFT merge files, applies CONFIRMED merges
 ```
 
 ### Apply entity merges (after analyst reviews entity_groups/*.yaml)
@@ -218,7 +228,7 @@ python -m farmer_factory.cli apply-merges CASE-ID --include-drafts  # preview
 
 ### Merge two entities manually (analyst-driven)
 ```bash
-python -m farmer_factory.cli merge-entities CASE-ID --entity-type PERSON --canonical-id X --member-id Y
+python -m farmer_factory.cli merge-entities CASE-ID ENTITY_A ENTITY_B
 ```
 
 ### Clean case for re-processing
@@ -244,8 +254,8 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 
 **See:** `.claude/ROADMAP.md` for current implementation status.
 
-**Recent:** Phase 9C - Entity Merge Authority (✅ COMPLETE - 2026-01-29)
-**Status:** YAML-based merge authority, analyst-driven merges, graph surgery engine
+**Recent:** Phase 9C + 9D (✅ COMPLETE - 2026-01-29)
+**Status:** Entity merge authority, rebuild-graph CLI, frontend document grouping integration
 
 ### Completed Phases
 - Phase 6 - Narrative Generation (✅ 2026-01-25)
@@ -281,8 +291,17 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - YAML-based merge authority with DRAFT/CONFIRMED two-level status
   - Per-type entity group files in `entity_groups/`
   - Graph surgery engine (node merge, relation rewrite, metadata recompute)
-  - CLI: `apply-merges`, `merge-entities` commands
+  - CLI: `apply-merges`, `merge-entities`, `rebuild-graph` commands
+  - Merge conflict provenance via `_merge_conflicts` dict (not list-valued fields)
   - Pipeline integration + 54 tests
+- Phase 9D - Frontend Document Grouping (✅ COMPLETE - 2026-01-29)
+  - All Vault API routes support `document_groups.yaml` (documents list, single doc, image, timeline)
+  - Multi-page document viewer with page navigation (prev/next)
+  - Grouped documents aggregated as single entries in document list
+  - `js-yaml` dependency for YAML parsing in API routes
+  - Expanded `inferType()` heuristics (Property, Survey, Financial, Inheritance)
+  - Date sort order toggle (ascending/descending)
+  - Iframe-based PDF viewer replacing manual zoom controls
 
 ### Strategic Priorities (from Civic Architecture Vision)
 1. **Domain Configuration Abstraction** — ✅ Complete

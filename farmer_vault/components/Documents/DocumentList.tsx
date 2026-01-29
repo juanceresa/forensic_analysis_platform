@@ -13,6 +13,7 @@ type SortBy = 'date' | 'type';
 
 export function DocumentList({ documents, caseId }: DocumentListProps) {
   const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [dateOrder, setDateOrder] = useState<'asc' | 'desc'>('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
 
@@ -64,11 +65,12 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
 
     // Sort
     if (sortBy === 'date') {
+      const dir = dateOrder === 'asc' ? 1 : -1;
       return docs.sort((a, b) => {
         if (!a.date && !b.date) return 0;
         if (!a.date) return 1;
         if (!b.date) return -1;
-        return new Date(a.date).getTime() - new Date(b.date).getTime();
+        return dir * (new Date(a.date).getTime() - new Date(b.date).getTime());
       });
     } else {
       return docs.sort((a, b) => {
@@ -82,7 +84,7 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
     }
-  }, [documents, searchTerm, selectedType, sortBy]);
+  }, [documents, searchTerm, selectedType, sortBy, dateOrder]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -163,6 +165,28 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
             By Type
           </button>
         </div>
+
+        {/* Date order chips (only when sorting by date) */}
+        {sortBy === 'date' && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500 font-mono mr-1">Order:</span>
+            {(['asc', 'desc'] as const).map(order => (
+              <button
+                key={order}
+                onClick={() => setDateOrder(order)}
+                className={`px-3 py-1 text-xs font-mono rounded border transition-colors
+                  focus-visible:ring-2 focus-visible:ring-blue-500
+                  ${
+                    dateOrder === order
+                      ? 'bg-blue-600 border-blue-500 text-white'
+                      : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                  }`}
+              >
+                {order === 'asc' ? 'Ascending' : 'Descending'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Type filter chips (only when sorting by type) */}
         {sortBy === 'type' && documentTypes.length > 0 && (

@@ -836,6 +836,50 @@ def generate_manifest(case_id: str):
     click.echo(f"  Successful: {summary['successful']}")
 
 
+@cli.command("rebuild-graph")
+@click.argument("case_id")
+@click.option(
+    "--skip-validation",
+    is_flag=True,
+    help="Skip graph_data.json validation",
+)
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def rebuild_graph(case_id: str, skip_validation: bool, domain: str):
+    """Rebuild graph from existing extractions (no OCR/LLM).
+
+    Loads extraction JSONs, rebuilds the knowledge graph using current
+    dedupe models, exports graph_data.json, generates merge files, and
+    applies confirmed merges.
+
+    Use after retraining dedupe models to see improved deduplication.
+
+    Example:
+        python cli.py rebuild-graph TEST-CERESA
+    """
+    setup_domain(domain)
+
+    from farmer_factory.processing.pipeline import rebuild_graph as _rebuild_graph
+
+    click.echo(f"Rebuilding graph for {case_id} from existing extractions...")
+
+    try:
+        stats = _rebuild_graph(
+            case_id=case_id,
+            skip_validation=skip_validation,
+        )
+        click.echo(f"\n✅ Graph rebuilt successfully!")
+        click.echo(f"   Documents: {stats['documents_processed']}")
+        click.echo(f"   Entities:  {stats['entities_extracted']} extracted, {stats['entities_merged']} merged")
+        click.echo(f"   Relations: {stats['relations_added']}")
+    except Exception as e:
+        logger.exception(f"rebuild-graph failed: {e}")
+        raise click.ClickException(str(e))
+
+
 @cli.command("apply-merges")
 @click.argument("case_id")
 @click.option(

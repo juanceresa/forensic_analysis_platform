@@ -1468,7 +1468,8 @@ tests/structure/
 
 ### CLI Commands Added
 - `apply-merges CASE-ID [--include-drafts]` — Apply confirmed merges to graph_data.json
-- `merge-entities CASE-ID --entity-type TYPE --canonical-id ID --member-id ID` — Analyst-driven merge
+- `merge-entities CASE-ID ENTITY_A ENTITY_B` — Analyst-driven merge (positional args)
+- `rebuild-graph CASE-ID [--skip-validation]` — Rebuild graph from existing extractions (no OCR/LLM)
 
 ### Key Design Decisions
 - **Two-level status:** File-level + per-entry DRAFT/CONFIRMED
@@ -1476,6 +1477,42 @@ tests/structure/
 - **Idempotent:** Running apply-merges twice produces same result
 - **Staleness detection:** `extractions_hash` warns when merge files are stale
 - **Metadata recompute:** entity_count, relation_count, verification_distribution updated after merge
+- **Rebuild clears stale merges:** `rebuild-graph` deletes old `entity_groups/*.yaml` because entity IDs change on rebuild
+- **Conflict provenance:** Entity merges store rejected values in `_merge_conflicts` dict (not as list-valued fields)
+
+---
+
+## Phase 9D: Frontend Document Grouping Integration
+
+### Status: ✅ COMPLETE (2026-01-29)
+
+### Overview
+Vault (Next.js frontend) now respects `document_groups.yaml` across all API routes, presenting grouped multi-part documents as single logical entries with multi-page navigation.
+
+### Changes
+
+| Area | File | Change |
+|------|------|--------|
+| Documents list API | `app/api/cases/[caseId]/documents/route.ts` | Aggregates grouped extraction files into single entries; loads `document_groups.yaml` |
+| Single document API | `app/api/cases/[caseId]/document/[docId]/route.ts` | `handleGroupedDocument()` merges all pages' entities, OCR, translations; returns `pages[]` array |
+| Image API | `app/api/cases/[caseId]/document/[docId]/image/route.ts` | `?page=N` query param for serving specific group file images |
+| Timeline API | `app/api/cases/[caseId]/timeline/route.ts` | Groups extraction files by document group; deduplicates timeline entries |
+| Document viewer | `components/Documents/DocumentViewer.tsx` | Multi-page navigation (prev/next); per-page OCR, translation, entities; iframe PDF viewer |
+| Document list | `components/Documents/DocumentList.tsx` | Date sort order toggle (ascending/descending) |
+| Dependencies | `package.json` | Added `js-yaml` + `@types/js-yaml` |
+
+### Frontend API Changes
+- Grouped documents use `doc_<group_id>` as their document ID
+- Single document API returns `pages[]` array for grouped docs (each page has `ocrText`, `translatedText`, `imagePath`, `entities`)
+- Image API accepts `?page=N` to serve specific pages within a group
+- `inferType()` expanded: Property, Survey, Financial, Inheritance types added
+
+### Key Design Decisions
+- **Backward compatible:** No `document_groups.yaml` = all documents treated as standalone (existing behavior)
+- **Only CONFIRMED groups:** DRAFT groups are ignored by frontend
+- **Aggregate stats:** Entity counts, confidence scores aggregated across all pages in a group
+- **Page-level content:** OCR text, translations, and entities are per-page, not concatenated
+- **Iframe viewer:** Replaced manual zoom controls with native browser PDF rendering via `<iframe>`
 
 ---
 

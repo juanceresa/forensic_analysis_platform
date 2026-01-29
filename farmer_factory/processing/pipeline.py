@@ -241,6 +241,10 @@ def process_case(
             except Exception as e:
                 logger.warning(f"Failed to translate OCR text: {e}")
 
+            # Ensure document_id is in processing_metadata for grouping lookup
+            if extraction.processing_metadata is not None:
+                extraction.processing_metadata.setdefault("document_id", document_id)
+
             # Add to graph (with auto-deduplication)
             try:
                 builder.add_extraction(extraction)
@@ -319,6 +323,176 @@ def process_case(
     return stats
 
 
+def rebuild_graph(
+    case_id: str,
+    base_dir: Path = None,
+    skip_validation: bool = False,
+) -> Dict[str, Any]:
+    """Rebuild graph from existing extractions without OCR or LLM calls.
+
+    Loads all extraction JSON files, runs them through the graph builder
+    with current dedupe models, exports graph_data.json, generates merge
+    files, and applies confirmed merges.
+
+    Use after retraining dedupe models to see improved deduplication
+    without re-running the expensive OCR/extraction pipeline.
+
+    Args:
+        case_id: Case identifier (e.g., "TEST-CERESA")
+        base_dir: Base directory for cases (defaults to "cases")
+        skip_validation: Skip validating exported graph_data.json
+
+    Returns:
+        Dictionary with processing statistics
+    """
+    import json
+    from farmer_factory.structure.schema import BaseEntity, Relation
+
+    if base_dir is None:
+        base_dir = Path("cases")
+
+    case_dir = base_dir / case_id
+    if not case_dir.exists():
+        raise ProcessingError(f"Case directory not found: {case_dir}")
+
+    extractions_dir = case_dir / "extractions"
+    output_dir = case_dir / "output"
+
+    if not extractions_dir.exists():
+        raise ProcessingError(f"No extractions directory: {extractions_dir}")
+
+    extraction_files = sorted(extractions_dir.glob("*.json"))
+    if not extraction_files:
+        raise ProcessingError(f"No extraction JSON files in: {extractions_dir}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Rebuilding graph for case: {case_id}")
+    logger.info(f"Found {len(extraction_files)} extraction files")
+
+    # Initialize graph builder with current dedupe models
+    graph = KnowledgeGraph(case_id=case_id)
+    resolver = DedupeEntityResolver(threshold=0.5)
+    builder = GraphBuilder(knowledge_graph=graph, resolver=resolver)
+
+    # Load and apply document groups if available
+    doc_groups = load_document_groups(case_dir)
+    if doc_groups and doc_groups.is_confirmed():
+        builder.set_document_groups(doc_groups)
+        logger.info(f"Loaded {len(doc_groups.groups)} confirmed document groups")
+
+    # Load each extraction and feed into graph builder
+    for ext_file in extraction_files:
+        try:
+            with open(ext_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Reconstruct entities from JSON
+            entities = []
+            for e_data in data.get("entities", []):
+                entity_type = e_data.get("entity_type", "")
+                entity_cls = _get_entity_class(entity_type)
+                if entity_cls:
+                    try:
+                        entities.append(entity_cls.model_validate(e_data))
+                    except Exception as e:
+                        logger.warning(f"Failed to parse entity in {ext_file.name}: {e}")
+
+            # Reconstruct relations from JSON
+            relations = []
+            for r_data in data.get("relations", []):
+                try:
+                    relations.append(Relation.model_validate(r_data))
+                except Exception as e:
+                    logger.warning(f"Failed to parse relation in {ext_file.name}: {e}")
+
+            # Build a minimal ExtractionResult
+            from farmer_factory.extract.pipeline import ExtractionResult
+            from farmer_factory.prepare import DocumentPath
+
+            # Inject document_id from filename so _create_document_entity
+            # can identify the source file even when entities list is empty
+            proc_meta = data.get("processing_metadata", {})
+            proc_meta.setdefault("document_id", ext_file.stem)
+
+            extraction = ExtractionResult(
+                entities=entities,
+                relations=relations,
+                ocr_result=None,
+                confidence_scores=data.get("confidence_scores", {}),
+                path=DocumentPath.TYPED,
+                processing_metadata=proc_meta,
+            )
+            builder.add_extraction(extraction)
+            logger.info(f"  Loaded {ext_file.name}: {len(entities)} entities, {len(relations)} relations")
+
+        except Exception as e:
+            logger.warning(f"Failed to load {ext_file.name}: {e}")
+
+    # Export graph
+    logger.info("Exporting graph...")
+    exporter = GraphExporter(knowledge_graph=graph)
+    exporter.save(output_dir / "graph_data.json", factory_version="1.0.0")
+
+    # Clear stale entity_groups (entity IDs change on rebuild)
+    entity_groups_dir = case_dir / "entity_groups"
+    if entity_groups_dir.exists():
+        for f in entity_groups_dir.iterdir():
+            if f.suffix == ".yaml":
+                f.unlink()
+        logger.info("Cleared stale entity group files")
+
+    # Generate merge files and apply confirmed merges
+    try:
+        _generate_merge_files(case_dir, graph, builder)
+        if entity_groups_dir.exists() and any(entity_groups_dir.iterdir()):
+            try:
+                from farmer_factory.structure.merge_engine import apply_merges
+                apply_merges(case_dir, include_drafts=False,
+                            output_path=output_dir / "graph_data.json")
+                logger.info("Applied confirmed merges to graph")
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                logger.warning(f"Failed to apply confirmed merges: {e}")
+    except Exception as e:
+        logger.warning(f"Merge file generation failed (non-fatal): {e}")
+
+    # Validate
+    if not skip_validation:
+        try:
+            from farmer_factory.structure.schema import GraphExport
+            graph_file = output_dir / "graph_data.json"
+            with open(graph_file, "r", encoding="utf-8") as f:
+                export_data = json.load(f)
+            GraphExport.model_validate(export_data)
+        except Exception as e:
+            raise ProcessingError(f"Export validation failed: {e}")
+
+    stats = builder.processing_stats
+    logger.info("Graph rebuild complete!")
+    logger.info(f"Documents processed: {stats['documents_processed']}")
+    logger.info(f"Entities extracted:  {stats['entities_extracted']}")
+    logger.info(f"Entities merged:     {stats['entities_merged']}")
+    logger.info(f"Relations added:     {stats['relations_added']}")
+
+    return stats
+
+
+def _get_entity_class(entity_type: str):
+    """Get the Pydantic entity class for a given entity type string."""
+    from farmer_factory.structure.schema import (
+        Person, Property, Organization, Location, Document,
+    )
+    return {
+        "PERSON": Person,
+        "PROPERTY": Property,
+        "ORGANIZATION": Organization,
+        "LOCATION": Location,
+        "DOCUMENT": Document,
+    }.get(entity_type)
+
+
 def _generate_merge_files(
     case_dir: Path,
     graph: "KnowledgeGraph",
@@ -329,28 +503,68 @@ def _generate_merge_files(
     Extracts clusters of merged entities from the graph builder's stats
     and writes them as DRAFT entity_groups/*.yaml files.
     """
+    from collections import defaultdict
     from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
 
-    # Group entities by type from graph
-    entities_by_type: Dict[str, list] = {}
+    # Build clusters from builder's merge_log
+    # merge_log entries: (absorbed_id, absorbed_name, canonical_id, canonical_name, confidence)
+    # Group by canonical_id
+    clusters_by_canonical: Dict[str, list] = defaultdict(list)
+    for absorbed_id, absorbed_name, canonical_id, canonical_name, confidence in builder.merge_log:
+        clusters_by_canonical[canonical_id].append(
+            (absorbed_id, absorbed_name, confidence)
+        )
+
+    # Determine entity type for each canonical from the graph
+    clusters_by_type: Dict[str, list] = defaultdict(list)
+    canonical_names: Dict[str, str] = {}
+    for canonical_id, members in clusters_by_canonical.items():
+        node_data = graph.graph.nodes.get(canonical_id)
+        if not node_data:
+            continue
+        etype = node_data.get("entity_type", "")
+        name = node_data.get("name", "")
+        if isinstance(name, list):
+            name = name[0] if name else ""
+        canonical_names[canonical_id] = str(name)
+        # Build cluster: canonical first (conf 1.0), then absorbed members
+        cluster = [(canonical_id, str(name), 1.0)]
+        for absorbed_id, absorbed_name, conf in members:
+            cluster.append((absorbed_id, str(absorbed_name), conf))
+        clusters_by_type[etype].append(cluster)
+
+    # Identify all entity IDs that participated in a merge (canonical or absorbed)
+    merged_ids: set = set()
+    for canonical_id, members in clusters_by_canonical.items():
+        merged_ids.add(canonical_id)
+        for absorbed_id, _, _ in members:
+            merged_ids.add(absorbed_id)
+
+    # Group all graph entities by type; singletons are those not in any merge
+    entities_by_type: Dict[str, list] = defaultdict(list)
     for node_id, node_data in graph.graph.nodes(data=True):
         etype = node_data.get("entity_type", "")
-        if etype not in entities_by_type:
-            entities_by_type[etype] = []
-        entities_by_type[etype].append((node_id, node_data.get("name", "")))
+        if node_id not in merged_ids:
+            name = node_data.get("name", "")
+            if isinstance(name, list):
+                name = name[0] if name else ""
+            entities_by_type[etype].append((node_id, str(name)))
 
-    # For each entity type, write singletons (no clusters yet from fresh processing)
-    # Clusters will come from future dedupe partition runs
-    for entity_type, entities in entities_by_type.items():
-        if entity_type not in ("PERSON", "PROPERTY", "ORGANIZATION", "LOCATION"):
-            continue
+    # Write merge files per entity type
+    for entity_type in ("PERSON", "PROPERTY", "ORGANIZATION", "LOCATION"):
+        clusters = clusters_by_type.get(entity_type, [])
+        singletons = entities_by_type.get(entity_type, [])
         try:
             write_entity_groups(
                 case_dir=case_dir,
                 entity_type=entity_type,
-                clusters=[],  # No new clusters from this run
-                singletons=entities,
+                clusters=clusters,
+                singletons=singletons,
             )
+            if clusters:
+                logger.info(
+                    f"Wrote {len(clusters)} merge group(s) for {entity_type}"
+                )
         except Exception as e:
             logger.warning(f"Failed to write {entity_type} merge file: {e}")
 
@@ -360,9 +574,17 @@ def _generate_merge_files(
         source_type = graph.graph.nodes[source].get("entity_type", "")
         target_type = graph.graph.nodes[target].get("entity_type", "")
         if source_type != target_type:
+            source_name = graph.graph.nodes[source].get("name", "")
+            target_name = graph.graph.nodes[target].get("name", "")
+            if isinstance(source_name, list):
+                source_name = source_name[0] if source_name else ""
+            if isinstance(target_name, list):
+                target_name = target_name[0] if target_name else ""
             cross_relations.append({
                 "source_id": source,
+                "source_name": str(source_name),
                 "target_id": target,
+                "target_name": str(target_name),
                 "relation_type": edge_data.get("relation_type", ""),
                 "date": edge_data.get("date"),
                 "source": "extraction",

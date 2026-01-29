@@ -6,6 +6,7 @@ CONFIRMED entries when updating.
 
 import hashlib
 import logging
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -223,7 +224,9 @@ def write_cross_type_relations(
         if key not in confirmed_keys:
             draft_relations.append(CrossTypeRelation(
                 source_id=rel_dict["source_id"],
+                source_name=rel_dict.get("source_name", ""),
                 target_id=rel_dict["target_id"],
+                target_name=rel_dict.get("target_name", ""),
                 relation_type=rel_dict["relation_type"],
                 date=rel_dict.get("date"),
                 source=rel_dict.get("source", "extraction"),
@@ -239,7 +242,7 @@ def write_cross_type_relations(
         relations=all_relations,
     )
 
-    _write_yaml(filepath, cross_file.model_dump())
+    _write_yaml_with_spaced_list(filepath, cross_file.model_dump(), list_key="relations")
     logger.info(
         f"Wrote cross-type relations: {len(confirmed_relations)} confirmed, "
         f"{len(draft_relations)} draft"
@@ -332,3 +335,12 @@ def _write_yaml(path: Path, data: dict) -> None:
     """Write data to YAML with clean formatting."""
     with open(path, "w") as f:
         yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+
+def _write_yaml_with_spaced_list(path: Path, data: dict, list_key: str) -> None:
+    """Write YAML with blank lines between items in the specified list key."""
+    text = yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    # Add blank line before each list entry (- source_id:) except the first
+    text = re.sub(r'\n(- source_id:)', r'\n\n\1', text)
+    with open(path, "w") as f:
+        f.write(text)

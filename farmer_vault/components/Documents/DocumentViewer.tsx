@@ -29,14 +29,25 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('ocr');
-  const [zoom, setZoom] = useState(0.25); // Start zoomed out to fit document
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const pages = document.pages;
+  const totalPages = pages ? pages.length : 1;
+  const isMultiPage = totalPages > 1;
+
+  // Current page data
+  const currentOcrText = pages ? pages[currentPage]?.ocrText : document.ocrText;
+  const currentTranslatedText = pages ? pages[currentPage]?.translatedText : document.translatedText;
+  const currentImagePath = pages ? pages[currentPage]?.imagePath : document.imagePath;
+  const currentEntities = pages ? pages[currentPage]?.entities : document.entities;
 
   const languageDisplayName = document.detectedLanguage
     ? LANGUAGE_NAMES[document.detectedLanguage] || document.detectedLanguage.toUpperCase()
     : null;
 
-  // Translation is pre-generated during processing
-  const hasTranslation = !!document.translatedText;
+  const hasTranslation = pages
+    ? pages.some(p => !!p.translatedText)
+    : !!document.translatedText;
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -59,70 +70,63 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
     }, {} as Record<string, BaseNode[]>);
   };
 
-  const groupedEntities = groupEntitiesByType(document.entities);
+  const groupedEntities = groupEntitiesByType(currentEntities || []);
+
+  const goToPage = (page: number) => {
+    if (page >= 0 && page < totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   return (
     <div className="h-full flex">
       {/* Left: Original Image */}
       <section
-        className="flex-1 bg-slate-900 border-r border-slate-800 overflow-auto"
+        className="flex-1 bg-slate-900 border-r border-slate-800 overflow-auto flex flex-col"
         aria-label="Document image"
       >
-        <div className="p-8">
-          {/* Zoom controls */}
-          <div className="mb-4 flex items-center gap-2">
+        <div className="flex flex-col flex-1 min-h-0 p-2">
+          {/* Document image/PDF — browser handles zoom natively */}
+          <iframe
+            key={currentImagePath}
+            src={currentImagePath}
+            className="w-full flex-1 border border-slate-800 rounded"
+            title={`Document: ${document.filename}${isMultiPage ? ` - Page ${currentPage + 1}` : ''}`}
+          />
+        </div>
+
+        {/* Page navigation bar at bottom of image pane */}
+        {isMultiPage && (
+          <nav className="flex items-center justify-center gap-3 px-4 py-3 bg-slate-950 border-t border-slate-800">
             <button
-              aria-label="Zoom out"
-              className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors
+              aria-label="Previous page"
+              disabled={currentPage === 0}
+              onClick={() => goToPage(currentPage - 1)}
+              className="p-2 rounded bg-slate-800 hover:bg-slate-700 transition-colors
+                         disabled:opacity-30 disabled:cursor-not-allowed
                          focus-visible:ring-2 focus-visible:ring-blue-500"
-              onClick={() => setZoom(z => Math.max(0.1, z - 0.1))}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <span className="px-3 py-1 bg-slate-800 rounded font-mono text-sm tabular-nums min-w-[4rem] text-center">
-              {Math.round(zoom * 100)}%
+            <span className="font-mono text-sm text-slate-300 tabular-nums min-w-[5rem] text-center">
+              {currentPage + 1} / {totalPages}
             </span>
             <button
-              aria-label="Zoom in"
-              className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors
+              aria-label="Next page"
+              disabled={currentPage === totalPages - 1}
+              onClick={() => goToPage(currentPage + 1)}
+              className="p-2 rounded bg-slate-800 hover:bg-slate-700 transition-colors
+                         disabled:opacity-30 disabled:cursor-not-allowed
                          focus-visible:ring-2 focus-visible:ring-blue-500"
-              onClick={() => setZoom(z => Math.min(1, z + 0.1))}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            <button
-              aria-label="Reset zoom"
-              className="ml-auto px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-sm transition-colors
-                         focus-visible:ring-2 focus-visible:ring-blue-500"
-              onClick={() => setZoom(0.25)}
-            >
-              Reset
-            </button>
-          </div>
-
-          {/* Document image/PDF */}
-          {document.imagePath.endsWith('.pdf') ? (
-            <iframe
-              src={document.imagePath}
-              className="w-full h-[calc(100vh-12rem)] border border-slate-800 rounded"
-              title={`Document: ${document.filename}`}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-            />
-          ) : (
-            <img
-              src={document.imagePath}
-              alt={`Document: ${document.filename}`}
-              width={2550}
-              height={4200}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
-              className="max-w-none transition-transform"
-            />
-          )}
-        </div>
+          </nav>
+        )}
       </section>
 
       {/* Right: Tabbed Content */}
@@ -140,6 +144,12 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
               <div className="flex items-center gap-1.5">
                 <span className="text-xs uppercase tracking-wider">OCR</span>
                 <span className="font-mono tabular-nums">{Math.round(document.confidence * 100)}%</span>
+              </div>
+            )}
+            {isMultiPage && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs uppercase tracking-wider">Pages</span>
+                <span className="font-mono tabular-nums">{totalPages}</span>
               </div>
             )}
           </div>
@@ -195,7 +205,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
                        }`}
             onClick={() => setActiveTab('entities')}
           >
-            Entities ({document.entities.length})
+            Entities ({(currentEntities || []).length})
           </button>
         </div>
 
@@ -210,7 +220,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
               className="p-6"
             >
               <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-300">
-                {document.ocrText}
+                {currentOcrText}
               </pre>
             </div>
           )}
@@ -223,9 +233,15 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
               aria-labelledby="translated-tab"
               className="p-6"
             >
-              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-300">
-                {document.translatedText}
-              </pre>
+              {currentTranslatedText ? (
+                <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-300">
+                  {currentTranslatedText}
+                </pre>
+              ) : (
+                <p className="text-sm text-slate-500 font-mono">
+                  No translation available for this page.
+                </p>
+              )}
             </div>
           )}
 
@@ -257,10 +273,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
                             <div className="font-mono text-sm text-slate-100 truncate">
                               {entity.name || entity.id}
                             </div>
-                            {/* TODO: Add roleLabel when available */}
                           </div>
-
-                          {/* Verification badge */}
                           <VerificationBadge tier={entity.verification.tier} size="small" />
                         </div>
                       </Link>
@@ -268,6 +281,11 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
                   </div>
                 </section>
               ))}
+              {Object.keys(groupedEntities).length === 0 && (
+                <p className="text-sm text-slate-500 font-mono">
+                  No entities extracted from this page.
+                </p>
+              )}
             </div>
           )}
         </div>

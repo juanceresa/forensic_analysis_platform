@@ -184,7 +184,10 @@ class GraphExporter:
         # Calculate verification distribution
         verification_dist = Counter()
         for node in nodes:
-            tier = node.get("verification", {}).get("tier", "TIER_3_AI")
+            verification = node.get("verification", {})
+            if isinstance(verification, list):
+                verification = verification[0] if verification else {}
+            tier = verification.get("tier", "TIER_3_AI") if isinstance(verification, dict) else "TIER_3_AI"
             verification_dist[tier] += 1
 
         # Calculate entity type summary

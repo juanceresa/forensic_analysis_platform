@@ -1,11 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
-// Doc IDs can contain spaces, periods, alphanumerics, underscores, and hyphens
 const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
+
+interface DocumentGroup {
+  id: string;
+  name: string;
+  files: string[];
+}
+
+interface DocumentGroupsConfig {
+  status: string;
+  groups: DocumentGroup[];
+}
 
 export async function GET(
   request: NextRequest,
@@ -26,21 +37,48 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
 
-    // Strip _page_N suffix to get base document name
-    const baseDocName = decodedDocId.replace(/_page_\d+$/, '');
+    const caseDir = path.join(CASES_DIR, caseId);
+    const intakeDir = path.join(caseDir, 'intake');
+    const intakeFiles = await fs.readdir(intakeDir);
 
-    // Validate docId to prevent path traversal
-    if (!DOC_ID_PATTERN.test(baseDocName)) {
-      return NextResponse.json({ error: 'Invalid docId' }, { status: 400 });
+    // Support ?page=N for grouped documents
+    const pageParam = request.nextUrl.searchParams.get('page');
+    const pageIndex = pageParam !== null ? parseInt(pageParam, 10) : 0;
+
+    // For grouped documents (doc_ prefix), find the file at the requested page index
+    let matchingFile: string | undefined;
+
+    if (decodedDocId.startsWith('doc_')) {
+      const groupsPath = path.join(caseDir, 'document_groups.yaml');
+      try {
+        const content = await fs.readFile(groupsPath, 'utf-8');
+        const config = yaml.load(content) as DocumentGroupsConfig;
+        if (config?.status === 'CONFIRMED' && config.groups) {
+          const targetId = decodedDocId.replace(/^doc_/, '');
+          const group = config.groups.find(g => g.id === targetId);
+          if (group && group.files.length > 0) {
+            // Get the file at the requested page index
+            const targetFile = group.files[pageIndex] || group.files[0];
+            if (intakeFiles.includes(targetFile)) {
+              matchingFile = targetFile;
+            }
+          }
+        }
+      } catch {
+        // Fall through to standard matching
+      }
     }
 
-    const intakeDir = path.join(CASES_DIR, caseId, 'intake');
-
-    // Find matching intake file
-    const intakeFiles = await fs.readdir(intakeDir);
-    const matchingFile = intakeFiles.find(f =>
-      f.replace(/\.(pdf|jpg|png)$/i, '') === baseDocName
-    );
+    // Standard matching for standalone docs
+    if (!matchingFile) {
+      const baseDocName = decodedDocId.replace(/_page_\d+$/, '');
+      if (!DOC_ID_PATTERN.test(baseDocName)) {
+        return NextResponse.json({ error: 'Invalid docId' }, { status: 400 });
+      }
+      matchingFile = intakeFiles.find(f =>
+        f.replace(/\.(pdf|jpg|png)$/i, '') === baseDocName
+      );
+    }
 
     if (!matchingFile) {
       return NextResponse.json(
@@ -52,7 +90,6 @@ export async function GET(
     const imagePath = path.join(intakeDir, matchingFile);
     const imageBuffer = await fs.readFile(imagePath);
 
-    // Determine content type
     const ext = path.extname(matchingFile).toLowerCase();
     let contentType = 'application/pdf';
     if (ext === '.jpg' || ext === '.jpeg') {

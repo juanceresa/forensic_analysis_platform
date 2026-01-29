@@ -140,6 +140,91 @@ This guide covers all operational procedures for administering the Civic Table p
 
 ---
 
+### Rebuild Graph (After Retraining Dedupe)
+
+**When:** After retraining dedupe models, or when you want to re-deduplicate without re-running OCR/LLM extraction (which is expensive).
+
+**Prerequisites:**
+- Case has been processed at least once (`extractions/*.json` exist)
+- Dedupe models retrained (optional — uses current models)
+
+**Why this exists:**
+Full `process` re-runs OCR and LLM extraction (~$5-10 per case). If you've only retrained dedupe models, `rebuild-graph` reconstructs the graph from saved extraction JSONs with zero API calls.
+
+**Steps:**
+
+1. **(Optional) Retrain dedupe models:**
+   ```bash
+   python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type PERSON
+   python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type LOCATION
+   python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type PROPERTY
+   python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type ORGANIZATION
+   ```
+
+2. **Rebuild the graph:**
+   ```bash
+   python -m farmer_factory.cli rebuild-graph CASE-XXX
+   ```
+
+   **What this does:**
+   - Loads all `extractions/*.json` files
+   - Reconstructs entities and relations from saved data
+   - Runs deduplication with current trained models
+   - Exports new `graph_data.json`
+   - **Clears stale `entity_groups/*.yaml`** (entity IDs change on rebuild)
+   - Generates fresh DRAFT merge files
+   - Applies any CONFIRMED merges
+
+   **What it does NOT do:**
+   - No OCR (reuses existing extraction JSONs)
+   - No LLM calls (no API cost)
+   - No image preprocessing
+
+3. **Review new entity groups:**
+   - Check `entity_groups/*.yaml` for new merge suggestions
+   - Confirm or reject DRAFT groups
+   - Apply confirmed merges: `python -m farmer_factory.cli apply-merges CASE-XXX`
+
+**Expected output:**
+```
+✅ Graph rebuilt successfully!
+   Documents: 18
+   Entities:  145 extracted, 37 merged
+   Relations: 94
+```
+
+**Important:** Rebuild clears all `entity_groups/*.yaml` files because entity IDs change when the graph is reconstructed. Any previous CONFIRMED merges must be re-confirmed after rebuild. This is by design — stale merge files referencing old entity IDs would silently fail.
+
+---
+
+### Complete Processing Workflow
+
+**End-to-end workflow for a new case:**
+
+```
+1. Create case        →  create-case --id CASE-XXX --name "..." --family "..."
+2. Add PDFs           →  cp documents/*.pdf cases/CASE-XXX/intake/
+3. Detect groups      →  detect-groups CASE-XXX
+4. Review groups      →  Edit document_groups.yaml: DRAFT → CONFIRMED
+5. Process            →  process CASE-XXX --force-typed
+6. Train dedupe       →  train-deduplication CASE-XXX --entity-type PERSON (etc.)
+7. Rebuild graph      →  rebuild-graph CASE-XXX
+8. Review merges      →  Edit entity_groups/*.yaml: DRAFT → CONFIRMED
+9. Apply merges       →  apply-merges CASE-XXX
+10. Generate dossier  →  generate-dossier CASE-XXX --property-id X --family-member-id Y
+```
+
+**Iterative refinement loop (steps 6-9):**
+After initial processing, you may iterate on dedupe quality:
+- Retrain models with more labeled pairs
+- Rebuild graph to apply new models
+- Review and confirm new merge suggestions
+- Apply merges
+
+This loop costs nothing (no API calls) and can be repeated as many times as needed.
+
+---
+
 ### Upload Graph to Supabase
 
 **When:** After successful processing and validation
@@ -579,6 +664,15 @@ python -m farmer_factory.cli merge-entities CASE-XXX \
   --entity-type PERSON \
   --canonical-id "person_abc" \
   --member-id "person_xyz"
+
+# Rebuild graph from existing extractions (no OCR/LLM, uses current dedupe models)
+python -m farmer_factory.cli rebuild-graph CASE-XXX
+
+# Train entity deduplication models
+python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type PERSON
+python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type LOCATION
+python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type PROPERTY
+python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type ORGANIZATION
 
 # Clean case outputs
 python -m farmer_factory.cli clean CASE-XXX --confirm

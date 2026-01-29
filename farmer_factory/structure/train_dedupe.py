@@ -132,6 +132,7 @@ def _prepare_training_data(
                 'residence': entity_data.get('residence', ''),
                 'profession': entity_data.get('profession', ''),
                 'nationality': entity_data.get('nationality', ''),
+                'marital_status': entity_data.get('marital_status', ''),
             }
         elif entity_type == "LOCATION":
             data_dict[entity_id] = {

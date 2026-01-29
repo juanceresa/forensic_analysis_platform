@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import type { GraphData } from '@/lib/types';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
@@ -128,27 +129,70 @@ export async function GET(
       // case_narrative.json not yet generated — proceed without it
     }
 
-    // Read documents from extractions directory
+    // Load document groups config
+    const caseDir = path.join(CASES_DIR, caseId);
+    interface DocGroup { id: string; name: string; document_type?: string; date?: string; files: string[]; }
+    interface DocGroupsConfig { status: string; groups: DocGroup[]; standalone?: string[]; }
+    let fileToGroup: Map<string, DocGroup> | null = null;
+    try {
+      const groupsContent = await fs.readFile(path.join(caseDir, 'document_groups.yaml'), 'utf-8');
+      const groupsConfig = yaml.load(groupsContent) as DocGroupsConfig;
+      if (groupsConfig?.status === 'CONFIRMED' && groupsConfig.groups) {
+        fileToGroup = new Map();
+        for (const group of groupsConfig.groups) {
+          for (const file of group.files) {
+            fileToGroup.set(file, group);
+            fileToGroup.set(file.replace(/\.(pdf|jpg|png)$/i, ''), group);
+          }
+        }
+      }
+    } catch { /* no groups file */ }
+
+    // Read documents from extractions directory, respecting groups
     const extractionsDir = path.join(CASES_DIR, caseId, 'extractions');
     const extractionFiles = await fs.readdir(extractionsDir);
     const jsonFiles = extractionFiles.filter(f => f.endsWith('.json'));
 
     const documents: DocumentInfo[] = [];
     const entityIdsByDoc: Map<string, Set<string>> = new Map();
+    const seenGroupIds = new Set<string>();
 
     for (const filename of jsonFiles) {
       const extractionPath = path.join(extractionsDir, filename);
       const content = await fs.readFile(extractionPath, 'utf-8');
       const extraction = JSON.parse(content);
 
-      const docId = filename.replace('_page_0.json', '');
-      const date = extraction.processing_metadata?.llm_metadata?.document_date || null;
+      const baseName = filename.replace(/\.json$/i, '');
+      const stripped = baseName.replace(/_page_\d+$/i, '');
 
-      documents.push({
-        id: docId,
-        filename: `${docId}.pdf`,
-        date,
-      });
+      // Check if this file belongs to a group
+      const group = fileToGroup?.get(stripped) || null;
+
+      let docId: string;
+      let docFilename: string;
+      let date: string | null;
+
+      if (group) {
+        docId = `doc_${group.id}`;
+        if (seenGroupIds.has(docId)) {
+          // Already added this group — just aggregate entities
+          const entityIds = entityIdsByDoc.get(docId) || new Set<string>();
+          for (const entity of (extraction.entities || [])) {
+            if (entity.id) entityIds.add(entity.id);
+          }
+          entityIdsByDoc.set(docId, entityIds);
+          continue;
+        }
+        seenGroupIds.add(docId);
+        docFilename = group.name;
+        date = group.date || extraction.processing_metadata?.llm_metadata?.document_date || null;
+      } else {
+        docId = baseName.replace(/_page_\d+$/i, '');
+        docFilename = `${docId}.pdf`;
+        date = extraction.processing_metadata?.llm_metadata?.document_date || null;
+      }
+
+      documents.push({ id: docId, filename: docFilename, date });
 
       // Track entities in this document
       const entityIds = new Set<string>();

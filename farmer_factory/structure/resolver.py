@@ -151,6 +151,7 @@ class DedupeEntityResolver:
                 'residence': entity.residence or None,
                 'profession': entity.profession or None,
                 'nationality': entity.nationality or None,
+                'marital_status': getattr(entity, 'marital_status', None) or None,
             }
         elif entity_type == "LOCATION":
             return {
@@ -189,6 +190,7 @@ class DedupeEntityResolver:
                 'residence': entity_data.get('residence') or None,
                 'profession': entity_data.get('profession') or None,
                 'nationality': entity_data.get('nationality') or None,
+                'marital_status': entity_data.get('marital_status') or None,
             }
         elif entity_type == "LOCATION":
             return {
@@ -223,8 +225,9 @@ class DedupeEntityResolver:
         """
         Merge entities using confidence-weighted approach.
 
-        For high-confidence matches (≥0.8), prefer higher quality data.
-        For lower confidence, create conflict lists with provenance.
+        Always picks the better value for each field. Conflicting values
+        are recorded in a separate _merge_conflicts dict for provenance,
+        keeping all node fields as their native types (never lists-of-strings).
 
         Args:
             existing: Existing entity data from graph
@@ -252,6 +255,15 @@ class DedupeEntityResolver:
         merged_sources = [s for s in all_sources if not (s in seen or seen.add(s))]
         merged["extracted_from"] = ",".join(merged_sources)
 
+        # Carry forward existing conflicts
+        conflicts: Dict[str, List[str]] = dict(existing.get("_merge_conflicts", {}))
+
+        existing_conf = existing.get('verification', {})
+        if isinstance(existing_conf, list):
+            existing_conf = existing_conf[0] if existing_conf else {}
+        existing_confidence = existing_conf.get('confidence', 0.5) if isinstance(existing_conf, dict) else 0.5
+        new_confidence = new.verification.confidence
+
         # Merge other fields
         for field, new_value in new_data.items():
             if field in ("id", "entity_type", "extracted_from", "created_at", "updated_at"):
@@ -275,23 +287,27 @@ class DedupeEntityResolver:
                     merged[field] = new_value
                 continue
 
-            # Both have values - decide merge strategy
+            # Both have scalar values — always pick the better one
             if existing_value != new_value:
-                if match_confidence >= 0.8:
-                    # High confidence - choose better value
-                    merged[field] = self._choose_better_value(
-                        existing_value,
-                        new_value,
-                        existing.get('verification', {}).get('confidence', 0.5),
-                        new.verification.confidence
-                    )
-                else:
-                    # Lower confidence - create conflict list
-                    merged[field] = self._create_conflict_list(
-                        existing_value,
-                        new_value,
-                        merged_sources
-                    )
+                chosen = self._choose_better_value(
+                    existing_value, new_value,
+                    existing_confidence, new_confidence,
+                )
+                rejected = new_value if chosen == existing_value else existing_value
+                merged[field] = chosen
+
+                # Record conflict for provenance
+                rejected_source = merged_sources[-1] if chosen == existing_value else (
+                    merged_sources[0] if merged_sources else "unknown"
+                )
+                conflict_entry = f"{rejected} ({rejected_source})"
+                field_conflicts = conflicts.get(field, [])
+                if conflict_entry not in field_conflicts:
+                    field_conflicts.append(conflict_entry)
+                conflicts[field] = field_conflicts
+
+        if conflicts:
+            merged["_merge_conflicts"] = conflicts
 
         return merged
 
@@ -317,18 +333,3 @@ class DedupeEntityResolver:
 
         return existing_value
 
-    def _create_conflict_list(
-        self,
-        existing_value: Any,
-        new_value: Any,
-        sources: List[str]
-    ) -> List[str]:
-        """Create conflict list with provenance."""
-        if isinstance(existing_value, list):
-            # Already a conflict list
-            return existing_value + [f"{new_value} ({sources[-1]})"]
-        else:
-            return [
-                f"{existing_value} ({sources[0] if sources else 'unknown'})",
-                f"{new_value} ({sources[-1] if len(sources) > 1 else 'unknown'})"
-            ]

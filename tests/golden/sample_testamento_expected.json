@@ -1,0 +1,190 @@
+{
+    "document_id": "sample_testamento",
+    "document_date": "1958-08-27",
+    "document_type": "Testamento Abierto (Open Will)",
+    "expected_entities": {
+        "persons": [
+            {
+                "name": "Rosalia Queral y Cartaya",
+                "alternate_names": [
+                    "Señorita Rosalia Queral y Cartaya"
+                ],
+                "nationality": "Cuban",
+                "birth_date": null,
+                "age_at_document": 84,
+                "marital_status": "soltera",
+                "residence": "Puerto Padre",
+                "roles": [
+                    "testator"
+                ]
+            },
+            {
+                "name": "Alberto Luis Arce y Padron",
+                "alternate_names": [
+                    "Doctor Alberto Luis Arce y Padron",
+                    "Dr. Alberto Luis Arce y Padron"
+                ],
+                "profession": "Abogado y Notario",
+                "residence": "Puerto Padre",
+                "roles": [
+                    "notary"
+                ]
+            },
+            {
+                "name": "Mario Ceresa y Queral",
+                "roles": [
+                    "heir",
+                    "executor"
+                ],
+                "notes": "Nephew of testator, inherits Hacienda Aguaras"
+            },
+            {
+                "name": "Manuel Magariño Estrada",
+                "profession": "Procurador Público",
+                "residence": "Puerto Padre",
+                "roles": [
+                    "witness"
+                ]
+            },
+            {
+                "name": "Manuel Anguera Ballester",
+                "profession": "empleado",
+                "residence": "Gibara",
+                "roles": [
+                    "witness"
+                ]
+            },
+            {
+                "name": "Jorge Berga Peña",
+                "profession": "comerciante",
+                "residence": "Puerto Padre",
+                "roles": [
+                    "witness"
+                ]
+            },
+            {
+                "name": "Jose Queral y Lopez",
+                "nationality": "Spanish",
+                "birth_location": "Barcelona, España",
+                "notes": "Father of testator, deceased",
+                "roles": [
+                    "parent"
+                ]
+            },
+            {
+                "name": "Maria Cartaya y Rodriguez",
+                "birth_location": "Puerto Padre",
+                "notes": "Mother of testator, deceased",
+                "roles": [
+                    "parent"
+                ]
+            }
+        ],
+        "properties": [
+            {
+                "name": "Hacienda Aguaras",
+                "property_type": "finca",
+                "location": "Camagüey",
+                "notes": "Inherited by Mario Ceresa y Queral"
+            }
+        ],
+        "locations": [
+            {
+                "name": "Puerto Padre",
+                "location_type": "city",
+                "parent": "Oriente"
+            },
+            {
+                "name": "Holguín",
+                "location_type": "city",
+                "notes": "Colegio Notarial location"
+            },
+            {
+                "name": "Camagüey",
+                "location_type": "province",
+                "country": "Cuba"
+            },
+            {
+                "name": "Gibara",
+                "location_type": "city"
+            },
+            {
+                "name": "Barcelona",
+                "location_type": "city",
+                "country": "España"
+            }
+        ],
+        "organizations": [
+            {
+                "name": "Colegio Notarial de Holguín",
+                "org_type": "professional association",
+                "location": "Holguín"
+            }
+        ]
+    },
+    "expected_relations": [
+        {
+            "type": "HEIR_OF",
+            "source": "Mario Ceresa y Queral",
+            "target": "Rosalia Queral y Cartaya",
+            "evidence": "Named as heir in TERCERA clause"
+        },
+        {
+            "type": "INHERITED",
+            "source": "Mario Ceresa y Queral",
+            "target": "Hacienda Aguaras",
+            "evidence": "Legado in TERCERA clause"
+        },
+        {
+            "type": "CHILD_OF",
+            "source": "Rosalia Queral y Cartaya",
+            "target": "Jose Queral y Lopez",
+            "evidence": "PRIMERA clause declares parentage"
+        },
+        {
+            "type": "CHILD_OF",
+            "source": "Rosalia Queral y Cartaya",
+            "target": "Maria Cartaya y Rodriguez",
+            "evidence": "PRIMERA clause declares parentage"
+        },
+        {
+            "type": "NOTARIZED_BY",
+            "source": "sample_testamento",
+            "target": "Alberto Luis Arce y Padron"
+        },
+        {
+            "type": "WITNESSED",
+            "source": "sample_testamento",
+            "target": "Manuel Magariño Estrada"
+        },
+        {
+            "type": "WITNESSED",
+            "source": "sample_testamento",
+            "target": "Manuel Anguera Ballester"
+        },
+        {
+            "type": "WITNESSED",
+            "source": "sample_testamento",
+            "target": "Jorge Berga Peña"
+        },
+        {
+            "type": "LOCATED_IN",
+            "source": "Hacienda Aguaras",
+            "target": "Camagüey"
+        }
+    ],
+    "quality_notes": {
+        "document_type": "Testamento Abierto (Open Will/Testament)",
+        "key_facts": [
+            "Testator: Rosalia Queral y Cartaya, 84 years old, single",
+            "Primary heir: Mario Ceresa y Queral (nephew)",
+            "Key property: Hacienda Aguaras in Camagüey",
+            "Document date: August 27, 1958",
+            "Location: Puerto Padre, Oriente"
+        ],
+        "family_relationships": [
+            "Rosalia is daughter of Jose Queral y Lopez and Maria Cartaya y Rodriguez",
+            "Mario Ceresa y Queral is nephew of Rosalia (sobrino)"
+        ]
+    }
+}
