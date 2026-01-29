@@ -1,8 +1,8 @@
 # Structure Module
 
-> **Version:** 1.2.0
-> **Last Updated:** 2026-01-25
-> **Status:** Active with ML-based entity resolution
+> **Version:** 1.3.0
+> **Last Updated:** 2026-01-29
+> **Status:** Active with ML-based entity resolution and merge authority
 
 Graph construction and entity deduplication for Civic Table knowledge graph.
 
@@ -312,6 +312,100 @@ exporter.save(
 
 ---
 
+### 7. Entity Merge Authority (`merge_models.py`, `merge_writer.py`, `merge_reader.py`, `merge_engine.py`)
+
+Analyst-driven entity merges on top of automated dedupe. Produces YAML authority files that analysts review, then applies confirmed merges to `graph_data.json`.
+
+#### Workflow
+
+```
+Pipeline dedupe → graph_data.json → DRAFT merge YAML → analyst review → CONFIRMED → apply-merges
+```
+
+#### Merge Models (`merge_models.py`)
+
+Pydantic models for merge authority YAML files:
+
+- `MergeGroupMember` — Member of a merge group (id, name, source, confidence)
+- `MergeGroup` — Group of entities to merge (canonical_id, members, status)
+- `EntityGroupFile` — Per-type YAML file (groups, relations, unmerged, status)
+- `CrossTypeRelation` / `CrossTypeRelationsFile` — Cross-type relations
+
+Status is two-level: file-level (`DRAFT`/`CONFIRMED`) + per-entry status.
+
+#### Merge Writer (`merge_writer.py`)
+
+```python
+from farmer_factory.structure.merge_writer import write_entity_groups, add_analyst_merge
+
+# Auto-generate DRAFT merge groups from dedupe clusters
+write_entity_groups(case_dir, "PERSON", clusters, singletons)
+
+# Analyst manually merges two entities (writes CONFIRMED)
+add_analyst_merge(case_dir, "PERSON", "person_a", "Alice", "person_b", "Alise")
+```
+
+**Key behavior:** Preserves existing CONFIRMED entries when writing new DRAFT groups.
+
+#### Merge Reader (`merge_reader.py`)
+
+```python
+from farmer_factory.structure.merge_reader import get_confirmed_merges
+
+# Get merge map: member_id → canonical_id
+merge_map = get_confirmed_merges(case_dir)  # Only CONFIRMED
+merge_map = get_confirmed_merges(case_dir, include_drafts=True)  # All
+```
+
+#### Merge Engine (`merge_engine.py`)
+
+```python
+from farmer_factory.structure.merge_engine import apply_merges
+
+# Apply confirmed merges to graph_data.json (no OCR, no LLM)
+apply_merges(case_dir)  # Only CONFIRMED
+apply_merges(case_dir, include_drafts=True)  # Preview with drafts
+```
+
+**What it does:**
+1. Reads `graph_data.json` and merge authority files
+2. Merges entity nodes (canonical gets member's missing fields)
+3. Combines `extracted_from` sources
+4. Rewrites relation endpoints to canonical IDs
+5. Deduplicates relations (keeps higher confidence)
+6. Removes self-loops
+7. Applies cross-type relations from `cross_type_relations.yaml`
+8. Recomputes metadata (entity_count, relation_count, verification_distribution)
+
+**Idempotent:** Running twice produces the same result.
+
+#### YAML File Format
+
+```yaml
+# entity_groups/person_groups.yaml
+status: DRAFT
+extractions_hash: "abc123def456"
+groups:
+  - canonical_id: person_a
+    canonical_name: Alice
+    status: CONFIRMED
+    members:
+      - id: person_a
+        name: Alice
+        source: dedupe
+        confidence: 0.95
+      - id: person_b
+        name: Alise
+        source: dedupe
+        confidence: 0.85
+relations: []
+unmerged:
+  - id: person_c
+    name: Carlos
+```
+
+---
+
 ## Complete Usage Example
 
 ```python
@@ -497,6 +591,14 @@ All entities and relations require verification metadata:
 ---
 
 ## Version History
+
+**v1.3.0 (2026-01-29):**
+- Added entity merge authority system (merge_models, merge_writer, merge_reader, merge_engine)
+- YAML-based merge files with DRAFT/CONFIRMED two-level status
+- Graph surgery engine: node merge, relation rewrite, dedup, metadata recompute
+- CLI: apply-merges, merge-entities commands
+- Pipeline integration: auto-generate DRAFT files, apply confirmed merges
+- 54 tests across 4 test files
 
 **v1.2.0 (2026-01-25):**
 - Added family relationship fields to Person schema

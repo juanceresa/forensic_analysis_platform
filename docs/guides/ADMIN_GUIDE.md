@@ -570,6 +570,16 @@ python -m farmer_factory.cli list-domains
 # Generate dossier PDF
 python -m farmer_factory.cli generate-dossier CASE-XXX --property-id "ID" --family-member-id "ID"
 
+# Apply entity merges (after analyst reviews entity_groups/*.yaml)
+python -m farmer_factory.cli apply-merges CASE-XXX
+python -m farmer_factory.cli apply-merges CASE-XXX --include-drafts  # Preview with drafts
+
+# Merge two entities manually (analyst-driven, writes CONFIRMED + applies immediately)
+python -m farmer_factory.cli merge-entities CASE-XXX \
+  --entity-type PERSON \
+  --canonical-id "person_abc" \
+  --member-id "person_xyz"
+
 # Clean case outputs
 python -m farmer_factory.cli clean CASE-XXX --confirm
 ```

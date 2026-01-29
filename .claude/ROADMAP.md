@@ -872,6 +872,10 @@ farmer_factory/
 │   ├── graph_builder.py      [✓] # Complete (integrates postprocessor)
 │   ├── resolver.py           [✓] # Complete - Dedupe-based entity resolution
 │   ├── postprocessor.py      [✓] # NEW - Graph post-processing (transitive redundancy, validation)
+│   ├── merge_models.py       [✓] # NEW - Pydantic models for merge authority YAML
+│   ├── merge_writer.py       [✓] # NEW - Write entity group YAML files
+│   ├── merge_reader.py       [✓] # NEW - Read entity groups, get merge maps
+│   ├── merge_engine.py       [✓] # NEW - Graph surgery engine (apply_merges)
 │   ├── models/               [ ] # Trained dedupe models (*.pkl)
 │   └── ~~gap_detector.py~~   [x] # DEFERRED to analyst workflow
 ├── narrative/                [✓] # Batch case narrative generation
@@ -920,7 +924,11 @@ tests/
 ├── extract/
 │   └── test_chunker.py       [✓] # Document chunking tests (9 tests)
 ├── structure/
-│   └── test_postprocessor.py [✓] # Post-processing tests (9 tests)
+│   ├── test_postprocessor.py [✓] # Post-processing tests (9 tests)
+│   ├── test_merge_models.py  [✓] # Merge model tests (17 tests)
+│   ├── test_merge_writer.py  [✓] # Merge writer tests (9 tests)
+│   ├── test_merge_reader.py  [✓] # Merge reader tests (10 tests)
+│   └── test_merge_engine.py  [✓] # Merge engine tests (18 tests)
 ├── golden/                   [✓] # Golden standard evaluation
 │   ├── __init__.py
 │   ├── data/
@@ -1405,6 +1413,69 @@ docs/guides/ADMIN_GUIDE.md  ✅ MODIFIED - Translation setup docs
 - **Processing-time:** Translations run once during processing, not on-demand
 - **Offline-first:** Local backend is default (zero cost, no PII exposure)
 - **GCP migration path:** Swap `TRANSLATION_BACKEND=gcp` when quality matters
+
+---
+
+## Phase 9C: Entity Merge Authority
+
+### Status: ✅ COMPLETE (2026-01-29)
+
+### Overview
+YAML-based entity merge authority system enabling analyst-driven entity merges on top of automated dedupe. Produces per-type YAML files in `entity_groups/` with two-level status (DRAFT/CONFIRMED) and graph surgery via `apply-merges`.
+
+### Tasks
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 9C.1 | `structure/merge_models.py` | ✅ | Pydantic models: MergeGroup, EntityGroupFile, CrossTypeRelationsFile |
+| 9C.2 | `structure/merge_writer.py` | ✅ | Write DRAFT groups from dedupe, preserve CONFIRMED, analyst merge |
+| 9C.3 | `structure/merge_reader.py` | ✅ | Read entity groups, get confirmed merges, iterate all files |
+| 9C.4 | `structure/merge_engine.py` | ✅ | Graph surgery: node merge, relation rewrite, dedup, metadata recompute |
+| 9C.5 | CLI commands | ✅ | `apply-merges` and `merge-entities` commands |
+| 9C.6 | Pipeline integration | ✅ | Auto-generate DRAFT merge files + apply confirmed merges |
+| 9C.7 | Tests | ✅ | 54 tests across 4 test files |
+
+### Architecture
+
+```
+Processing Pipeline
+        ↓
+Dedupe merges entities automatically (builder.py)
+        ↓
+Graph exported to graph_data.json
+        ↓
+DRAFT merge files generated in entity_groups/*.yaml
+        ↓
+Analyst reviews YAML: DRAFT → CONFIRMED
+        ↓
+apply-merges rewrites graph (node merge, relation rewrite, metadata recompute)
+```
+
+### Files Created
+```
+farmer_factory/structure/
+├── merge_models.py     ✅ Pydantic models (MergeGroup, EntityGroupFile, etc.)
+├── merge_writer.py     ✅ Write/update entity group YAML files
+├── merge_reader.py     ✅ Read entity groups, get merge maps
+└── merge_engine.py     ✅ Graph surgery engine (apply_merges)
+
+tests/structure/
+├── test_merge_models.py   ✅ 17 tests
+├── test_merge_writer.py   ✅ 9 tests
+├── test_merge_reader.py   ✅ 10 tests
+└── test_merge_engine.py   ✅ 18 tests
+```
+
+### CLI Commands Added
+- `apply-merges CASE-ID [--include-drafts]` — Apply confirmed merges to graph_data.json
+- `merge-entities CASE-ID --entity-type TYPE --canonical-id ID --member-id ID` — Analyst-driven merge
+
+### Key Design Decisions
+- **Two-level status:** File-level + per-entry DRAFT/CONFIRMED
+- **Layered merges:** Analyst merges layer on top of dedupe merges (not replace)
+- **Idempotent:** Running apply-merges twice produces same result
+- **Staleness detection:** `extractions_hash` warns when merge files are stale
+- **Metadata recompute:** entity_count, relation_count, verification_distribution updated after merge
 
 ---
 

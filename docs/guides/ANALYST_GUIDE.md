@@ -441,6 +441,106 @@ Relations connect entities (e.g., PERSON -[OWNS]-> PROPERTY).
 
 ---
 
+## Entity Merge Review
+
+After processing, the system generates **entity merge suggestions** in YAML files. These are entities the deduplication algorithm thinks might be the same real-world entity. Your job is to review and confirm or reject these suggestions.
+
+### Understanding Merge Files
+
+Merge files live in `cases/CASE-ID/entity_groups/`:
+
+```
+entity_groups/
+├── person_groups.yaml           # Person merge suggestions
+├── property_groups.yaml         # Property merge suggestions
+├── organization_groups.yaml     # Organization merge suggestions
+├── location_groups.yaml         # Location merge suggestions
+└── cross_type_relations.yaml    # Cross-type relation suggestions
+```
+
+Each file has a **two-level status system:**
+- **File-level status:** `DRAFT` or `CONFIRMED`
+- **Per-entry status:** Each group/relation is `DRAFT` or `CONFIRMED`
+
+### Reviewing Merge Groups
+
+**Open the YAML file** (e.g., `person_groups.yaml`):
+
+```yaml
+status: DRAFT
+groups:
+  - canonical_id: person_abc123
+    canonical_name: "Mario Ceresa"
+    status: DRAFT
+    members:
+      - id: person_abc123
+        name: "Mario Ceresa"
+        source: dedupe
+        confidence: 0.95
+      - id: person_def456
+        name: "M. Ceresa"
+        source: dedupe
+        confidence: 0.82
+unmerged:
+  - id: person_ghi789
+    name: "Carlos Ceresa"
+```
+
+**For each DRAFT group, decide:**
+
+| Decision | Action | When |
+|----------|--------|------|
+| **Confirm** | Change `status: DRAFT` → `status: CONFIRMED` | You agree these are the same entity |
+| **Reject** | Delete the group, move members to `unmerged` | These are different entities |
+| **Split** | Break into smaller groups | Some members match, others don't |
+
+### Applying Merges
+
+Once you've reviewed and confirmed merge groups:
+
+```bash
+# Apply only CONFIRMED merges to the graph
+python3 -m farmer_factory.cli apply-merges CASE-ID
+
+# Preview with DRAFT merges included (doesn't save)
+python3 -m farmer_factory.cli apply-merges CASE-ID --include-drafts
+```
+
+**What happens:**
+- Confirmed member entities are merged into the canonical entity
+- Relations are rewritten to point to the canonical entity
+- Duplicate relations are deduplicated (higher confidence wins)
+- Self-loops are removed
+- Metadata is recomputed
+
+### Manual Analyst Merge
+
+If you identify duplicates the system missed:
+
+```bash
+python3 -m farmer_factory.cli merge-entities CASE-ID \
+  --entity-type PERSON \
+  --canonical-id "person_abc123" \
+  --member-id "person_xyz789"
+```
+
+This creates a CONFIRMED merge entry and immediately applies it to the graph.
+
+### Merge Review Checklist
+
+Before confirming a merge group:
+- [ ] Both entities appear in source documents
+- [ ] Names are plausible variants (e.g., "Mario Ceresa" / "M. Ceresa")
+- [ ] Entity types match
+- [ ] No conflicting attributes (different birth dates = probably different people)
+- [ ] Check confidence score (< 0.7 = review carefully)
+
+### Cross-Type Relations
+
+The `cross_type_relations.yaml` file contains suggested relations between entities of different types (e.g., PERSON → PROPERTY). Review and confirm the same way as merge groups.
+
+---
+
 ## Common Mistakes to Avoid
 
 ### ❌ Mistake 1: Making Legal Conclusions

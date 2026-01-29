@@ -266,11 +266,35 @@ def process_case(
     except Exception as e:
         raise ProcessingError(f"Failed to export graph: {e}")
 
-    # 5a. Save manifest
+    # 5a. Generate/update entity merge files (DRAFT)
+    try:
+        from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
+        from farmer_factory.structure.merge_engine import apply_merges
+
+        # Collect dedupe clusters from the resolver's partition results
+        # For now, generate merge files from the graph's merged entities
+        # The builder tracks merges; we record them as DRAFT merge authority files
+        _generate_merge_files(case_dir, graph, builder)
+
+        # Apply any previously CONFIRMED merges (from prior analyst review)
+        entity_groups_dir = case_dir / "entity_groups"
+        if entity_groups_dir.exists() and any(entity_groups_dir.iterdir()):
+            try:
+                apply_merges(case_dir, include_drafts=False,
+                            output_path=output_dir / 'graph_data.json')
+                logger.info("Applied confirmed merges to graph")
+            except FileNotFoundError:
+                pass  # No graph yet, skip
+            except Exception as e:
+                logger.warning(f"Failed to apply confirmed merges: {e}")
+    except Exception as e:
+        logger.warning(f"Merge file generation failed (non-fatal): {e}")
+
+    # 5b. Save manifest
     manifest.save_manifest(case_dir / 'manifest.json')
     logger.info(f"Manifest saved: {case_dir / 'manifest.json'}")
 
-    # 5b. Validate export output
+    # 5c. Validate export output
     if not skip_validation:
         try:
             import json
@@ -293,3 +317,59 @@ def process_case(
     logger.info(f"Relations added:     {stats['relations_added']}")
 
     return stats
+
+
+def _generate_merge_files(
+    case_dir: Path,
+    graph: "KnowledgeGraph",
+    builder: "GraphBuilder",
+) -> None:
+    """Generate DRAFT entity merge files from the current graph state.
+
+    Extracts clusters of merged entities from the graph builder's stats
+    and writes them as DRAFT entity_groups/*.yaml files.
+    """
+    from farmer_factory.structure.merge_writer import write_entity_groups, write_cross_type_relations
+
+    # Group entities by type from graph
+    entities_by_type: Dict[str, list] = {}
+    for node_id, node_data in graph.graph.nodes(data=True):
+        etype = node_data.get("entity_type", "")
+        if etype not in entities_by_type:
+            entities_by_type[etype] = []
+        entities_by_type[etype].append((node_id, node_data.get("name", "")))
+
+    # For each entity type, write singletons (no clusters yet from fresh processing)
+    # Clusters will come from future dedupe partition runs
+    for entity_type, entities in entities_by_type.items():
+        if entity_type not in ("PERSON", "PROPERTY", "ORGANIZATION", "LOCATION"):
+            continue
+        try:
+            write_entity_groups(
+                case_dir=case_dir,
+                entity_type=entity_type,
+                clusters=[],  # No new clusters from this run
+                singletons=entities,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to write {entity_type} merge file: {e}")
+
+    # Collect cross-type relations from graph
+    cross_relations = []
+    for source, target, _key, edge_data in graph.graph.edges(keys=True, data=True):
+        source_type = graph.graph.nodes[source].get("entity_type", "")
+        target_type = graph.graph.nodes[target].get("entity_type", "")
+        if source_type != target_type:
+            cross_relations.append({
+                "source_id": source,
+                "target_id": target,
+                "relation_type": edge_data.get("relation_type", ""),
+                "date": edge_data.get("date"),
+                "source": "extraction",
+            })
+
+    if cross_relations:
+        try:
+            write_cross_type_relations(case_dir, cross_relations)
+        except Exception as e:
+            logger.warning(f"Failed to write cross-type relations: {e}")

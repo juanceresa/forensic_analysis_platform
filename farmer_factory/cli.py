@@ -836,5 +836,134 @@ def generate_manifest(case_id: str):
     click.echo(f"  Successful: {summary['successful']}")
 
 
+@cli.command("apply-merges")
+@click.argument("case_id")
+@click.option(
+    "--include-drafts",
+    is_flag=True,
+    help="Also apply DRAFT merges (for preview, not production)",
+)
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def apply_merges(case_id: str, include_drafts: bool, domain: str):
+    """Apply confirmed entity merges to rebuild graph_data.json.
+
+    Reads entity_groups/*.yaml merge files and rewrites graph_data.json
+    with merged entities and rewritten relations.
+
+    No OCR, no extraction, no LLM calls — graph surgery only.
+    Idempotent: running twice produces the same result.
+
+    Example:
+        python cli.py apply-merges TEST-CERESA
+        python cli.py apply-merges TEST-CERESA --include-drafts
+    """
+    setup_domain(domain)
+
+    from farmer_factory.structure.merge_engine import apply_merges as _apply_merges
+
+    case_dir = Path("cases") / case_id
+    graph_path = case_dir / "output" / "graph_data.json"
+
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+    if not graph_path.exists():
+        raise click.ClickException(
+            f"graph_data.json not found. Run 'process' first."
+        )
+
+    if include_drafts:
+        click.echo("⚠️  Including DRAFT merges (preview mode)")
+
+    try:
+        result_path = _apply_merges(
+            case_dir, include_drafts=include_drafts, output_path=graph_path
+        )
+        click.echo(f"\n✅ Merges applied. Graph updated: {result_path}")
+    except Exception as e:
+        logger.exception(f"apply-merges failed: {e}")
+        raise click.ClickException(str(e))
+
+
+@cli.command("merge-entities")
+@click.argument("case_id")
+@click.argument("entity_a")
+@click.argument("entity_b")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def merge_entities(case_id: str, entity_a: str, entity_b: str, domain: str):
+    """Merge two entities manually (analyst merge).
+
+    ENTITY_A becomes the canonical entity; ENTITY_B is merged into it.
+    The merge is written as CONFIRMED to entity_groups/*.yaml, then
+    apply-merges is run automatically.
+
+    Example:
+        python cli.py merge-entities TEST-CERESA person_mario_ceresa_001 person_mario_feresa_012
+    """
+    setup_domain(domain)
+
+    import json
+    from farmer_factory.structure.merge_writer import add_analyst_merge
+    from farmer_factory.structure.merge_engine import apply_merges as _apply_merges
+
+    case_dir = Path("cases") / case_id
+    graph_path = case_dir / "output" / "graph_data.json"
+
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+    if not graph_path.exists():
+        raise click.ClickException(
+            f"graph_data.json not found. Run 'process' first."
+        )
+
+    # Load graph to get entity names and types
+    with open(graph_path) as f:
+        graph_data = json.load(f)
+
+    node_map = {n["id"]: n for n in graph_data.get("nodes", [])}
+
+    if entity_a not in node_map:
+        raise click.ClickException(f"Entity not found: {entity_a}")
+    if entity_b not in node_map:
+        raise click.ClickException(f"Entity not found: {entity_b}")
+
+    node_a = node_map[entity_a]
+    node_b = node_map[entity_b]
+    entity_type = node_a.get("entity_type", "")
+
+    if entity_type != node_b.get("entity_type", ""):
+        raise click.ClickException(
+            f"Cannot merge different entity types: "
+            f"{entity_type} and {node_b.get('entity_type')}"
+        )
+
+    click.echo(f"Merging: {node_b.get('name', entity_b)} → {node_a.get('name', entity_a)}")
+
+    try:
+        add_analyst_merge(
+            case_dir=case_dir,
+            entity_type=entity_type,
+            canonical_id=entity_a,
+            canonical_name=node_a.get("name", entity_a),
+            member_id=entity_b,
+            member_name=node_b.get("name", entity_b),
+        )
+        click.echo("✓ Merge recorded in entity_groups/")
+
+        _apply_merges(case_dir, include_drafts=False, output_path=graph_path)
+        click.echo(f"✅ Graph updated: {graph_path}")
+
+    except Exception as e:
+        logger.exception(f"merge-entities failed: {e}")
+        raise click.ClickException(str(e))
+
+
 if __name__ == "__main__":
     cli()
