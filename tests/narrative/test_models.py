@@ -1,108 +1,92 @@
-"""Tests for narrative generation data models."""
+"""Tests for batch case narrative Pydantic models."""
 
-import pytest
+import json
 from datetime import datetime
+
 from farmer_factory.narrative.models import (
-    EvidenceCitation,
-    FactualClaim,
-    NarrativeResult,
-    EventHighlight
+    CaseNarrative,
+    EventHighlight,
+    NarrativeMetadata,
+    NarrativePeriod,
 )
-from farmer_factory.structure.schema import VerificationTier
 
 
-def test_evidence_citation_creation():
-    """Test EvidenceCitation model creation."""
-    citation = EvidenceCitation(
-        doc_id="doc_001",
-        page=2,
-        quote="Mario Ceresa, propietario de Villa Aurelia",
-        confidence=0.92,
-        verification_tier=VerificationTier.TIER_2_ANALYST,
-        ocr_confidence=0.88
+def test_event_highlight_minimal():
+    event = EventHighlight(event_type="CONFISCATED", summary="State confiscated Villa")
+    assert event.event_type == "CONFISCATED"
+    assert event.date is None
+    assert event.parties_involved == []
+
+
+def test_event_highlight_full():
+    event = EventHighlight(
+        event_type="SOLD",
+        summary="Garcia sold to Lopez",
+        date="1952-03-15",
+        parties_involved=["Garcia", "Lopez"],
     )
-
-    assert citation.doc_id == "doc_001"
-    assert citation.page == 2
-    assert citation.confidence == 0.92
-    assert citation.verification_tier == VerificationTier.TIER_2_ANALYST
+    assert event.date == "1952-03-15"
+    assert len(event.parties_involved) == 2
 
 
-def test_event_highlight_creation():
-    """Test EventHighlight model for special events."""
-    highlight = EventHighlight(
-        event_type="CONFISCATED",
-        summary="INRA confiscated 12.99 caballerías under Agrarian Reform Law",
-        date="1960",
-        citation_number=4,
-        evidence=[
-            EvidenceCitation(
-                doc_id="doc_012",
-                quote="confiscated by INRA",
-                confidence=0.74,
-                verification_tier=VerificationTier.TIER_3_AI
-            )
-        ]
-    )
-
-    assert highlight.event_type == "CONFISCATED"
-    assert highlight.citation_number == 4
-    assert len(highlight.evidence) == 1
-
-
-def test_factual_claim_creation():
-    """Test FactualClaim model."""
-    claim = FactualClaim(
-        claim_text="Mario Ceresa owned Villa Aurelia",
-        citation_number=1,
-        evidence=[
-            EvidenceCitation(
-                doc_id="doc_003",
-                page=2,
-                quote="Mario Ceresa, propietario",
-                confidence=0.92,
-                verification_tier=VerificationTier.TIER_2_ANALYST
-            )
+def test_narrative_period_serialization():
+    period = NarrativePeriod(
+        period_id="1950-1959",
+        label="Post-War Era",
+        narrative="Villa Aurelia first appears in the record...",
+        document_ids=["doc_001", "doc_002"],
+        entity_ids=["ent_001"],
+        highlighted_events=[
+            EventHighlight(event_type="SOLD", summary="Property sold"),
         ],
-        temporal_context="1952",
-        fact_type="OWNERSHIP"
+        evidence=["doc:doc_001", "rel:SOLD:Garcia->Lopez"],
     )
+    data = json.loads(period.model_dump_json())
+    assert data["period_id"] == "1950-1959"
+    assert len(data["highlighted_events"]) == 1
+    assert len(data["evidence"]) == 2
 
-    assert claim.claim_text == "Mario Ceresa owned Villa Aurelia"
-    assert claim.temporal_context == "1952"
-    assert len(claim.evidence) == 1
+
+def test_narrative_metadata_defaults():
+    meta = NarrativeMetadata(case_id="TEST-001", model_used="sonnet")
+    assert meta.verification_tier == "TIER_3_AI"
+    assert meta.factory_version == "1.6.0"
+    assert meta.generation_cost == 0.0
+    assert isinstance(meta.generated_at, datetime)
 
 
-def test_narrative_result_creation():
-    """Test NarrativeResult model."""
-    result = NarrativeResult(
-        focal_entity_id="prop_villa_aurelia_001",
-        focal_entity_name="Villa Aurelia",
-        focal_entity_type="PROPERTY",
-        constellation_size=15,
-        model_used="sonnet",
-        main_narrative="Villa Aurelia was a 59.28 caballería estate [①].",
-        facts=[
-            FactualClaim(
-                claim_text="Estate size was 59.28 caballerías",
-                citation_number=1,
-                evidence=[
-                    EvidenceCitation(
-                        doc_id="doc_003",
-                        quote="59.28 caballerías",
-                        confidence=0.92,
-                        verification_tier=VerificationTier.TIER_2_ANALYST
-                    )
-                ]
-            )
+def test_case_narrative_roundtrip():
+    narrative = CaseNarrative(
+        metadata=NarrativeMetadata(
+            case_id="TEST-001",
+            model_used="sonnet",
+            generation_cost=0.05,
+        ),
+        case_summary="The documentary record spans 1940-1960.",
+        periods=[
+            NarrativePeriod(
+                period_id="1940-1949",
+                label="Pre-War Period",
+                narrative="Early records show...",
+            ),
+            NarrativePeriod(
+                period_id="1950-1959",
+                label="Post-War Era",
+                narrative="Property transfers occurred...",
+            ),
         ],
-        total_documents=8,
-        total_citations=12,
-        date_range="1952-1962",
-        generation_cost=0.015
     )
+    json_str = narrative.model_dump_json(indent=2)
+    restored = CaseNarrative.model_validate_json(json_str)
+    assert restored.case_summary == narrative.case_summary
+    assert len(restored.periods) == 2
+    assert restored.metadata.generation_cost == 0.05
 
-    assert result.focal_entity_name == "Villa Aurelia"
-    assert result.model_used == "sonnet"
-    assert result.generation_cost == 0.015
-    assert not result.from_cache
+
+def test_empty_narrative():
+    narrative = CaseNarrative(
+        metadata=NarrativeMetadata(case_id="EMPTY", model_used="none"),
+        case_summary="No documents.",
+        periods=[],
+    )
+    assert len(narrative.periods) == 0

@@ -1,172 +1,147 @@
-"""LLM prompts for single-stage narrative generation."""
+"""LLM prompts for batch case narrative generation."""
 
-from typing import Dict, Any
+from typing import Dict, List, Any
 
 
-class NarrativePrompts:
-    """Prompt templates for narrative generation."""
-
-    NARRATIVE_TEMPLATE = """You are a forensic analyst writing a historical narrative for property restitution research.
+PERIOD_NARRATIVE_TEMPLATE = """You are a forensic analyst writing a historical narrative for property restitution research.
 
 **CRITICAL CONSTRAINTS:**
-1. Write in past tense with engaging narrative voice (not mechanical data dump)
-2. EVERY claim must have inline citation: [①], [②], etc.
-3. Present events in chronological order
-4. NEVER make legal conclusions or assess ownership validity
-5. NEVER infer beyond what documents explicitly state
-6. Highlight expropriations, sales, and inheritances prominently
+1. Write in past tense with engaging narrative voice (not a mechanical data dump)
+2. Present events in chronological order within this period
+3. NEVER make legal conclusions or assess ownership validity
+4. NEVER infer beyond what the documents explicitly state
+5. Highlight expropriations, sales, and inheritances prominently
+6. Ground every claim in the documents provided — do not fabricate
 
-**Focal Entity:** {focal_entity_name} ({focal_entity_type})
+**Time Period:** {period_label} ({period_range})
 
-**Graph Context:**
-{graph_context}
+**Documents in this period:**
+{documents_context}
 
-**Special Instructions:**
-- If CONFISCATED relations exist, dedicate a prominent paragraph starting with "🚨 EXPROPRIATION EVENT"
-- For SOLD or INHERITED events, note them clearly with dates and parties
-- Use engaging language: "Villa Aurelia first appears..." not "Villa Aurelia was mentioned..."
-- Keep it accessible for families, not just lawyers
+**Entities referenced in this period:**
+{entities_context}
 
-**Output Format:**
-Write a chronological narrative (3-8 paragraphs) with inline citations [①], [②], etc.
-
-For each citation number, the evidence will be:
-- Document ID and page
-- Exact quote from document
-- Date if available
-
-Example style:
-"Villa Aurelia, a 59.28 caballería estate in Maniabón [①], passed to the Rodríguez Pérez heirs in 1960 [②]. That same year, the Instituto Nacional de Reforma Agraria confiscated 12.99 caballerías under the Agrarian Reform Law [③]."
-"""
-
-    SIMPLE_NARRATIVE_TEMPLATE = """You are a forensic analyst providing context for an entity with limited data.
-
-**Entity:** {entity_name} ({entity_type})
-
-**Available Information:**
-{context}
-
-**Task:**
-Write 1-2 sentences explaining this entity's role in the documents, even though we have limited context.
-
-Example:
-"Juan Mir Perez appears as Jefe del Departamento Legal del Instituto Nacional de Reforma Agraria (INRA) in a 1960 co-heir document. Role: INRA legal official involved in Villa Aurelia estate proceedings."
-
-Focus on: who they are, what role they played, how they connect to the case.
-"""
-
-    HIGHLIGHTED_EVENT_TEMPLATE = """**🚨 {event_type} EVENT**
-{summary}
-
-{details}
-"""
-
-    def build_narrative_prompt(self, graph_context: Dict[str, Any]) -> str:
-        """
-        Build prompt for full narrative generation.
-
-        Args:
-            graph_context: Dict with focal entity, entities, relations, documents
-
-        Returns:
-            Formatted prompt string
-        """
-        focal = graph_context.get("focal_entity", {})
-        entities = graph_context.get("entities", [])
-        relations = graph_context.get("relations", [])
-        documents = graph_context.get("documents", [])
-
-        # Format graph context
-        entities_str = "\n".join([f"- {e}" for e in entities])
-
-        relations_str = "\n".join([
-            f"- {r.get('type', 'UNKNOWN')}: {r.get('source', '?')} → {r.get('target', '?')}"
-            f"{' (date: ' + r['date'] + ')' if r.get('date') else ''}"
-            f"{' [doc: ' + r['document_id'] + ']' if r.get('document_id') else ''}"
-            f"{' evidence: ' + r['evidence'] if r.get('evidence') else ''}"
-            for r in relations
-        ])
-
-        docs_str = "\n".join([f"- {d}" for d in documents])
-
-        # Check for special events
-        has_confiscation = any(r.get("type") == "CONFISCATED" for r in relations)
-        has_sale = any(r.get("type") == "SOLD" for r in relations)
-        has_inheritance = any(r.get("type") == "INHERITED" for r in relations)
-
-        special_events = []
-        if has_confiscation:
-            special_events.append("CONFISCATION (highlight prominently)")
-        if has_sale:
-            special_events.append("SALE (note clearly)")
-        if has_inheritance:
-            special_events.append("INHERITANCE (note clearly)")
-
-        context_str = f"""
-**Entities in Context:**
-{entities_str}
-
-**Relations:**
-{relations_str}
-
-**Source Documents:**
-{docs_str}
+**Relations between entities in this period:**
+{relations_context}
 
 **Special Events to Highlight:**
-{', '.join(special_events) if special_events else 'None'}
-"""
+{special_events}
 
-        return self.NARRATIVE_TEMPLATE.format(
-            focal_entity_name=focal.get("name", "Unknown"),
-            focal_entity_type=focal.get("type", "UNKNOWN"),
-            graph_context=context_str
-        )
+**Instructions:**
+Write a narrative (2-5 paragraphs) telling the story of this period as revealed by these documents.
+Use engaging language: "Villa Aurelia first appears..." not "Villa Aurelia was mentioned..."
+Keep it accessible for families and researchers, not just lawyers.
+If CONFISCATED relations exist, dedicate a prominent paragraph to the expropriation.
+For SOLD or INHERITED events, note them clearly with dates and parties.
 
-    def build_simple_narrative_prompt(self, context: Dict[str, Any]) -> str:
-        """
-        Build prompt for simple entities (insufficient data).
+Output ONLY the narrative prose. No headers, no bullet points, no metadata."""
 
-        Args:
-            context: Dict with entity name, type, role, document
 
-        Returns:
-            Formatted prompt string
-        """
-        context_lines = []
-        if context.get("role"):
-            context_lines.append(f"Role: {context['role']}")
-        if context.get("document"):
-            context_lines.append(f"Appears in: {context['document']}")
-        if context.get("connections"):
-            context_lines.append(f"Connected to: {', '.join(context['connections'])}")
+CASE_SUMMARY_TEMPLATE = """You are a forensic analyst writing an executive summary for a property restitution case.
 
-        context_str = "\n".join(context_lines)
+**CRITICAL CONSTRAINTS:**
+1. Write in past tense with engaging narrative voice
+2. Summarize the full arc of the family's documentary record
+3. NEVER make legal conclusions or assess ownership validity
+4. NEVER infer beyond what the documents state
+5. This is AI-generated research analysis, not a legal document
 
-        return self.SIMPLE_NARRATIVE_TEMPLATE.format(
-            entity_name=context.get("name", "Unknown"),
-            entity_type=context.get("type", "UNKNOWN"),
-            context=context_str
-        )
+**Case:** {case_id}
+**Date Range:** {date_range}
+**Total Documents:** {total_documents}
+**Total Entities:** {total_entities}
 
-    def format_highlighted_event(
-        self,
-        event_type: str,
-        summary: str,
-        details: str
-    ) -> str:
-        """
-        Format highlighted event (expropriation, sale, inheritance).
+**Period Summaries (chronological):**
+{period_summaries}
 
-        Args:
-            event_type: "CONFISCATION", "SALE", or "INHERITANCE"
-            summary: Brief event summary
-            details: Detailed description with citations
+**Instructions:**
+Write a 2-3 paragraph executive summary of this case. Describe the arc of the family's
+documentary record — what the documents reveal about property ownership, transfers,
+and any state actions over time. Be specific about key events and dates.
 
-        Returns:
-            Formatted event block
-        """
-        return self.HIGHLIGHTED_EVENT_TEMPLATE.format(
-            event_type=event_type,
-            summary=summary,
-            details=details
-        )
+Output ONLY the summary prose. No headers, no bullet points, no metadata."""
+
+
+def build_period_prompt(
+    period_label: str,
+    period_range: str,
+    documents: List[Dict[str, Any]],
+    entities: List[Dict[str, Any]],
+    relations: List[Dict[str, Any]],
+) -> str:
+    """Build prompt for a single period's narrative generation."""
+    docs_lines = []
+    for doc in documents:
+        line = f"- {doc.get('name', doc.get('id', 'Unknown'))}"
+        if doc.get("date"):
+            line += f" (dated {doc['date']})"
+        if doc.get("document_type"):
+            line += f" [{doc['document_type']}]"
+        docs_lines.append(line)
+    docs_str = "\n".join(docs_lines) if docs_lines else "No documents with dates in this period."
+
+    entity_lines = []
+    for ent in entities:
+        line = f"- {ent.get('name', ent.get('id', 'Unknown'))} ({ent.get('entity_type', 'UNKNOWN')})"
+        entity_lines.append(line)
+    entities_str = "\n".join(entity_lines) if entity_lines else "No entities identified."
+
+    relation_lines = []
+    has_confiscation = False
+    has_sale = False
+    has_inheritance = False
+    for rel in relations:
+        rel_type = rel.get("relation_type", "UNKNOWN")
+        line = f"- {rel_type}: {rel.get('source_name', '?')} -> {rel.get('target_name', '?')}"
+        if rel.get("date"):
+            line += f" (date: {rel['date']})"
+        relation_lines.append(line)
+
+        if rel_type == "CONFISCATED":
+            has_confiscation = True
+        elif rel_type == "SOLD":
+            has_sale = True
+        elif rel_type == "INHERITED":
+            has_inheritance = True
+
+    relations_str = "\n".join(relation_lines) if relation_lines else "No relations identified."
+
+    special = []
+    if has_confiscation:
+        special.append("CONFISCATION (highlight prominently)")
+    if has_sale:
+        special.append("SALE (note clearly)")
+    if has_inheritance:
+        special.append("INHERITANCE (note clearly)")
+    special_str = ", ".join(special) if special else "None"
+
+    return PERIOD_NARRATIVE_TEMPLATE.format(
+        period_label=period_label,
+        period_range=period_range,
+        documents_context=docs_str,
+        entities_context=entities_str,
+        relations_context=relations_str,
+        special_events=special_str,
+    )
+
+
+def build_summary_prompt(
+    case_id: str,
+    date_range: str,
+    total_documents: int,
+    total_entities: int,
+    period_summaries: List[Dict[str, str]],
+) -> str:
+    """Build prompt for the overall case summary."""
+    summaries_lines = []
+    for ps in period_summaries:
+        summaries_lines.append(f"**{ps['label']} ({ps['range']}):**\n{ps['narrative']}\n")
+    summaries_str = "\n".join(summaries_lines)
+
+    return CASE_SUMMARY_TEMPLATE.format(
+        case_id=case_id,
+        date_range=date_range,
+        total_documents=total_documents,
+        total_entities=total_entities,
+        period_summaries=summaries_str,
+    )

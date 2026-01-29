@@ -31,8 +31,6 @@ supabase>=2.3.0
 # Utilities
 requests>=2.31.0
 tqdm>=4.66.0  # Progress bars
-ctranslate2>=4.0.0  # Offline neural translation engine
-subword-nmt>=0.3.8  # BPE tokenization (pure Python)
 
 # Development (optional)
 pytest>=7.4.0

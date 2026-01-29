@@ -1,140 +1,177 @@
-"""Tests for narrative generator orchestrator."""
+"""Tests for batch case narrative generator."""
 
 import pytest
-from unittest.mock import Mock, patch
-from farmer_factory.narrative.generator import NarrativeGenerator
-from farmer_factory.narrative.exceptions import SessionCostLimitExceeded
-from farmer_factory.structure.graph import KnowledgeGraph
-from farmer_factory.structure.schema import (
-    Property,
-    Person,
-    Relation,
-    EntityType,
-    RelationType,
-    VerificationTier,
-    Verification
+from unittest.mock import Mock, patch, MagicMock
+
+from farmer_factory.narrative.generator import (
+    CaseNarrativeGenerator,
+    _get_period_label,
+    _estimate_cost,
+    _prompt_hash,
 )
+from farmer_factory.narrative.models import CaseNarrative
 
 
-@pytest.fixture
-def sample_graph():
-    """Create sample graph for testing."""
-    kg = KnowledgeGraph(case_id="test_001")
-
-    prop = Property(
-        id="prop_001",
-        name="Villa Aurelia",
-        entity_type=EntityType.PROPERTY,
-        verification=Verification(tier=VerificationTier.TIER_2_ANALYST, confidence=0.92),
-        extracted_from="doc_001, doc_003"
-    )
-    kg.add_entity(prop)
-
-    person = Person(
-        id="person_001",
-        name="Mario Ceresa",
-        entity_type=EntityType.PERSON,
-        verification=Verification(tier=VerificationTier.TIER_2_ANALYST, confidence=0.89),
-        extracted_from="doc_001"
-    )
-    kg.add_entity(person)
-
-    rel = Relation(
-        id="rel_001",
-        type=RelationType.OWNS,
-        source_id="person_001",
-        target_id="prop_001",
-        verification=Verification(tier=VerificationTier.TIER_2_ANALYST, confidence=0.90),
-        extracted_from="doc_001"
-    )
-    kg.add_relation(rel)
-
-    return kg
+# ── Helper function tests ─────────────────────────────────────────
 
 
-def test_generator_initialization():
-    """Test NarrativeGenerator initialization."""
-    generator = NarrativeGenerator(api_key="test_key")
-    assert generator is not None
+def test_get_period_label_known_ranges():
+    assert _get_period_label(1959, 1961) == "Expropriation Period"
+    assert _get_period_label(1945, 1958) == "Post-War Era"
+    assert _get_period_label(1930, 1944) == "Pre-War Period"
+    assert _get_period_label(1910, 1929) == "Early Property Records"
 
 
-@patch('farmer_factory.narrative.generator.ClaudeAPIClient')
-def test_generate_narrative(mock_api_client, sample_graph):
-    """Test full narrative generation pipeline."""
-    mock_client_instance = Mock()
-    mock_api_client.return_value = mock_client_instance
-
-    # Mock LLM response
-    mock_client_instance.call_with_retry.return_value = (
-        "Villa Aurelia was owned by Mario Ceresa [①]. "
-        "The property was located in Maniabón [②]."
-    )
-
-    generator = NarrativeGenerator(api_key="test_key", use_cache=False)
-
-    result = generator.generate(
-        clicked_node_id="person_001",
-        graph=sample_graph,
-        session_id="sess_123"
-    )
-
-    assert result is not None
-    assert result.focal_entity_id == "prop_001"  # Property is hub
-    assert len(result.main_narrative) > 0
-    assert result.generation_cost > 0
+def test_get_period_label_unknown_range():
+    assert _get_period_label(1970, 1979) == "1970-1979"
 
 
-def test_session_cost_limit_exceeded(sample_graph):
-    """Test that generator blocks at session cost limit."""
-    generator = NarrativeGenerator(api_key="test_key", use_cache=False)
-
-    # Manually set session cost above limit
-    generator.session_costs["sess_123"] = 1.50  # Above $1 limit
-
-    with pytest.raises(SessionCostLimitExceeded):
-        generator.generate(
-            clicked_node_id="person_001",
-            graph=sample_graph,
-            session_id="sess_123",
-            max_cost_per_session=1.0
-        )
+def test_estimate_cost_positive():
+    cost = _estimate_cost("hello world prompt", "response text here", "haiku")
+    assert cost > 0
 
 
-@patch('farmer_factory.narrative.generator.ClaudeAPIClient')
-def test_simple_entity_narrative(mock_api_client, sample_graph):
-    """Test narrative for simple entity (< 3 entities)."""
-    mock_client_instance = Mock()
-    mock_api_client.return_value = mock_client_instance
-
-    # Mock LLM response for simple narrative
-    mock_client_instance.call_with_retry.return_value = (
-        "Mario Ceresa appears as owner of Villa Aurelia in documents from 1952."
-    )
-
-    generator = NarrativeGenerator(api_key="test_key", use_cache=False)
-
-    result = generator.generate(
-        clicked_node_id="person_001",
-        graph=sample_graph,
-        session_id="sess_123"
-    )
-
-    # Should handle gracefully (2 entities < 3 threshold)
-    assert result.is_simple_entity or len(result.main_narrative) > 0
+def test_estimate_cost_sonnet_more_expensive():
+    prompt = "a " * 100
+    response = "b " * 50
+    haiku_cost = _estimate_cost(prompt, response, "haiku")
+    sonnet_cost = _estimate_cost(prompt, response, "sonnet")
+    assert sonnet_cost > haiku_cost
 
 
-def test_build_graph_context_dedupes_relations(sample_graph):
-    """Test graph context relation list does not duplicate edges."""
-    generator = NarrativeGenerator(api_key="test_key", use_cache=False)
+def test_prompt_hash_deterministic():
+    h1 = _prompt_hash("hello", "world")
+    h2 = _prompt_hash("hello", "world")
+    assert h1 == h2
+    assert len(h1) == 12
 
-    constellation = {"person_001", "prop_001"}
-    context = generator._build_graph_context(
-        focal_entity_id="prop_001",
-        focal_entity_name="Villa Aurelia",
-        focal_entity_type="PROPERTY",
-        constellation=constellation,
-        graph=sample_graph
-    )
 
-    assert len(context["relations"]) == 1
-    assert "document_id" in context["relations"][0]
+def test_prompt_hash_differs():
+    h1 = _prompt_hash("hello")
+    h2 = _prompt_hash("goodbye")
+    assert h1 != h2
+
+
+# ── Period grouping tests ─────────────────────────────────────────
+
+
+class TestPeriodGrouping:
+    def _make_gen(self) -> CaseNarrativeGenerator:
+        with patch("farmer_factory.narrative.generator.ClaudeAPIClient"):
+            return CaseNarrativeGenerator(api_key="test")
+
+    def test_group_by_decade(self):
+        gen = self._make_gen()
+        docs = [
+            {"id": "d1", "date": "1952-01-01"},
+            {"id": "d2", "date": "1955-06-15"},
+            {"id": "d3", "date": "1960-03-01"},
+        ]
+        groups = gen._group_by_decade(docs)
+        assert "1950-1959" in groups
+        assert "1960-1969" in groups
+        assert len(groups["1950-1959"]) == 2
+        assert len(groups["1960-1969"]) == 1
+
+    def test_group_by_decade_skips_undated(self):
+        gen = self._make_gen()
+        docs = [
+            {"id": "d1", "date": "1952-01-01"},
+            {"id": "d2", "date": None},
+            {"id": "d3"},
+        ]
+        groups = gen._group_by_decade(docs)
+        assert len(groups) == 1
+        assert len(groups["1950-1959"]) == 1
+
+    def test_merge_sparse_periods(self):
+        gen = self._make_gen()
+        periods = {
+            "1930-1939": [{"id": "d1"}],
+            "1940-1949": [{"id": "d2"}],
+            "1950-1959": [{"id": "d3"}, {"id": "d4"}, {"id": "d5"}],
+        }
+        merged = gen._merge_sparse_periods(periods)
+        # 1930s and 1940s both <3 docs → merged
+        assert "1930-1949" in merged
+        # 1950s has >=3 docs → kept
+        assert "1950-1959" in merged
+        assert len(merged) == 2
+
+    def test_merge_sparse_single_period(self):
+        gen = self._make_gen()
+        periods = {"1950-1959": [{"id": "d1"}]}
+        merged = gen._merge_sparse_periods(periods)
+        assert merged == periods
+
+    def test_parse_period_key(self):
+        gen = self._make_gen()
+        assert gen._parse_period_key("1950-1959") == (1950, 1959)
+
+
+# ── Cost guard tests ──────────────────────────────────────────────
+
+
+class TestCostGuards:
+    def test_cost_limit_raises(self):
+        with patch("farmer_factory.narrative.generator.ClaudeAPIClient"):
+            gen = CaseNarrativeGenerator(api_key="test", max_cost=1.0)
+        gen.total_cost = 1.0
+        with pytest.raises(RuntimeError, match="cost limit exceeded"):
+            gen._call_llm("any prompt")
+
+    @patch("farmer_factory.narrative.generator.ClaudeAPIClient")
+    def test_model_downgrade_on_failure(self, mock_client_cls):
+        mock_client = Mock()
+        mock_client_cls.return_value = mock_client
+        # First call (sonnet) fails, second call (haiku) succeeds
+        mock_client.call_with_retry.side_effect = [
+            Exception("rate limit"),
+            "fallback response",
+        ]
+        gen = CaseNarrativeGenerator(api_key="test", primary_model="sonnet")
+        text, cost = gen._call_llm("test prompt")
+        assert text == "fallback response"
+        assert cost > 0
+        assert gen.total_cost > 0
+
+    @patch("farmer_factory.narrative.generator.ClaudeAPIClient")
+    def test_cost_accumulates(self, mock_client_cls):
+        mock_client = Mock()
+        mock_client_cls.return_value = mock_client
+        mock_client.call_with_retry.return_value = "response"
+        gen = CaseNarrativeGenerator(api_key="test", max_cost=10.0)
+        gen._call_llm("prompt one")
+        cost_after_first = gen.total_cost
+        gen._call_llm("prompt two")
+        assert gen.total_cost > cost_after_first
+
+
+# ── Evidence population tests ─────────────────────────────────────
+
+
+class TestEvidence:
+    def test_extract_highlighted_confiscated(self):
+        with patch("farmer_factory.narrative.generator.ClaudeAPIClient"):
+            gen = CaseNarrativeGenerator(api_key="test")
+        relations = [
+            {"relation_type": "CONFISCATED", "source_name": "INRA", "target_name": "Villa Aurelia", "date": "1960"},
+            {"relation_type": "OWNS", "source_name": "Mario", "target_name": "Villa Aurelia"},
+        ]
+        highlights = gen._extract_highlighted_events([], relations)
+        assert len(highlights) == 1
+        assert highlights[0].event_type == "CONFISCATED"
+        assert "INRA" in highlights[0].summary
+
+    def test_extract_highlighted_multiple_types(self):
+        with patch("farmer_factory.narrative.generator.ClaudeAPIClient"):
+            gen = CaseNarrativeGenerator(api_key="test")
+        relations = [
+            {"relation_type": "SOLD", "source_name": "A", "target_name": "B"},
+            {"relation_type": "INHERITED", "source_name": "C", "target_name": "D"},
+            {"relation_type": "MENTIONS", "source_name": "E", "target_name": "F"},
+        ]
+        highlights = gen._extract_highlighted_events([], relations)
+        assert len(highlights) == 2
+        types = {h.event_type for h in highlights}
+        assert types == {"SOLD", "INHERITED"}

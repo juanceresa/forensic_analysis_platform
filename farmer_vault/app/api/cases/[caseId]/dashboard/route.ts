@@ -131,7 +131,7 @@ export async function GET(
         complete: verifiedPercent > 50,
         items: [
           { label: 'Analyst review in progress', complete: verifiedPercent > 0 },
-          { label: 'Narrative generation', complete: false },
+          { label: 'AI analysis generation', complete: false },
           { label: 'Gap identification', complete: false },
         ],
       },

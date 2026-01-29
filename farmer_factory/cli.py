@@ -305,6 +305,20 @@ def process(
         output_path = Path("cases") / case_id / "output" / "graph_data.json"
         click.echo(f"\nGraph saved to: {output_path}")
 
+        # Generate case narrative (final pipeline step)
+        try:
+            from farmer_factory.narrative import CaseNarrativeGenerator
+            from farmer_factory.structure.graph import KnowledgeGraph
+
+            graph = KnowledgeGraph.load(output_path)
+            generator = CaseNarrativeGenerator()
+            output_dir = Path("cases") / case_id / "output"
+            narrative_path = generator.generate_and_save(case_id, graph, output_dir)
+            click.echo(f"Narrative saved to: {narrative_path}")
+        except Exception as e:
+            logger.warning(f"Narrative generation failed (non-fatal): {e}")
+            click.echo(f"\n⚠️  Narrative generation skipped: {e}", err=True)
+
     except ProcessingError as e:
         logger.error(f"Processing failed: {e}")
         click.echo(f"\n❌ Processing failed: {e}", err=True)
@@ -320,6 +334,40 @@ def process(
         if case_dir.exists():
             click.echo(f"Check detailed logs: {case_dir}/processing.log")
         raise click.ClickException(str(e))
+
+
+@cli.command("generate-narrative")
+@click.argument("case_id")
+@click.option("--max-cost", default=2.0, help="Max generation cost in USD (default: 2.0)")
+@click.option("--model", default="sonnet", type=click.Choice(["haiku", "sonnet"]), help="Primary model")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def generate_narrative(case_id: str, max_cost: float, model: str, domain: str):
+    """Generate or regenerate case narrative from existing graph data."""
+    setup_domain(domain)
+
+    graph_path = Path("cases") / case_id / "output" / "graph_data.json"
+    if not graph_path.exists():
+        raise click.ClickException(
+            f"graph_data.json not found at {graph_path}. Run 'process' first."
+        )
+
+    from farmer_factory.narrative import CaseNarrativeGenerator
+    from farmer_factory.structure.graph import KnowledgeGraph
+
+    click.echo(f"Loading graph from {graph_path}...")
+    graph = KnowledgeGraph.load(graph_path)
+
+    click.echo(f"Generating narrative (model={model}, max_cost=${max_cost:.2f})...")
+    generator = CaseNarrativeGenerator(max_cost=max_cost, primary_model=model)
+    output_dir = Path("cases") / case_id / "output"
+    narrative_path = generator.generate_and_save(case_id, graph, output_dir)
+
+    click.echo(f"\n✅ Narrative saved to: {narrative_path}")
+    click.echo(f"   Cost: ${generator.total_cost:.4f}")
 
 
 @cli.command()

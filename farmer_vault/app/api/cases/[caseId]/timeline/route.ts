@@ -6,6 +6,25 @@ import type { GraphData } from '@/lib/types';
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
+interface CaseNarrativeData {
+  metadata: Record<string, unknown>;
+  case_summary: string;
+  periods: Array<{
+    period_id: string;
+    label: string;
+    narrative: string;
+    document_ids: string[];
+    entity_ids: string[];
+    highlighted_events: Array<{
+      event_type: string;
+      summary: string;
+      date: string | null;
+      parties_involved: string[];
+    }>;
+    evidence: string[];
+  }>;
+}
+
 interface DocumentInfo {
   id: string;
   filename: string;
@@ -32,6 +51,13 @@ interface TimePeriod {
   entities: EntityInfo[];
   documentCount: number;
   entityCount: number;
+  narrative: string | null;
+  highlightedEvents: Array<{
+    event_type: string;
+    summary: string;
+    date: string | null;
+    parties_involved: string[];
+  }>;
 }
 
 function getPeriodTitle(startYear: number, endYear: number): string {
@@ -91,6 +117,16 @@ export async function GET(
     const graphDataPath = path.join(CASES_DIR, caseId, 'output', 'graph_data.json');
     const graphDataContent = await fs.readFile(graphDataPath, 'utf-8');
     const graphData: GraphData = JSON.parse(graphDataContent);
+
+    // Read case narrative (optional — timeline works without it)
+    let caseNarrative: CaseNarrativeData | null = null;
+    try {
+      const narrativePath = path.join(CASES_DIR, caseId, 'output', 'case_narrative.json');
+      const narrativeContent = await fs.readFile(narrativePath, 'utf-8');
+      caseNarrative = JSON.parse(narrativeContent);
+    } catch {
+      // case_narrative.json not yet generated — proceed without it
+    }
 
     // Read documents from extractions directory
     const extractionsDir = path.join(CASES_DIR, caseId, 'extractions');
@@ -169,16 +205,21 @@ export async function GET(
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
 
+      // Match narrative period by period_id
+      const narrativePeriod = caseNarrative?.periods.find(p => p.period_id === periodKey);
+
       periods.push({
         id: periodKey,
         dateRange: periodKey,
         startYear,
         endYear,
-        title: getPeriodTitle(startYear, endYear),
+        title: narrativePeriod?.label || getPeriodTitle(startYear, endYear),
         documents: periodDocs,
         entities: periodEntities.slice(0, 10), // Limit to top 10 entities per period
         documentCount: periodDocs.length,
         entityCount: periodEntities.length,
+        narrative: narrativePeriod?.narrative || null,
+        highlightedEvents: narrativePeriod?.highlighted_events || [],
       });
     }
 
@@ -189,6 +230,7 @@ export async function GET(
       periods,
       totalDocuments: documents.length,
       dateRange: graphData.metadata.date_range,
+      caseSummary: caseNarrative?.case_summary || null,
     });
   } catch (error) {
     console.error('Error fetching timeline:', error);

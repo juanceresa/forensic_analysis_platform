@@ -19,6 +19,13 @@ interface EntityInfo {
   };
 }
 
+interface HighlightedEvent {
+  event_type: string;
+  summary: string;
+  date: string | null;
+  parties_involved: string[];
+}
+
 interface TimePeriodData {
   id: string;
   dateRange: string;
@@ -29,6 +36,8 @@ interface TimePeriodData {
   entities: EntityInfo[];
   documentCount: number;
   entityCount: number;
+  narrative: string | null;
+  highlightedEvents: HighlightedEvent[];
 }
 
 interface TimelinePeriodProps {
@@ -103,6 +112,42 @@ export function TimelinePeriod({ period, caseId, index, defaultOpen = false }: T
         </summary>
 
         <div className="p-6 bg-slate-900 border border-t-0 border-slate-800 rounded-b space-y-6">
+          {/* AI Narrative */}
+          {period.narrative && (
+            <section>
+              <div className="prose prose-invert prose-sm max-w-none text-slate-300 leading-relaxed">
+                {period.narrative.split('\n\n').map((paragraph, i) => (
+                  <p key={i} className="mb-3 last:mb-0">{paragraph}</p>
+                ))}
+              </div>
+              {period.highlightedEvents.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {period.highlightedEvents.map((event, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                        event.event_type === 'CONFISCATED'
+                          ? 'bg-red-500/10 border border-red-500/20 text-red-300'
+                          : event.event_type === 'SOLD'
+                            ? 'bg-blue-500/10 border border-blue-500/20 text-blue-300'
+                            : 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
+                      }`}
+                    >
+                      <span className="font-mono text-xs uppercase tracking-wider opacity-70">
+                        {event.event_type}
+                      </span>
+                      <span>{event.summary}</span>
+                      {event.date && (
+                        <span className="ml-auto text-xs opacity-60">{event.date}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <hr className="border-slate-800 mt-4" />
+            </section>
+          )}
+
           {/* Supporting Documents */}
           <section>
             <h3 className="text-sm font-mono uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">

@@ -1,111 +1,71 @@
-"""Pydantic models for narrative generation output."""
+"""Pydantic models for case narrative generation output."""
 
 from datetime import datetime
-from typing import Optional, List, Dict, Literal
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
-
-from farmer_factory.structure.schema import VerificationTier
-
-
-class EvidenceCitation(BaseModel):
-    """Single piece of evidence supporting a claim."""
-
-    doc_id: str = Field(description="Source document ID")
-    page: Optional[int] = Field(default=None, description="Page number in document")
-    quote: str = Field(description="Exact quote from document")
-    confidence: float = Field(ge=0.0, le=1.0, description="Extraction confidence")
-    verification_tier: VerificationTier = Field(description="Verification tier")
-    ocr_confidence: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="OCR quality score"
-    )
-
-
-class FactualClaim(BaseModel):
-    """Single fact in the narrative with supporting evidence."""
-
-    claim_text: str = Field(description="The factual claim statement")
-    citation_number: int = Field(description="Citation reference number")
-    evidence: List[EvidenceCitation] = Field(
-        description="Supporting evidence",
-        min_length=1
-    )
-    temporal_context: Optional[str] = Field(
-        default=None,
-        description="Date/time context (e.g., '1956', 'Early 1960s')"
-    )
-    fact_type: Optional[str] = Field(
-        default=None,
-        description="Fact category (e.g., 'OWNERSHIP', 'TRANSFER', 'CONFISCATION')"
-    )
 
 
 class EventHighlight(BaseModel):
-    """Special events that need prominent display (expropriations, sales, inheritances)."""
+    """Key event requiring prominent display (expropriation, sale, inheritance)."""
 
-    event_type: Literal["CONFISCATED", "SOLD", "INHERITED"] = Field(
-        description="Type of highlighted event"
-    )
+    event_type: str = Field(description="Event type (e.g., CONFISCATED, SOLD, INHERITED)")
     summary: str = Field(description="Brief event summary")
     date: Optional[str] = Field(default=None, description="Event date if known")
-    citation_number: int = Field(description="Citation reference number")
-    evidence: List[EvidenceCitation] = Field(
-        description="Supporting evidence",
-        min_length=1
-    )
     parties_involved: List[str] = Field(
         default_factory=list,
-        description="Entity names involved in event"
+        description="Entity names involved in event",
     )
 
 
-class NarrativeResult(BaseModel):
-    """Complete narrative generation result."""
+class NarrativePeriod(BaseModel):
+    """AI-generated narrative for a single time period."""
 
-    # Metadata
-    focal_entity_id: str = Field(description="ID of narrative focal point")
-    focal_entity_name: str = Field(description="Name of focal entity")
-    focal_entity_type: str = Field(description="Entity type (PROPERTY, PERSON, etc)")
-    constellation_size: int = Field(description="Number of entities in context")
-    generated_at: datetime = Field(default_factory=datetime.now)
-    model_used: Literal["haiku", "sonnet"] = Field(description="LLM model used")
-
-    # Content
-    main_narrative: str = Field(
-        description="Chronological narrative with inline citations [①]"
+    period_id: str = Field(description="Period identifier (e.g., '1950-1959')")
+    label: str = Field(description="Human-readable period label")
+    narrative: str = Field(description="AI-generated prose narrative for this period")
+    document_ids: List[str] = Field(
+        default_factory=list,
+        description="Document IDs referenced in this period",
     )
-    facts: List[FactualClaim] = Field(description="Structured factual claims")
+    entity_ids: List[str] = Field(
+        default_factory=list,
+        description="Entity IDs referenced in this period",
+    )
     highlighted_events: List[EventHighlight] = Field(
         default_factory=list,
-        description="Special events needing prominence"
+        description="Key events in this period",
+    )
+    evidence: List[str] = Field(
+        default_factory=list,
+        description="Relation IDs and event summaries used as evidence",
     )
 
-    # Quality indicators
-    total_documents: int = Field(description="Number of source documents")
-    total_citations: int = Field(description="Total evidence citations")
-    date_range: Optional[str] = Field(
+
+class NarrativeMetadata(BaseModel):
+    """Provenance metadata for the generated narrative."""
+
+    case_id: str
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    model_used: str = Field(description="Primary model used for generation")
+    model_version: Optional[str] = Field(default=None, description="Model version string")
+    prompt_hash: Optional[str] = Field(
         default=None,
-        description="Temporal span (e.g., '1952-1962')"
+        description="Hash of prompt templates for reproducibility",
+    )
+    generation_cost: float = Field(default=0.0, description="Total generation cost in USD")
+    factory_version: str = Field(default="1.6.0", description="Factory version")
+    verification_tier: str = Field(
+        default="TIER_3_AI",
+        description="All narrative content is TIER_3_AI",
     )
 
-    # Session tracking
-    generation_cost: float = Field(
-        default=0.0,
-        description="Estimated API cost for this generation (USD)"
-    )
-    from_cache: bool = Field(
-        default=False,
-        description="Whether result came from cache"
-    )
 
-    # Flags
-    is_simple_entity: bool = Field(
-        default=False,
-        description="True if insufficient data for full narrative"
-    )
-    quality_warning: Optional[str] = Field(
-        default=None,
-        description="Warning for low-quality data"
+class CaseNarrative(BaseModel):
+    """Complete case narrative — the family's story told through documents over time."""
+
+    metadata: NarrativeMetadata
+    case_summary: str = Field(description="Overall case narrative summary")
+    periods: List[NarrativePeriod] = Field(
+        default_factory=list,
+        description="Per-period narratives in chronological order",
     )

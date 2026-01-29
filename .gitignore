@@ -75,3 +75,6 @@ temp/
 .claude
 docs/internal_docx/*
 .worktrees/
+
+# CLAUDE.md files
+**/CLAUDE.md
