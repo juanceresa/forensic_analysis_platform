@@ -4,7 +4,7 @@
 
 **Goal:** Provide a persistent, analyst-reviewable merge authority for all entity types, with a fast `apply-merges` command that rebuilds the graph without re-running OCR or LLM calls.
 
-**Architecture:** YAML-based merge files per entity type, auto-generated as DRAFT during processing, reviewed and CONFIRMED by analyst. Two-level status system (file-level + entry-level). Dedupe never touches CONFIRMED entries. Graph is always derived from raw extractions + merge files.
+**Architecture:** YAML-based merge files per entity type, auto-generated as DRAFT during processing, reviewed and CONFIRMED by analyst. Two-level status system (file-level + entry-level). Dedupe never touches CONFIRMED entries. Graph is derived from existing `graph_data.json` + merge files (preserving LLM-enriched fields like verification tiers and confidence scores).
 
 **Tech Stack:** Python, Pydantic, PyYAML, existing dedupe infrastructure
 
@@ -29,6 +29,7 @@ cases/CASE-ID/
 
 ```yaml
 status: DRAFT                       # Top-level: DRAFT if any entry is DRAFT
+extractions_hash: "a1b2c3d4e5f6"    # SHA-256 prefix of extractions dir at generation time
 
 groups:
   - canonical_id: "person_mario_ceresa_001"
@@ -79,6 +80,7 @@ unmerged:
 
 ```yaml
 status: DRAFT
+extractions_hash: "a1b2c3d4e5f6"
 
 relations:
   - source_id: "person_mario_ceresa_001"
@@ -113,6 +115,40 @@ relations:
 - Adding new documents flips top-level back to DRAFT
 - Dedupe never modifies CONFIRMED entries during re-processing
 - Deleting an entry from the file undoes that merge on next `apply-merges`
+
+## Constraints and Invariants
+
+### Canonical ID Rules
+- Canonical IDs are always existing entity IDs from extraction (never manually invented)
+- The canonical is the **first member** of the group (the merge target)
+- An entity ID may appear in **at most one group** across all files of the same type
+- Validation rejects duplicate entity IDs across groups (hard error, not warning)
+
+### Relation Rewriting
+- When entities are merged, all relations pointing to a merged member are rewritten to the canonical ID
+- Duplicate relations (same source, target, type) after rewriting are deduplicated, keeping the higher-confidence one
+- Self-loops (source == target after rewriting) are dropped
+- Bidirectional edges are preserved as separate relations (A→B and B→A remain distinct)
+
+### Cross-Type Relations and DRAFT/CONFIRMED
+- DRAFT relations are **skipped** by `apply-merges` by default
+- DRAFT relations are **applied** only with `--include-drafts` flag (for preview)
+- Same behavior as entity groups — analyst must CONFIRM before relations take effect
+
+### LLM-Enriched Field Preservation
+- `apply-merges` reads the current `graph_data.json`, not raw extractions
+- Verification tiers, confidence scores, and all enriched fields are preserved
+- When merging two entities, the canonical entity's fields take precedence; missing fields are filled from the merged member
+- `extracted_from` is combined (comma-separated union of all source documents)
+
+### Staleness Detection
+- Each YAML file includes an `extractions_hash` header — SHA-256 of the extractions directory file listing at generation time
+- `apply-merges` warns (but proceeds) if the hash doesn't match current extractions
+- Stale files may reference entity IDs that no longer exist — these are logged as warnings and skipped
+
+### Concurrency
+- Single-analyst CLI workflow — no locking required for current scope
+- Future: if multi-user Vault editing is added, implement file-level advisory locks
 
 ## Lifecycle
 
@@ -184,8 +220,8 @@ python3 -m farmer_factory.cli merge-entities CASE-ID entity_a entity_b
 python3 -m farmer_factory.cli apply-merges CASE-ID --domain cuban_property
 ```
 
-- Reads raw extractions + all CONFIRMED entity_groups/*.yaml files
-- Rebuilds `graph_data.json` by merging entities and rewriting relations
+- Reads current `graph_data.json` + all CONFIRMED entity_groups/*.yaml files
+- Rebuilds graph by merging entities and rewriting relations, preserving LLM-enriched fields
 - **No OCR, no extraction, no LLM calls** — graph surgery only
 - Idempotent — running twice produces same result
 - Optional: `--include-drafts` to preview DRAFT merges without requiring CONFIRMED
@@ -252,10 +288,14 @@ Read and validate merge files:
 
 Core graph rebuild logic:
 - `apply_merges(case_id, include_drafts=False)` → writes `graph_data.json`
-- Read raw extractions from `cases/CASE-ID/extractions/`
+- Read current `graph_data.json` (preserves LLM-enriched fields)
 - Build entity ID remapping from confirmed merge groups
+- Merge entity nodes: canonical fields take precedence, combine `extracted_from`
 - Rewrite all relations to use canonical IDs
-- Apply cross-type relation corrections
+- Deduplicate relations after rewriting (keep higher confidence)
+- Drop self-loops created by merging
+- Apply cross-type relation corrections from `cross_type_relations.yaml`
+- Validate: warn on stale `extractions_hash`, skip references to missing entities
 - Export merged graph
 
 ### Task 5: CLI Commands
@@ -292,3 +332,11 @@ Test:
 - Merge application produces correct graph
 - Idempotency of apply-merges
 - merge-entities CLI writes correct YAML
+- Entity ID appearing in multiple groups → validation error
+- Relation rewriting with bidirectional edges (both preserved)
+- Self-loop detection and removal after merge
+- Duplicate relation deduplication (keep higher confidence)
+- `--include-drafts` applies DRAFT entries, default skips them
+- Stale `extractions_hash` produces warning but proceeds
+- Missing entity IDs in merge file → logged warning, skipped
+- Cross-type relations respect DRAFT/CONFIRMED status
