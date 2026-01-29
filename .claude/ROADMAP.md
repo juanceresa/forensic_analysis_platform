@@ -274,100 +274,75 @@ Set up Supabase project:
 
 ## Phase 6: Narrative Generation
 
-### Status: ✅ COMPLETE (2026-01-25)
+### Status: ✅ COMPLETE (redesigned 2026-01-28)
 
 ### Dependencies
 - **Prerequisite:** Phase 5 complete (graph constructed)
 
 ### Overview
-Contextual narrative generation for knowledge graph entities with forensic intelligence narratives, inline citations, and event highlighting. User-driven exploration with session cost tracking.
+Batch case narrative generation during Factory processing. Produces `case_narrative.json` with per-period narratives organized by decade, case summary, and highlighted events. Delivered to the Vault as a static artifact (air gap maintained).
+
+**Redesign (2026-01-28):** Replaced on-demand per-entity generation with batch per-case processing. See `docs/plans/2026-01-28-case-narrative-generation-redesign.md`.
 
 ### Tasks
 
 | Task | File | Status | Notes |
 |------|------|--------|-------|
-| 6.1 | `narrative/models.py` | ✅ | Pydantic models: EvidenceCitation, EventHighlight, NarrativeResult |
-| 6.2 | `narrative/scorer.py` | ✅ | Story centrality scoring with weight profiles (properties prioritized) |
-| 6.3 | `narrative/constellation.py` | ✅ | Connected component extraction + model selection (Haiku/Sonnet) |
-| 6.4 | `narrative/prompts.py` | ✅ | Single-stage LLM prompts with forensic voice |
-| 6.5 | `narrative/cache.py` | ✅ | In-memory cache with Redis adapter pattern, graph-state invalidation |
-| 6.6 | `narrative/generator.py` | ✅ | Main orchestrator with 8-step pipeline, session cost tracking |
-| 6.7 | `narrative/exceptions.py` | ✅ | SessionCostLimitExceeded, InsufficientGraphData |
-| 6.8 | `api/narrative.py` | ✅ | Backend API endpoint with validation |
-| 6.9 | `scripts/generate_narrative.py` | ✅ | CLI script for subprocess invocation |
-| 6.10 | Frontend components | ✅ | NarrativePanel.tsx, useNarrative.ts, API route |
-| 6.11 | Test suite | ✅ | 34 tests (31 narrative, 3 API endpoint) |
-| 6.12 | Documentation | ✅ | README.md with examples and architecture |
+| 6.1 | `narrative/models.py` | ✅ | Pydantic models: CaseNarrative, NarrativePeriod, NarrativeMetadata, EventHighlight |
+| 6.2 | `narrative/prompts.py` | ✅ | Period + summary prompt templates with forensic voice |
+| 6.3 | `narrative/generator.py` | ✅ | CaseNarrativeGenerator: decade grouping, sparse merge, cost tracking, model downgrade |
+| 6.4 | CLI integration | ✅ | `generate-narrative` command + auto-run in `process` pipeline |
+| 6.5 | Vault timeline API | ✅ | Reads case_narrative.json, merges into timeline response |
+| 6.6 | Vault components | ✅ | TimelinePeriod renders narrative prose + highlighted events, page shows case_summary |
+| 6.7 | Test suite | ✅ | 27 tests (models, prompts, generator) |
 
 **Acceptance Criteria (Phase):**
-- ✅ Single-stage narrative generation (1 API call)
-- ✅ Story centrality scoring prioritizes properties and confiscation events
-- ✅ Smart model selection (Haiku for simple, Sonnet for complex)
-- ✅ In-memory cache with TTL and graph-state invalidation
-- ✅ Session cost tracking with $1 hard limit
+- ✅ Batch per-case narrative generation (one run per case during processing)
+- ✅ Period-based organization (decade grouping with sparse merge)
+- ✅ Cost tracking with configurable limit ($2 default) and model downgrade (sonnet→haiku)
 - ✅ Event highlighting (CONFISCATED, SOLD, INHERITED)
-- ✅ Inline citations with unicode markers [①], [②]
-- ✅ Backend API endpoint with error handling
-- ✅ CLI script for Next.js subprocess integration
-- ✅ Frontend React component with dark theme
-- ✅ 34 passing tests (100% success rate)
-- ✅ Comprehensive documentation
+- ✅ Case summary generated from period narratives
+- ✅ Output: `case_narrative.json` in case output directory
+- ✅ Vault timeline API merges narrative into period responses
+- ✅ Graceful degradation (timeline works without narrative file)
+- ✅ 27 passing tests
+- ✅ Design document
 
 **Implementation Details:**
-- **Architecture:** Single-stage LLM generation (50% faster than two-stage)
-- **Caching:** In-memory with Redis adapter pattern for easy migration
-- **Cache Invalidation:** Graph hash includes verification tiers and relation counts
-- **Cost Tracking:** Per-session accumulation with hard limit enforcement
-- **Model Selection:** Complexity threshold at 50.0 (entities×2 + relations×1.5 + documents×3)
-- **Weight Profile:** PROPERTY=10.0, CONFISCATED=+5.0, SOLD/INHERITED=+3.0
-- **Frontend:** Next.js API route spawns Python subprocess (air gap maintained)
+- **Architecture:** Batch generation during `process` pipeline (not on-demand)
+- **Grouping:** Documents grouped by decade, adjacent sparse periods (<3 docs) merged
+- **Cost Control:** Configurable max cost, model downgrade on failure, cost accumulation tracking
+- **Output:** `case_narrative.json` with metadata, case_summary, and periods array
+- **Vault:** Timeline API reads narrative file, merges into period response; handles missing file gracefully
 
 **Test Coverage:**
 ```
 tests/narrative/
-├── test_models.py (4 tests)
-├── test_scorer.py (6 tests)
-├── test_constellation.py (4 tests)
-├── test_prompts.py (3 tests)
-├── test_cache.py (6 tests)
-├── test_generator.py (4 tests)
-└── test_integration.py (4 tests)
-
-tests/api/
-└── test_narrative_endpoint.py (3 tests)
+├── test_models.py (6 tests) — serialization, defaults, roundtrip
+├── test_prompts.py (6 tests) — constraints, highlighting, templates
+└── test_generator.py (15 tests) — grouping, merge, cost guards, evidence
 ```
 
-**Files Created:**
+**Files:**
 ```
 farmer_factory/
 ├── narrative/
 │   ├── __init__.py
-│   ├── README.md
-│   ├── models.py
-│   ├── scorer.py
-│   ├── constellation.py
-│   ├── prompts.py
-│   ├── cache.py
-│   ├── generator.py (415 lines - main orchestrator)
-│   └── exceptions.py
-├── api/
-│   ├── __init__.py
-│   └── narrative.py
-└── scripts/
-    └── generate_narrative.py
+│   ├── models.py          # CaseNarrative, NarrativePeriod, NarrativeMetadata, EventHighlight
+│   ├── prompts.py         # Period + summary prompt templates
+│   └── generator.py       # CaseNarrativeGenerator (batch processing)
+└── cli.py                 # generate-narrative command + process integration
 
 farmer_vault/
-├── components/
-│   ├── NarrativePanel.tsx
-│   └── NarrativePanel.module.css
-├── hooks/
-│   └── useNarrative.ts
-└── pages/api/cases/[caseId]/
-    └── narrative.ts
+├── app/api/cases/[caseId]/timeline/route.ts  # Reads case_narrative.json
+├── app/case/[caseId]/narrative/page.tsx       # Renders case_summary
+└── components/Narrative/TimelinePeriod.tsx     # Renders period narrative + events
 ```
 
-**Risks:**
-- NONE - Phase complete with full test coverage
+**Removed (old on-demand architecture):**
+- `narrative/scorer.py`, `constellation.py`, `cache.py`, `exceptions.py`
+- `api/narrative.py`, `scripts/generate_narrative.py`
+- `NarrativePanel.tsx`, `useNarrative.ts`, Vault narrative API route
 
 ---
 
@@ -376,8 +351,8 @@ farmer_vault/
 **Deliverables:**
 - ✅ Next.js 14 app with App Router (16.1.4 with Turbopack)
 - ✅ Force-directed graph visualization (react-force-graph-2d)
-- ✅ Tabbed sidebar (Details/Narrative)
-- ✅ Narrative generation integration (Python subprocess API)
+- ✅ Entity sidebar (details panel with API-fetched data)
+- ✅ Narrative timeline (batch-generated, rendered per-period)
 - ✅ Dark theme with verification tier colors
 - ✅ Error boundary for production resilience
 - ✅ Comprehensive test suite (12 passing tests)
@@ -390,9 +365,7 @@ farmer_vault/
 - SWR for client-side caching
 - Dynamic imports (~200KB bundle reduction)
 - ARIA-compliant accessibility (WCAG AA)
-- Typewriter effect for narratives
 - Pulsing glow on selected graph nodes
-- Session-level narrative caching
 
 **Limitations:**
 - Local development only (no authentication yet)
@@ -901,21 +874,11 @@ farmer_factory/
 │   ├── postprocessor.py      [✓] # NEW - Graph post-processing (transitive redundancy, validation)
 │   ├── models/               [ ] # Trained dedupe models (*.pkl)
 │   └── ~~gap_detector.py~~   [x] # DEFERRED to analyst workflow
-├── narrative/                [✓] # NEW - Narrative generation module
+├── narrative/                [✓] # Batch case narrative generation
 │   ├── __init__.py           [✓]
-│   ├── README.md             [✓]
-│   ├── models.py             [✓]
-│   ├── scorer.py             [✓]
-│   ├── constellation.py      [✓]
-│   ├── prompts.py            [✓]
-│   ├── cache.py              [✓]
-│   ├── generator.py          [✓]
-│   └── exceptions.py         [✓]
-├── api/                      [✓] # NEW - API endpoints
-│   ├── __init__.py           [✓]
-│   └── narrative.py          [✓]
-├── scripts/                  [✓] # NEW - CLI scripts
-│   └── generate_narrative.py [✓]
+│   ├── models.py             [✓] # CaseNarrative, NarrativePeriod, NarrativeMetadata, EventHighlight
+│   ├── prompts.py            [✓] # Period + summary prompt templates
+│   └── generator.py          [✓] # CaseNarrativeGenerator (batch processing)
 ├── export/
 │   ├── json_exporter.py      [ ]
 │   └── audit_log.py          [ ]
@@ -983,21 +946,34 @@ farmer_vault/
 │   │       └── [id]/
 │   │           ├── graph/route.ts [ ] # NEW - Fetch graph from Supabase
 │   │           ├── verify-entity/route.ts [ ] # NEW - Analyst verification
-│   │           ├── narrative.ts  [✓] # NEW - Narrative generation API route
 │   │           └── dossier/route.ts [ ] # NEW - PDF dossier download
 │   └── case/[id]/page.tsx    [ ]
 ├── components/
-│   ├── KnowledgeGraph.tsx    [ ]
-│   ├── DossierPanel.tsx      [ ]
-│   ├── NodeBadge.tsx         [ ]
-│   ├── SourceViewer.tsx      [ ]
-│   ├── TimelineView.tsx      [ ]
-│   ├── GapAlert.tsx          [ ]
-│   ├── AnalystReviewPanel.tsx [ ] # NEW - Analyst verification UI
-│   ├── NarrativePanel.tsx    [✓] # NEW - Contextual narrative display
-│   └── NarrativePanel.module.css [✓] # NEW - Dark theme styles
-├── hooks/                    [✓] # NEW
-│   └── useNarrative.ts       [✓] # NEW - Narrative API integration hook
+│   ├── Graph/
+│   │   ├── KnowledgeGraph.tsx    [✓]
+│   │   ├── GraphView.tsx         [✓]
+│   │   ├── EntitySidebar.tsx     [✓]
+│   │   ├── GraphSettingsPanel.tsx [✓]
+│   │   └── NodeBadge.tsx         [✓]
+│   ├── Narrative/
+│   │   └── TimelinePeriod.tsx    [✓]
+│   ├── Dashboard/
+│   │   ├── Header.tsx            [✓]
+│   │   └── DossierDownload.tsx   [✓]
+│   ├── Documents/
+│   │   ├── DocumentViewer.tsx    [✓]
+│   │   └── DocumentList.tsx      [✓]
+│   ├── Entities/
+│   │   ├── EntityDetail.tsx      [✓]
+│   │   └── EntityBrowser.tsx     [✓]
+│   └── shared/
+│       ├── Header.tsx            [✓]
+│       ├── Sidebar.tsx           [✓]
+│       ├── ErrorBoundary.tsx     [✓]
+│       ├── ErrorState.tsx        [✓]
+│       ├── LoadingState.tsx      [✓]
+│       ├── VerificationBadge.tsx [✓]
+│       └── Card.tsx              [✓]
 ├── lib/
 │   ├── types.ts              [ ]
 │   ├── graph-config.ts       [ ]

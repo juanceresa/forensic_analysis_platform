@@ -868,17 +868,16 @@ export async function GET() {
 
 **2.5 Map Python endpoint errors to HTTP status codes**
 
-When a Python endpoint (e.g., `generate_narrative_endpoint`) returns a payload
-with `status_code`, map it to the HTTP response status in your Next.js route.
+When a Python endpoint returns a payload with `status_code`, map it to the
+HTTP response status in your Next.js route.
 
 ```typescript
-// app/api/cases/[id]/narrative/route.ts
+// Example: app/api/cases/[id]/dossier/route.ts
 import { NextRequest } from 'next/server'
-import { generateNarrative } from '@/lib/factory' // thin wrapper around Python call
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json()
-  const result = await generateNarrative(params.id, body)
+  const result = await callFactory(params.id, body)
 
   if (result?.status_code) {
     return Response.json(result, { status: result.status_code })
@@ -887,6 +886,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return Response.json(result, { status: 200 })
 }
 ```
+
+> **Note:** Narrative generation no longer uses an API endpoint. It runs as a
+> batch step during Factory processing, producing `case_narrative.json` which
+> the Vault reads as a static file.
 
 **Acceptance Criteria:**
 - ✅ New Clerk users auto-sync to Supabase
@@ -1211,8 +1214,8 @@ This section documents findings from the comprehensive security review conducted
 Multiple Python modules constructed file paths by directly interpolating user-supplied `case_id` values without validation. This could allow an attacker to access files outside the intended `cases/` directory by supplying malicious case IDs like `../etc/passwd`.
 
 **Affected Files:**
-- `farmer_factory/api/narrative.py`
-- `farmer_factory/scripts/generate_narrative.py`
+- `farmer_factory/api/narrative.py` (removed — narrative is now batch-generated)
+- `farmer_factory/scripts/generate_narrative.py` (removed — replaced by CLI command)
 - `farmer_factory/dossier/__init__.py`
 - `farmer_factory/dossier/preparer.py`
 

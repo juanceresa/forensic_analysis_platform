@@ -62,12 +62,11 @@ Context for recent updates in this session:
   - Added a near-blank page check in triage to avoid misrouting blank pages as handwritten.
   - Updated tests for the new default and added empty/RGB cases.
   - Docs clarify triage is disabled by default.
-- Narrative API now loads `graph_data.json`, and relation counting/model selection uses unique links.
-- Knowledge graph supports multiple relations between the same nodes (multi-edge) and cache invalidation hashes full graph state.
+- Narrative generation redesigned as batch per-case processing (2026-01-28). Produces `case_narrative.json` during Factory processing with per-period narratives and case summary. Old on-demand API removed.
+- Knowledge graph supports multiple relations between the same nodes (multi-edge).
 - Extraction now passes document dates into relation temporal fallbacks and skips invalid relation types without dropping valid ones.
 - Graph export format is unified on `nodes` + `links`, with metadata carrying verification distribution, entity type summary, and date range.
 - Processing now persists extraction flags, validates extraction payloads, and validates exported `graph_data.json`.
-- Narrative prompts now include relation evidence/doc IDs, cache hashing ignores timestamps, and document IDs are normalized.
 - CLI validate now runs schema checks; `process` supports `--skip-validation`.
 - Preprocessing triage is disabled by default; it can be enabled via `PreprocessingPipeline(enable_triage=True)`.
 - Handwritten Vision extraction is mocked right now (`farmer_factory/extract/vision.py`).
