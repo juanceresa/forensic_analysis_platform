@@ -479,11 +479,17 @@ def retry_relations(case_id: str, verbose: bool):
     "--num-examples", default=30, help="Number of labeled examples to collect per type"
 )
 @click.option(
+    "--from-groups",
+    is_flag=True,
+    default=False,
+    help="Train from CONFIRMED entity groups (no interactive labeling)",
+)
+@click.option(
     "--domain",
     default="cuban_property",
     help="Domain configuration to use (default: cuban_property)",
 )
-def train_deduplication(case_id: str, entity_type: str, num_examples: int, domain: str):
+def train_deduplication(case_id: str, entity_type: str, num_examples: int, from_groups: bool, domain: str):
     """
     Train entity deduplication models using labeled examples.
 
@@ -500,9 +506,9 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int, domai
     from farmer_factory.domains import domain_registry
 
     try:
-        from farmer_factory.structure.dedupe.train import train_dedupe_model
+        from farmer_factory.structure.dedupe.train import train_dedupe_model, train_dedupe_model_from_groups
     except ModuleNotFoundError:
-        from structure.train_dedupe import train_dedupe_model
+        from structure.train_dedupe import train_dedupe_model, train_dedupe_model_from_groups
 
     case_dir = Path("cases") / case_id
     extractions_dir = case_dir / "extractions"
@@ -533,9 +539,14 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int, domai
     for etype in entity_types:
         try:
             click.echo(f"\n--- Training {etype} ---\n")
-            model = train_dedupe_model(
-                case_id=case_id, entity_type=etype, num_examples=num_examples
-            )
+            if from_groups:
+                model = train_dedupe_model_from_groups(
+                    case_id=case_id, entity_type=etype
+                )
+            else:
+                model = train_dedupe_model(
+                    case_id=case_id, entity_type=etype, num_examples=num_examples
+                )
             click.echo(f"✓ {etype} model trained and saved\n")
         except ValueError as e:
             click.echo(f"⚠️  Skipping {etype}: {e}\n")
@@ -934,23 +945,25 @@ def apply_merges(case_id: str, include_drafts: bool, domain: str):
 
 @cli.command("merge-entities")
 @click.argument("case_id")
-@click.argument("entity_a")
-@click.argument("entity_b")
+@click.argument("entity_ids", nargs=-1, required=True)
 @click.option(
     "--domain",
     default="cuban_property",
     help="Domain configuration to use (default: cuban_property)",
 )
-def merge_entities(case_id: str, entity_a: str, entity_b: str, domain: str):
-    """Merge two entities manually (analyst merge).
+def merge_entities(case_id: str, entity_ids: tuple, domain: str):
+    """Merge multiple entities manually (analyst merge).
 
-    ENTITY_A becomes the canonical entity; ENTITY_B is merged into it.
+    First entity becomes the canonical; all others are merged into it.
     The merge is written as CONFIRMED to entity_groups/*.yaml, then
     apply-merges is run automatically.
 
     Example:
-        python cli.py merge-entities TEST-CERESA person_mario_ceresa_001 person_mario_feresa_012
+        python cli.py merge-entities TEST-CERESA entity_001 entity_002 entity_003
     """
+    if len(entity_ids) < 2:
+        raise click.ClickException("Need at least 2 entity IDs to merge.")
+
     setup_domain(domain)
 
     import json
@@ -973,32 +986,36 @@ def merge_entities(case_id: str, entity_a: str, entity_b: str, domain: str):
 
     node_map = {n["id"]: n for n in graph_data.get("nodes", [])}
 
-    if entity_a not in node_map:
-        raise click.ClickException(f"Entity not found: {entity_a}")
-    if entity_b not in node_map:
-        raise click.ClickException(f"Entity not found: {entity_b}")
+    # Validate all entity IDs exist
+    for eid in entity_ids:
+        if eid not in node_map:
+            raise click.ClickException(f"Entity not found: {eid}")
 
-    node_a = node_map[entity_a]
-    node_b = node_map[entity_b]
+    canonical_id = entity_ids[0]
+    node_a = node_map[canonical_id]
     entity_type = node_a.get("entity_type", "")
 
-    if entity_type != node_b.get("entity_type", ""):
-        raise click.ClickException(
-            f"Cannot merge different entity types: "
-            f"{entity_type} and {node_b.get('entity_type')}"
-        )
-
-    click.echo(f"Merging: {node_b.get('name', entity_b)} → {node_a.get('name', entity_a)}")
+    # Validate all same type
+    for eid in entity_ids[1:]:
+        other_type = node_map[eid].get("entity_type", "")
+        if other_type != entity_type:
+            raise click.ClickException(
+                f"Cannot merge different entity types: "
+                f"{entity_type} and {other_type} (entity {eid})"
+            )
 
     try:
-        add_analyst_merge(
-            case_dir=case_dir,
-            entity_type=entity_type,
-            canonical_id=entity_a,
-            canonical_name=node_a.get("name", entity_a),
-            member_id=entity_b,
-            member_name=node_b.get("name", entity_b),
-        )
+        for member_id in entity_ids[1:]:
+            node_b = node_map[member_id]
+            click.echo(f"Merging: {node_b.get('name', member_id)} → {node_a.get('name', canonical_id)}")
+            add_analyst_merge(
+                case_dir=case_dir,
+                entity_type=entity_type,
+                canonical_id=canonical_id,
+                canonical_name=node_a.get("name", canonical_id),
+                member_id=member_id,
+                member_name=node_b.get("name", member_id),
+            )
         click.echo("✓ Merge recorded in entity_groups/")
 
         _apply_merges(case_dir, include_drafts=False, output_path=graph_path)
@@ -1007,6 +1024,162 @@ def merge_entities(case_id: str, entity_a: str, entity_b: str, domain: str):
     except Exception as e:
         logger.exception(f"merge-entities failed: {e}")
         raise click.ClickException(str(e))
+
+
+@cli.command("review-groups")
+@click.argument("case_id")
+@click.option("--entity-type", help="Review only this entity type (e.g., PERSON)")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def review_groups(case_id: str, entity_type: str, domain: str):
+    """Interactively review DRAFT entity merge groups.
+
+    Walks through each DRAFT group, letting you confirm, edit, or reject
+    merges without touching YAML files directly.
+
+    Example:
+        python cli.py review-groups TEST-CERESA
+        python cli.py review-groups TEST-CERESA --entity-type PERSON
+    """
+    setup_domain(domain)
+
+    from farmer_factory.structure.merge.reader import get_all_entity_groups
+    from farmer_factory.structure.merge.writer import save_entity_group_file
+    from farmer_factory.structure.merge.models import UnmergedEntity
+
+    case_dir = Path("cases") / case_id
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+
+    groups_dir = case_dir / "entity_groups"
+    if not groups_dir.exists():
+        raise click.ClickException(
+            f"No entity_groups/ directory. Run 'rebuild-graph {case_id}' first."
+        )
+
+    all_files = get_all_entity_groups(case_dir)
+    if entity_type:
+        all_files = [(et, ef) for et, ef in all_files if et == entity_type.upper()]
+
+    if not all_files:
+        click.echo("No entity group files found.")
+        return
+
+    stats = {"confirmed": 0, "skipped": 0, "deleted": 0}
+    quit_requested = False
+
+    for etype, entity_file in all_files:
+        if quit_requested:
+            break
+
+        draft_groups = [g for g in entity_file.groups if g.status == "DRAFT"]
+        if not draft_groups:
+            continue
+
+        click.echo(f"\n=== Reviewing {etype} groups ({len(draft_groups)} DRAFT) ===")
+
+        for idx, group in enumerate(draft_groups):
+            if quit_requested:
+                break
+
+            click.echo(f"\n--- Group {idx + 1} of {len(draft_groups)} ---")
+            _display_group(group)
+
+            while True:
+                action = input("\n  [c]onfirm  [r]emove members  [s]et canonical  [d]elete group  [n]ext  [q]uit\n  > ").strip().lower()
+
+                if action == "c":
+                    group.status = "CONFIRMED"
+                    save_entity_group_file(case_dir, etype, entity_file)
+                    click.echo(f"  Confirmed ({len(group.members)} members)")
+                    stats["confirmed"] += 1
+                    break
+
+                elif action == "r":
+                    if len(group.members) <= 2:
+                        click.echo("  Group needs at least 2 members. Use [d]elete to remove the group.")
+                        continue
+                    selection = input("  Remove which members? (e.g. 3 or 1,3): ").strip()
+                    try:
+                        indices = [int(x.strip()) for x in selection.split(",")]
+                    except ValueError:
+                        click.echo("  Invalid input.")
+                        continue
+                    # Validate indices
+                    if any(i < 1 or i > len(group.members) for i in indices):
+                        click.echo(f"  Numbers must be 1-{len(group.members)}.")
+                        continue
+                    if 1 in indices:
+                        click.echo("  Cannot remove member 1 (canonical). Use [s]et canonical first.")
+                        continue
+                    remaining_count = len(group.members) - len(indices)
+                    if remaining_count < 2:
+                        click.echo("  Would leave fewer than 2 members. Use [d]elete instead.")
+                        continue
+                    # Remove members (highest index first to preserve ordering)
+                    for i in sorted(indices, reverse=True):
+                        removed = group.members.pop(i - 1)
+                        entity_file.unmerged.append(UnmergedEntity(id=removed.id, name=removed.name))
+                        click.echo(f"  Removed {removed.name} -> unmerged")
+                    save_entity_group_file(case_dir, etype, entity_file)
+                    _display_group(group)
+
+                elif action == "s":
+                    selection = input(f"  Set canonical to which member? (1-{len(group.members)}): ").strip()
+                    try:
+                        new_idx = int(selection)
+                    except ValueError:
+                        click.echo("  Invalid input.")
+                        continue
+                    if new_idx < 1 or new_idx > len(group.members):
+                        click.echo(f"  Must be 1-{len(group.members)}.")
+                        continue
+                    # Reorder: move chosen member to front
+                    chosen = group.members.pop(new_idx - 1)
+                    group.members.insert(0, chosen)
+                    group.canonical_id = chosen.id
+                    group.canonical_name = chosen.name
+                    save_entity_group_file(case_dir, etype, entity_file)
+                    click.echo(f"  Canonical set to: {chosen.name}")
+                    _display_group(group)
+
+                elif action == "d":
+                    # Move all members to unmerged, remove group
+                    for member in group.members:
+                        entity_file.unmerged.append(UnmergedEntity(id=member.id, name=member.name))
+                    entity_file.groups.remove(group)
+                    save_entity_group_file(case_dir, etype, entity_file)
+                    click.echo("  Group deleted, members moved to unmerged.")
+                    stats["deleted"] += 1
+                    break
+
+                elif action == "n":
+                    stats["skipped"] += 1
+                    break
+
+                elif action == "q":
+                    quit_requested = True
+                    break
+
+                else:
+                    click.echo("  Unknown action.")
+
+    # Summary
+    total = stats["confirmed"] + stats["skipped"] + stats["deleted"]
+    click.echo(f"\nSummary: {stats['confirmed']} confirmed, {stats['skipped']} skipped, {stats['deleted']} deleted")
+    if stats["confirmed"] > 0:
+        click.echo(f"Run 'apply-merges {case_id}' to update the graph.")
+
+
+def _display_group(group) -> None:
+    """Display a merge group's members in compact format."""
+    click.echo(f"  Canonical: {group.canonical_name}")
+    for i, member in enumerate(group.members, 1):
+        conf_pct = f"{member.confidence:.0%}" if member.confidence is not None else "?"
+        click.echo(f"  [{i}] {member.name:<40s} (conf: {conf_pct}, source: {member.source})")
 
 
 if __name__ == "__main__":

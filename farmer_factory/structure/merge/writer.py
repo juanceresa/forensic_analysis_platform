@@ -302,32 +302,58 @@ def add_analyst_merge(
     if existing is None:
         existing = EntityGroupFile(extractions_hash=extractions_hash)
 
-    # Check if canonical already has a group
-    target_group: Optional[MergeGroup] = None
+    # Find any existing group that contains either entity (as canonical or member)
+    canonical_group: Optional[MergeGroup] = None
+    member_group: Optional[MergeGroup] = None
     for group in existing.groups:
-        if group.canonical_id == canonical_id:
-            target_group = group
-            break
+        member_ids = {m.id for m in group.members}
+        if canonical_id in member_ids:
+            canonical_group = group
+        if member_id in member_ids:
+            member_group = group
 
     new_member = MergeGroupMember(
         id=member_id, name=member_name, source="analyst", confidence=1.0
     )
+    canonical_as_member = MergeGroupMember(
+        id=canonical_id, name=canonical_name, source="analyst", confidence=1.0
+    )
 
-    if target_group:
-        # Add to existing group (skip if already a member)
-        if not any(m.id == member_id for m in target_group.members):
-            target_group.members.append(new_member)
-        target_group.status = "CONFIRMED"
+    if canonical_group and member_group and canonical_group is member_group:
+        # Already in the same group — just confirm it
+        canonical_group.status = "CONFIRMED"
+    elif canonical_group and member_group:
+        # Both in different groups — merge the member's group into canonical's group
+        for m in member_group.members:
+            if not any(existing_m.id == m.id for existing_m in canonical_group.members):
+                canonical_group.members.append(m)
+        existing.groups.remove(member_group)
+        canonical_group.status = "CONFIRMED"
+    elif canonical_group:
+        # Canonical has a group, member doesn't — add member to it
+        if not any(m.id == member_id for m in canonical_group.members):
+            canonical_group.members.append(new_member)
+        canonical_group.status = "CONFIRMED"
+    elif member_group:
+        # Member has a group, canonical doesn't — add canonical and make it the canonical
+        if not any(m.id == canonical_id for m in member_group.members):
+            member_group.members.insert(0, canonical_as_member)
+        else:
+            # Move canonical to front
+            member_group.members = [
+                m for m in member_group.members if m.id != canonical_id
+            ]
+            member_group.members.insert(0, canonical_as_member)
+        member_group.canonical_id = canonical_id
+        member_group.canonical_name = canonical_name
+        member_group.status = "CONFIRMED"
     else:
-        # Create new group
-        canonical_member = MergeGroupMember(
-            id=canonical_id, name=canonical_name, source="analyst", confidence=1.0
-        )
+        # Neither in a group — create new group
         new_group = MergeGroup(
             canonical_id=canonical_id,
             canonical_name=canonical_name,
             status="CONFIRMED",
-            members=[canonical_member, new_member],
+            members=[canonical_as_member, new_member],
         )
         existing.groups.append(new_group)
 
@@ -345,6 +371,40 @@ def add_analyst_merge(
 
     _write_yaml(filepath, existing.model_dump())
     logger.info(f"Added analyst merge: {member_id} → {canonical_id}")
+    return filepath
+
+
+def save_entity_group_file(case_dir: Path, entity_type: str, entity_file: EntityGroupFile) -> Path:
+    """Save a modified EntityGroupFile directly to YAML.
+
+    Recomputes top-level status and extractions_hash before writing.
+
+    Args:
+        case_dir: Path to case directory.
+        entity_type: Entity type key (PERSON, PROPERTY, etc.)
+        entity_file: The modified EntityGroupFile to save.
+
+    Returns:
+        Path to written YAML file.
+    """
+    filename = ENTITY_TYPE_FILES.get(entity_type)
+    if filename is None:
+        raise ValueError(f"Unknown entity type: {entity_type}")
+
+    groups_dir = _entity_groups_dir(case_dir)
+    filepath = groups_dir / filename
+
+    # Recompute extractions_hash
+    entity_file.extractions_hash = _compute_extractions_hash(case_dir)
+
+    # Recompute top-level status
+    has_draft = any(g.status == "DRAFT" for g in entity_file.groups) or any(
+        r.status == "DRAFT" for r in entity_file.relations
+    )
+    entity_file.status = "DRAFT" if has_draft else "CONFIRMED"
+
+    _write_yaml(filepath, entity_file.model_dump())
+    logger.info(f"Saved {entity_type} merge file: {filepath}")
     return filepath
 
 

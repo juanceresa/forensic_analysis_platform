@@ -1,10 +1,12 @@
 """Train dedupe models using labeled examples."""
 
 import dedupe
+import itertools
 import json
 import logging
+import random
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from .config import FIELD_CONFIG
 
 logger = logging.getLogger(__name__)
@@ -113,6 +115,131 @@ def train_dedupe_model(
 
     logger.info(f"Saved {entity_type} model to {settings_path}")
 
+    return deduper
+
+
+def train_dedupe_model_from_groups(
+    case_id: str,
+    entity_type: str,
+    base_dir: Path = None,
+    model_dir: Path = None,
+) -> dedupe.Dedupe:
+    """Train a dedupe model using CONFIRMED entity groups as labeled data.
+
+    Reads CONFIRMED merge groups from entity_groups/ YAML files and uses them
+    to generate match/distinct pairs for dedupe training — no interactive
+    labeling required.
+
+    Args:
+        case_id: Case to use for training data.
+        entity_type: Entity type to train (PERSON, LOCATION, etc.)
+        base_dir: Base directory for cases.
+        model_dir: Directory to save trained model.
+
+    Returns:
+        Trained dedupe.Dedupe object.
+    """
+    from farmer_factory.structure.merge.reader import read_entity_groups
+
+    if base_dir is None:
+        base_dir = Path("cases")
+    if model_dir is None:
+        model_dir = Path(__file__).parent / "models"
+    model_dir.mkdir(exist_ok=True)
+
+    case_dir = base_dir / case_id
+
+    # Load CONFIRMED groups
+    group_file = read_entity_groups(case_dir, entity_type)
+    if group_file is None:
+        raise ValueError(
+            f"No entity group file found for {entity_type} in {case_dir / 'entity_groups'}"
+        )
+
+    confirmed_groups = [g for g in group_file.groups if g.status == "CONFIRMED"]
+    if not confirmed_groups:
+        raise ValueError(
+            f"No CONFIRMED groups for {entity_type}. "
+            "Confirm groups in entity_groups/ before training from them."
+        )
+
+    # Load entity data from extractions
+    entities = load_entities_from_case(case_id, entity_type, base_dir)
+    data_dict = _prepare_training_data(entities, entity_type)
+
+    # Build match pairs from intra-group combinations
+    match_pairs: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+    group_id_sets: List[set] = []
+
+    for group in confirmed_groups:
+        member_ids = [m.id for m in group.members if m.id in data_dict]
+        if len(member_ids) < 2:
+            continue
+        group_id_sets.append(set(member_ids))
+        for a, b in itertools.combinations(member_ids, 2):
+            match_pairs.append((data_dict[a], data_dict[b]))
+
+    if not match_pairs:
+        raise ValueError(
+            f"No valid match pairs could be built from CONFIRMED {entity_type} groups. "
+            "Ensure group member IDs exist in extraction data."
+        )
+
+    # Build distinct pairs from cross-group + singleton sampling
+    all_grouped_ids = set()
+    for ids in group_id_sets:
+        all_grouped_ids.update(ids)
+
+    singleton_ids = [
+        u.id for u in group_file.unmerged if u.id in data_dict
+    ]
+
+    # Collect representative IDs per group (canonical or first available)
+    group_representatives = []
+    for group in confirmed_groups:
+        for m in group.members:
+            if m.id in data_dict:
+                group_representatives.append(m.id)
+                break
+
+    # Pool of IDs for distinct sampling: one per group + singletons
+    distinct_pool = group_representatives + singleton_ids
+
+    distinct_pairs: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+    if len(distinct_pool) >= 2:
+        all_cross_pairs = list(itertools.combinations(distinct_pool, 2))
+        # Filter out pairs from the same group
+        same_group_pairs = set()
+        for ids in group_id_sets:
+            for a, b in itertools.combinations(ids, 2):
+                same_group_pairs.add((a, b))
+                same_group_pairs.add((b, a))
+
+        all_cross_pairs = [
+            (a, b) for a, b in all_cross_pairs if (a, b) not in same_group_pairs
+        ]
+
+        target_distinct = min(len(all_cross_pairs), 3 * len(match_pairs))
+        sampled = random.sample(all_cross_pairs, target_distinct) if len(all_cross_pairs) > target_distinct else all_cross_pairs
+        distinct_pairs = [(data_dict[a], data_dict[b]) for a, b in sampled]
+
+    logger.info(
+        f"Training {entity_type} from groups: "
+        f"{len(match_pairs)} match pairs, {len(distinct_pairs)} distinct pairs"
+    )
+
+    # Train dedupe model
+    fields = FIELD_CONFIG[entity_type]
+    deduper = dedupe.Dedupe(fields)
+    deduper.prepare_training(data_dict)
+    deduper.mark_pairs({"match": match_pairs, "distinct": distinct_pairs})
+    deduper.train()
+
+    settings_path = model_dir / f"{entity_type.lower()}_settings"
+    with open(settings_path, "wb") as f:
+        deduper.write_settings(f)
+
+    logger.info(f"Saved {entity_type} model to {settings_path}")
     return deduper
 
 
