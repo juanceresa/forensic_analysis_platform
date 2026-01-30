@@ -28,6 +28,10 @@ interface CaseNarrativeData {
     document_ids: string[];
     entity_ids: string[];
     inline_entities?: NarrativeInlineEntity[];
+    forensic_observations?: Array<{
+      observation: string;
+      severity: string;
+    }>;
     highlighted_events: Array<{
       event_type: string;
       summary: string;
@@ -90,6 +94,10 @@ interface TimePeriod {
     entityId: string;
     entityType: string;
     verificationTier: string;
+  }>;
+  forensicObservations: Array<{
+    observation: string;
+    severity: string;
   }>;
   highlightedEvents: Array<{
     event_type: string;
@@ -308,6 +316,10 @@ export async function GET(
         entityCount: periodEntities.length,
         narrative: narrativePeriod?.narrative || null,
         inlineEntities,
+        forensicObservations: (narrativePeriod?.forensic_observations || []).map(fo => ({
+          observation: fo.observation,
+          severity: fo.severity,
+        })),
         highlightedEvents: narrativePeriod?.highlighted_events || [],
       });
     }

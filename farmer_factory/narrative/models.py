@@ -17,11 +17,29 @@ class EventHighlight(BaseModel):
     )
 
 
+class ForensicObservation(BaseModel):
+    """Forensic observation flagged by the AI during narrative generation."""
+
+    observation: str = Field(description="The forensic observation text")
+    severity: Literal["HIGH", "MEDIUM", "LOW"] = Field(
+        default="MEDIUM", description="Severity/importance level"
+    )
+
+
+class InlineEntity(BaseModel):
+    """Entity reference found inline within narrative prose."""
+
+    name: str = Field(description="Entity name as it appears in the narrative")
+    entity_id: str = Field(description="Entity ID from the knowledge graph")
+    entity_type: str = Field(description="Entity type (PERSON, PROPERTY, etc.)")
+
+
 class NarrativePeriod(BaseModel):
     """AI-generated narrative for a single time period."""
 
     period_id: str = Field(description="Period identifier (e.g., '1950-1959')")
     label: str = Field(description="Human-readable period label")
+    title: str = Field(default="", description="Short evocative LLM-generated title")
     narrative: str = Field(description="AI-generated prose narrative for this period")
     document_ids: List[str] = Field(
         default_factory=list,
@@ -34,6 +52,14 @@ class NarrativePeriod(BaseModel):
     highlighted_events: List[EventHighlight] = Field(
         default_factory=list,
         description="Key events in this period",
+    )
+    inline_entities: List[InlineEntity] = Field(
+        default_factory=list,
+        description="Entities whose names appear in the narrative prose",
+    )
+    forensic_observations: List[ForensicObservation] = Field(
+        default_factory=list,
+        description="AI-flagged forensic observations (discrepancies, patterns)",
     )
     evidence: List[str] = Field(
         default_factory=list,

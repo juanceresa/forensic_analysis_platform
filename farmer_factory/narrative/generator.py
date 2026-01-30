@@ -12,6 +12,8 @@ from farmer_factory.extract.api_client import ClaudeAPIClient
 from farmer_factory.narrative.models import (
     CaseNarrative,
     EventHighlight,
+    ForensicObservation,
+    InlineEntity,
     NarrativeMetadata,
     NarrativePeriod,
 )
@@ -57,6 +59,27 @@ def _prompt_hash(*prompts: str) -> str:
     return hashlib.sha256(combined.encode()).hexdigest()[:12]
 
 
+def _parse_observations(obs_text: str) -> list:
+    """Parse pipe-separated observation lines into ForensicObservation objects."""
+    from farmer_factory.narrative.models import ForensicObservation
+
+    observations = []
+    for line in obs_text.strip().splitlines():
+        line = line.strip()
+        if not line or line.startswith("---"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        obs = parts[0]
+        severity = "MEDIUM"
+        if len(parts) >= 2 and parts[1].upper() in ("HIGH", "MEDIUM", "LOW"):
+            severity = parts[1].upper()
+        if obs:
+            observations.append(
+                ForensicObservation(observation=obs, severity=severity)
+            )
+    return observations
+
+
 class CaseNarrativeGenerator:
     """Generates a complete case narrative organized by time periods.
 
@@ -73,12 +96,14 @@ class CaseNarrativeGenerator:
         api_key: Optional[str] = None,
         max_cost: float = 2.0,
         primary_model: str = "sonnet",
+        domain_context: str = "",
     ):
         self.api_client = ClaudeAPIClient(api_key=api_key)
         self.max_cost = max_cost
         self.primary_model = primary_model
         self.fallback_model = "haiku"
         self.total_cost = 0.0
+        self.domain_context = domain_context
 
     def generate(self, case_id: str, graph: KnowledgeGraph) -> CaseNarrative:
         """Generate the full case narrative.
@@ -91,6 +116,10 @@ class CaseNarrativeGenerator:
             CaseNarrative with metadata, case_summary, and periods
         """
         logger.info(f"Generating case narrative for {case_id}")
+
+        # Load domain context if not already provided
+        if not self.domain_context:
+            self.domain_context = self._load_domain_context()
 
         # Step 1: Extract documents with dates from graph
         documents = self._extract_documents(graph)
@@ -363,9 +392,41 @@ class CaseNarrativeGenerator:
             documents=documents,
             entities=entities,
             relations=relations,
+            domain_context=self.domain_context,
         )
 
-        narrative_text, cost = self._call_llm(prompt)
+        # Thin-period logic: scale thinking budget by document count
+        doc_count = len(documents)
+        if doc_count <= 1:
+            use_thinking = False
+            thinking_budget = 0
+        elif doc_count <= 3:
+            use_thinking = True
+            thinking_budget = 5000
+        else:
+            use_thinking = True
+            thinking_budget = 10000
+
+        # Cost guard: if at 80% budget, downgrade remaining periods
+        if self.total_cost >= self.max_cost * 0.8:
+            logger.warning(
+                f"Cost guard triggered (${self.total_cost:.4f}/${self.max_cost:.2f}), "
+                f"downgrading period {period_key} to standard call"
+            )
+            use_thinking = False
+            thinking_budget = 0
+
+        raw_text, cost = self._call_llm(
+            prompt, use_thinking=use_thinking, thinking_budget=thinking_budget
+        )
+
+        # Parse structured response: title\n---\nnarrative\n---\nOBSERVATIONS:...
+        title, narrative_text, forensic_observations = self._parse_enriched_response(
+            raw_text, fallback_title=label
+        )
+
+        # Build inline entities by matching entity names in narrative
+        inline_entities = self._match_inline_entities(narrative_text, entities)
 
         # Extract highlighted events from relations
         highlighted = self._extract_highlighted_events(entities, relations)
@@ -380,9 +441,12 @@ class CaseNarrativeGenerator:
         return NarrativePeriod(
             period_id=period_key,
             label=label,
+            title=title,
             narrative=narrative_text,
             document_ids=[d["id"] for d in documents],
             entity_ids=[e["id"] for e in entities],
+            inline_entities=inline_entities,
+            forensic_observations=forensic_observations,
             highlighted_events=highlighted,
             evidence=evidence,
         )
@@ -428,8 +492,18 @@ class CaseNarrativeGenerator:
         summary_text, cost = self._call_llm(prompt)
         return summary_text
 
-    def _call_llm(self, prompt: str) -> Tuple[str, float]:
+    def _call_llm(
+        self,
+        prompt: str,
+        use_thinking: bool = False,
+        thinking_budget: int = 10000,
+    ) -> Tuple[str, float]:
         """Call the LLM with cost tracking and model downgrade on failure.
+
+        Args:
+            prompt: The prompt to send
+            use_thinking: Whether to use extended thinking
+            thinking_budget: Token budget for thinking (ignored if use_thinking=False)
 
         Returns:
             (response_text, cost)
@@ -446,8 +520,35 @@ class CaseNarrativeGenerator:
         model = self.primary_model
         model_id = self._model_id(model)
 
+        if use_thinking and thinking_budget > 0:
+            # Use extended thinking path
+            try:
+                response_text, usage = self.api_client.call_with_thinking(
+                    prompt=prompt,
+                    model=model_id,
+                    thinking_budget=thinking_budget,
+                )
+                cost = usage["cost"]
+                self.total_cost += cost
+                logger.info(
+                    f"Narrative LLM call: model={usage['model']}, thinking=true, "
+                    f"budget={thinking_budget}, "
+                    f"input_tokens={usage['input_tokens']}, "
+                    f"output_tokens={usage['output_tokens']}, "
+                    f"thinking_tokens={usage['thinking_tokens']}, "
+                    f"cost=${cost:.4f}, "
+                    f"cumulative=${self.total_cost:.4f}/${self.max_cost:.2f}"
+                )
+                return response_text, cost
+            except Exception as e:
+                logger.warning(
+                    f"Thinking call failed ({e}), falling back to standard call"
+                )
+                # Fall through to standard call
+
+        # Standard call (no thinking)
         try:
-            response = self.api_client.call_with_retry(
+            response = self.api_client.call_standard(
                 prompt=prompt,
                 model=model_id,
             )
@@ -458,7 +559,7 @@ class CaseNarrativeGenerator:
                 )
                 model = self.fallback_model
                 model_id = self._model_id(model)
-                response = self.api_client.call_with_retry(
+                response = self.api_client.call_standard(
                     prompt=prompt,
                     model=model_id,
                 )
@@ -467,7 +568,10 @@ class CaseNarrativeGenerator:
 
         cost = _estimate_cost(prompt, response, model)
         self.total_cost += cost
-        logger.debug(f"LLM call ({model}): ${cost:.4f} (total: ${self.total_cost:.4f})")
+        logger.info(
+            f"Narrative LLM call: model={model_id}, thinking=false, "
+            f"cost=${cost:.4f}, cumulative=${self.total_cost:.4f}/${self.max_cost:.2f}"
+        )
         return response, cost
 
     def _extract_highlighted_events(
@@ -492,6 +596,103 @@ class CaseNarrativeGenerator:
                     )
                 )
         return highlighted
+
+    @staticmethod
+    def _parse_enriched_response(
+        raw_text: str, fallback_title: str
+    ) -> Tuple[str, str, List[ForensicObservation]]:
+        """Parse enriched LLM response into title, narrative, and observations.
+
+        Expected format:
+            <title>
+            ---
+            <narrative prose>
+            ---
+            OBSERVATIONS:
+            <observation> | <severity>
+
+        Returns:
+            (title, narrative_text, forensic_observations)
+        """
+        title = fallback_title
+        narrative_text = raw_text
+        observations: List[ForensicObservation] = []
+
+        # Split on --- delimiters
+        sections = raw_text.split("\n---\n")
+
+        if len(sections) >= 2:
+            # Section 0: title
+            candidate_title = sections[0].strip()
+            if candidate_title and len(candidate_title) < 100:
+                title = candidate_title
+
+            # Remaining sections: narrative + possibly observations
+            remaining = "\n---\n".join(sections[1:])
+
+            # Check for OBSERVATIONS: section
+            if "\nOBSERVATIONS:" in remaining:
+                parts = remaining.split("\nOBSERVATIONS:", 1)
+                narrative_text = parts[0].strip()
+                obs_text = parts[1].strip()
+                observations = _parse_observations(obs_text)
+            elif remaining.strip().startswith("OBSERVATIONS:"):
+                # Edge case: no narrative, just observations
+                narrative_text = ""
+                observations = _parse_observations(
+                    remaining.strip().removeprefix("OBSERVATIONS:").strip()
+                )
+            else:
+                narrative_text = remaining.strip()
+        elif "OBSERVATIONS:" in raw_text:
+            # No --- delimiters but has observations
+            parts = raw_text.split("OBSERVATIONS:", 1)
+            narrative_text = parts[0].strip()
+            observations = _parse_observations(parts[1].strip())
+
+        return title, narrative_text, observations
+
+    @staticmethod
+    def _load_domain_context() -> str:
+        """Load domain context from the active domain's system_context.txt."""
+        try:
+            from farmer_factory.domains import domain_registry
+
+            domain = domain_registry.get_active_domain()
+            if domain is None:
+                return ""
+            context_path = domain.prompts_dir / "system_context.txt"
+            if context_path.exists():
+                text = context_path.read_text(encoding="utf-8")
+                if len(text) > 3000:
+                    text = text[:3000] + "\n[truncated]"
+                return text
+        except Exception as e:
+            logger.warning(f"Failed to load domain context: {e}")
+        return ""
+
+    @staticmethod
+    def _match_inline_entities(
+        narrative_text: str, entities: List[Dict[str, Any]]
+    ) -> List[InlineEntity]:
+        """Match entity names that appear as substrings in the narrative text."""
+        matched = []
+        seen_ids: set[str] = set()
+        for ent in entities:
+            name = ent.get("name", "")
+            ent_id = ent.get("id", "")
+            if not name or not ent_id or ent_id in seen_ids:
+                continue
+            if name in narrative_text:
+                matched.append(
+                    InlineEntity(
+                        name=name,
+                        entity_id=ent_id,
+                        entity_type=ent.get("entity_type", "UNKNOWN"),
+                    )
+                )
+                seen_ids.add(ent_id)
+        return matched
 
     def _empty_narrative(self, case_id: str) -> CaseNarrative:
         """Return empty narrative when no dated documents exist."""

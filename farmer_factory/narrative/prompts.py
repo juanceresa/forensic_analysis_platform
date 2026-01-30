@@ -26,15 +26,39 @@ PERIOD_NARRATIVE_TEMPLATE = """You are a forensic analyst writing a historical n
 
 **Special Events to Highlight:**
 {special_events}
-
+{domain_knowledge}
 **Instructions:**
-Write a narrative (2-5 paragraphs) telling the story of this period as revealed by these documents.
-Use engaging language: "Villa Aurelia first appears..." not "Villa Aurelia was mentioned..."
-Keep it accessible for families and researchers, not just lawyers.
-If CONFISCATED relations exist, dedicate a prominent paragraph to the expropriation.
-For SOLD or INHERITED events, note them clearly with dates and parties.
+First, write a short evocative title (3-6 words) for this period — something a family would recognize,
+like "The Confiscation" or "Building The Family Empire" or "A Legacy Divided". Not a date range.
 
-Output ONLY the narrative prose. No headers, no bullet points, no metadata."""
+Then write a narrative (3-6 paragraphs) that does THREE things:
+
+1. TELL THE STORY — what happened in this period, grounded in the documents.
+   Use engaging language. Keep it accessible for families, not lawyers.
+
+2. EXPLAIN THE SIGNIFICANCE — use your knowledge of the domain (see Domain
+   Knowledge above) to explain WHY document details matter. Example: if a tax
+   record lists 24 caballerías but other records show 60, explain what that
+   discrepancy means in context of Cuban fiscal practices.
+
+3. FLAG FORENSIC OBSERVATIONS — note discrepancies between documents, missing
+   records one would expect, patterns that suggest something, or connections
+   across documents the family might not see.
+
+Weave all three naturally into the prose — do not use headers, bullets, or
+separate sections. The narrative should read as one cohesive analytical story.
+
+After the narrative, on a new line starting with "OBSERVATIONS:", list 1-3
+brief forensic observations as pipe-separated entries:
+  observation text | severity (HIGH/MEDIUM/LOW)
+
+Output format:
+<title>
+---
+<narrative prose>
+---
+OBSERVATIONS:
+<observation> | <severity>"""
 
 
 CASE_SUMMARY_TEMPLATE = """You are a forensic analyst writing an executive summary for a property restitution case.
@@ -68,6 +92,7 @@ def build_period_prompt(
     documents: List[Dict[str, Any]],
     entities: List[Dict[str, Any]],
     relations: List[Dict[str, Any]],
+    domain_context: str = "",
 ) -> str:
     """Build prompt for a single period's narrative generation."""
     docs_lines = []
@@ -115,6 +140,14 @@ def build_period_prompt(
         special.append("INHERITANCE (note clearly)")
     special_str = ", ".join(special) if special else "None"
 
+    # Domain knowledge section (bound to 3000 chars)
+    domain_section = ""
+    if domain_context:
+        truncated = domain_context[:3000]
+        if len(domain_context) > 3000:
+            truncated += "\n[truncated]"
+        domain_section = f"\n**Domain Knowledge:**\n{truncated}\n"
+
     return PERIOD_NARRATIVE_TEMPLATE.format(
         period_label=period_label,
         period_range=period_range,
@@ -122,6 +155,7 @@ def build_period_prompt(
         entities_context=entities_str,
         relations_context=relations_str,
         special_events=special_str,
+        domain_knowledge=domain_section,
     )
 
 
