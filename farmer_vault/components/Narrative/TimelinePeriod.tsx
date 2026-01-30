@@ -33,6 +33,11 @@ interface InlineEntityInfo {
   verificationTier: string;
 }
 
+interface ForensicObservationInfo {
+  observation: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
 interface TimePeriodData {
   id: string;
   dateRange: string;
@@ -45,6 +50,7 @@ interface TimePeriodData {
   entityCount: number;
   narrative: string | null;
   inlineEntities?: InlineEntityInfo[];
+  forensicObservations?: ForensicObservationInfo[];
   highlightedEvents: HighlightedEvent[];
 }
 
@@ -175,6 +181,22 @@ export function TimelinePeriod({ period, caseId, index, defaultOpen = false }: T
                   </p>
                 ))}
               </div>
+              {period.forensicObservations && period.forensicObservations.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {period.forensicObservations.map((obs, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-2 px-3 py-2 rounded text-sm bg-cyan-500/5 border border-cyan-500/15"
+                    >
+                      <span className="shrink-0 text-cyan-400">◆</span>
+                      <span className="text-slate-300">{obs.observation}</span>
+                      <span className="ml-auto shrink-0 font-mono text-xs text-cyan-500/60">
+                        {obs.severity}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {period.highlightedEvents.length > 0 && (
                 <div className="mt-4 space-y-2">
                   {period.highlightedEvents.map((event, i) => (

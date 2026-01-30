@@ -3,6 +3,11 @@
 import { useRef, useEffect, useState } from 'react';
 import Link from 'next/link';
 
+interface ForensicObservationData {
+  observation: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
 export interface ScrollEventData {
   id: string;
   year: number;
@@ -14,6 +19,7 @@ export interface ScrollEventData {
   entityIds: string[];
   periodId: string;
   narrative?: string | null;
+  forensicObservations?: ForensicObservationData[];
 }
 
 interface ScrollEventNodeProps {
@@ -137,6 +143,22 @@ export default function ScrollEventNode({ event, caseId }: ScrollEventNodeProps)
         {/* Level 3: Full detail + Explore link */}
         {revealLevel >= 3 && (
           <div className="scroll-reveal-full space-y-2 pt-1">
+            {event.forensicObservations && event.forensicObservations.length > 0 && (
+              <div className="space-y-1.5">
+                {event.forensicObservations.map((obs, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-2 px-3 py-1.5 rounded text-xs bg-cyan-500/5 border border-cyan-500/15"
+                  >
+                    <span className="shrink-0 text-cyan-400">◆</span>
+                    <span className="text-slate-400">{obs.observation}</span>
+                    <span className="ml-auto shrink-0 font-mono text-[10px] text-cyan-500/60">
+                      {obs.severity}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <p className="text-slate-600 font-mono text-xs">
               {event.documentIds.length} document{event.documentIds.length !== 1 ? 's' : ''}
               {event.parties.length > 0 && (
