@@ -287,3 +287,99 @@ code, .font-mono, pre {
     transparent 4px
   );
 }
+
+/* Dossier rule - gradient divider */
+.dossier-rule {
+  height: 1px;
+  background: linear-gradient(to right, rgb(245 158 11 / 0.4), transparent 60%);
+  border: none;
+}
+
+/* Prose styling for narrative text */
+.dossier-prose p {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #cbd5e1; /* slate-300 */
+}
+.dossier-prose p + p {
+  margin-top: 1rem;
+}
+
+/* Timeline pulse animations */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+    50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  }
+  @keyframes pulse-amber {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+  }
+  .pulse-red { animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  .pulse-amber { animation: pulse-amber 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+  @keyframes expand-down {
+    from { max-height: 0; opacity: 0; }
+    to { max-height: 600px; opacity: 1; }
+  }
+  .animate-expand { animation: expand-down 0.3s ease-out forwards; overflow: hidden; }
+}
+
+/* Era atmosphere — very subtle background tint per era */
+.era-expropriation { background: linear-gradient(180deg, rgba(239,68,68,0.02) 0%, transparent 100%); }
+.era-revolutionary { background: linear-gradient(180deg, rgba(245,158,11,0.02) 0%, transparent 100%); }
+
+/* Scroll timeline: reveal stages */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes scroll-reveal-year {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes scroll-reveal-summary {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes scroll-reveal-full {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .scroll-reveal-year { animation: scroll-reveal-year 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .scroll-reveal-summary { animation: scroll-reveal-summary 0.4s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both; }
+  .scroll-reveal-full { animation: scroll-reveal-full 0.35s ease-out 0.15s both; }
+
+  @keyframes chevron-bounce {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(8px); opacity: 1; }
+  }
+  .animate-chevron-bounce { animation: chevron-bounce 2s ease-in-out infinite; }
+
+  @keyframes spine-draw {
+    from { clip-path: inset(0 0 100% 0); }
+    to { clip-path: inset(0 0 0% 0); }
+  }
+  .animate-spine-draw { animation: spine-draw 1.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}
+
+/* Reduced motion: everything visible immediately */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal-year,
+  .scroll-reveal-summary,
+  .scroll-reveal-full {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .animate-chevron-bounce {
+    animation: none !important;
+    opacity: 0.6;
+  }
+}
+
+/* Spine year marker */
+.spine-year-marker {
+  transition: color 0.3s ease, transform 0.2s ease;
+}
+.spine-year-marker[data-active="true"] {
+  color: #f1f5f9; /* slate-100 */
+  transform: scale(1.1);
+}

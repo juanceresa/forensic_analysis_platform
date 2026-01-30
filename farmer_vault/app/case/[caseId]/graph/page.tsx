@@ -1,4 +1,4 @@
-import { GraphView } from '@/components/Graph';
+import { redirect } from 'next/navigation';
 
 interface GraphPageProps {
   params: Promise<{ caseId: string }>;
@@ -6,10 +6,5 @@ interface GraphPageProps {
 
 export default async function GraphPage({ params }: GraphPageProps) {
   const { caseId } = await params;
-
-  return (
-    <div className="h-full">
-      <GraphView caseId={caseId} />
-    </div>
-  );
+  redirect(`/case/${caseId}/narrative/graph`);
 }

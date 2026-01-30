@@ -7,8 +7,17 @@ interface SidebarProps {
   caseId: string;
 }
 
+const SUB_ITEMS = [
+  { label: 'Chronological', href: 'chronological' },
+  { label: 'Geolocation', href: 'geolocation' },
+  { label: 'Graph', href: 'graph' },
+];
+
 export function Sidebar({ caseId }: SidebarProps) {
   const pathname = usePathname();
+
+  const narrativeBase = `/case/${caseId}/narrative`;
+  const isNarrativeActive = pathname.startsWith(narrativeBase);
 
   const navItems = [
     {
@@ -40,19 +49,10 @@ export function Sidebar({ caseId }: SidebarProps) {
     },
     {
       label: 'AI Analysis',
-      href: `/case/${caseId}/narrative`,
+      href: narrativeBase,
       icon: (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Graph',
-      href: `/case/${caseId}/graph`,
-      icon: (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
         </svg>
       ),
     },
@@ -89,6 +89,35 @@ export function Sidebar({ caseId }: SidebarProps) {
                   {item.icon}
                   <span>{item.label}</span>
                 </Link>
+
+                {/* Nested sub-items for AI Analysis */}
+                {item.label === 'AI Analysis' && isNarrativeActive && (
+                  <ul className="ml-8 mt-1 space-y-0.5">
+                    {SUB_ITEMS.map((sub) => {
+                      const subHref = `${narrativeBase}/${sub.href}`;
+                      const subActive = pathname.startsWith(subHref);
+                      return (
+                        <li key={sub.href}>
+                          <Link
+                            href={subHref}
+                            className={`
+                              block px-2 py-1 rounded text-xs font-mono transition-colors
+                              focus-visible:ring-2 focus-visible:ring-blue-500
+                              ${
+                                subActive
+                                  ? 'text-slate-200 bg-slate-800/50'
+                                  : 'text-slate-500 hover:text-slate-400 hover:bg-slate-900/50'
+                              }
+                            `}
+                            aria-current={subActive ? 'page' : undefined}
+                          >
+                            {sub.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </li>
             );
           })}

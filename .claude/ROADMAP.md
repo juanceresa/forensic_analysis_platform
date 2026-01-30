@@ -1,8 +1,8 @@
 # Farmer House Forensic Intelligence Platform — Implementation Roadmap
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.9.0
-> **Last Updated:** 2026-01-28
+> **Version:** 1.10.0
+> **Last Updated:** 2026-01-30
 > **Status:** MVP1 Planning (with dependencies and acceptance criteria)
 
 ---
@@ -965,6 +965,19 @@ farmer_vault/
 │   │   └── NodeBadge.tsx         [✓]
 │   ├── Narrative/
 │   │   └── TimelinePeriod.tsx    [✓]
+│   ├── Timeline/
+│   │   ├── HeroSection.tsx       [✓] # 100vh hero with scroll chevron
+│   │   ├── ScrollTimeline.tsx    [✓] # Client scroll container
+│   │   ├── ScrollEventNode.tsx   [✓] # Progressive reveal event node
+│   │   ├── ScrollGap.tsx         [✓] # Amber-pulsed gap indicator
+│   │   ├── StickySpine.tsx       [✓] # Sticky year markers
+│   │   ├── PlaceholderSection.tsx [✓] # Coming soon sections
+│   │   ├── TimelineView.tsx      [✓] # Static timeline (chronological)
+│   │   ├── EventNode.tsx         [✓] # Static event node
+│   │   ├── TimelineGap.tsx       [✓] # Static gap
+│   │   ├── TimelineSpine.tsx     [✓] # Static spine
+│   │   ├── EventDetail.tsx       [✓] # Event detail panel
+│   │   └── index.ts              [✓] # Barrel exports
 │   ├── Dashboard/
 │   │   ├── Header.tsx            [✓]
 │   │   └── DossierDownload.tsx   [✓]
@@ -1513,6 +1526,86 @@ Vault (Next.js frontend) now respects `document_groups.yaml` across all API rout
 - **Aggregate stats:** Entity counts, confidence scores aggregated across all pages in a group
 - **Page-level content:** OCR text, translations, and entities are per-page, not concatenated
 - **Iframe viewer:** Replaced manual zoom controls with native browser PDF rendering via `<iframe>`
+
+---
+
+## Phase 9E: Scroll-Driven AI Analysis Experience
+
+### Status: ✅ COMPLETE (2026-01-30)
+
+### Overview
+Transformed the AI Analysis page from a static event list into a full scroll-driven exploration experience. Each timeline event gets space to breathe with progressive reveal animations driven by IntersectionObserver. Sidebar restructured to 4 top-level items with AI Analysis containing sub-routes.
+
+### Routing Changes
+
+| Route | Purpose |
+|-------|---------|
+| `/case/[caseId]/narrative` | **Rewritten** — Scroll experience (hero + timeline + placeholders) |
+| `/case/[caseId]/narrative/chronological` | **New** — Static timeline (previous TimelinePeriod view) |
+| `/case/[caseId]/narrative/geolocation` | **New** — Placeholder page |
+| `/case/[caseId]/narrative/graph` | **New** — Wraps existing GraphView |
+| `/case/[caseId]/graph` | **Redirected** to `/narrative/graph` |
+
+### Components Created
+
+| Component | Description |
+|-----------|-------------|
+| `HeroSection.tsx` | 100vh hero with case name, doc count, date range, AI disclaimer, bounce chevron |
+| `ScrollTimeline.tsx` | Client container merging events + gaps chronologically with sticky spine |
+| `ScrollEventNode.tsx` | 60vh+ progressive reveal (4 stages via IntersectionObserver thresholds [0, 0.3, 0.6, 1.0]) |
+| `ScrollGap.tsx` | 20vh amber-pulsed documentary gap indicator |
+| `StickySpine.tsx` | Sticky left-edge year markers with active highlight on scroll |
+| `PlaceholderSection.tsx` | Reusable "coming soon" section for geolocation and graph |
+
+### Sidebar Changes
+- Removed "Graph" top-level link
+- 4 top-level items: Dashboard, Documents, Entities, AI Analysis
+- When AI Analysis active (pathname starts with `/narrative`), nested sub-items appear: Chronological, Geolocation, Graph
+
+### Scroll Reveal Mechanics
+- IntersectionObserver with thresholds `[0, 0.3, 0.6, 1.0]`
+- Level 0: invisible; Level 1: year + badge; Level 2: summary + bullets; Level 3: full + explore link
+- Once revealed, stays revealed (no re-collapse via `maxLevel` ref)
+- CONFISCATED events: red pulse (`pulse-red`) + `era-expropriation` background tint
+- `prefers-reduced-motion: reduce`: all content visible immediately, no animations
+
+### CSS Additions
+- `scroll-reveal-year`, `scroll-reveal-summary`, `scroll-reveal-full` keyframes
+- `chevron-bounce` animation for scroll indicator
+- `spine-draw` clip-path animation for spine entrance
+- `spine-year-marker` transition with `[data-active]` state
+- All animations wrapped in `prefers-reduced-motion: no-preference`
+
+### Files Created/Modified
+```
+farmer_vault/
+├── app/case/[caseId]/
+│   ├── narrative/
+│   │   ├── page.tsx                    ✅ REWRITTEN — scroll experience assembly
+│   │   ├── chronological/page.tsx      ✅ NEW — static timeline
+│   │   ├── geolocation/page.tsx        ✅ NEW — placeholder
+│   │   └── graph/page.tsx              ✅ NEW — GraphView wrapper
+│   └── graph/page.tsx                  ✅ REWRITTEN — redirect to /narrative/graph
+├── components/
+│   ├── Timeline/
+│   │   ├── index.ts                    ✅ MODIFIED — added new exports
+│   │   ├── HeroSection.tsx             ✅ NEW
+│   │   ├── ScrollTimeline.tsx          ✅ NEW
+│   │   ├── ScrollEventNode.tsx         ✅ NEW
+│   │   ├── ScrollGap.tsx               ✅ NEW
+│   │   ├── StickySpine.tsx             ✅ NEW
+│   │   └── PlaceholderSection.tsx      ✅ NEW
+│   └── shared/
+│       └── Sidebar.tsx                 ✅ MODIFIED — nested sub-items
+├── app/globals.css                     ✅ MODIFIED — scroll reveal keyframes
+└── lib/graph-api.ts                    ❌ REMOVED — stale reference to deleted API route
+```
+
+### Design Decisions
+- **Aesthetic:** "Archival Intelligence" — documentary forensics meets intelligence briefing
+- **Server components where possible:** HeroSection and PlaceholderSection are server components; scroll-interactive components are client
+- **No shared layout:** Navigation handled entirely by sidebar sub-items, not a nested layout
+- **Enriched events:** Main page enriches events with narrative text from periods for bullet snapshots
 
 ---
 

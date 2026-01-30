@@ -1,8 +1,8 @@
 # CLAUDE.md — Instructions for Claude Code
 
-> **Version:** 2.8.0
-> **Last Updated:** 2026-01-29
-> **Status:** Master instructions file (Entity merge authority + frontend document grouping complete)
+> **Version:** 2.9.0
+> **Last Updated:** 2026-01-30
+> **Status:** Master instructions file (Scroll-driven AI Analysis experience complete)
 
 ---
 
@@ -150,6 +150,31 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
   - `templates/` - LaTeX Jinja2 templates for PDF generation
   - `styles/civictable.sty` - Custom LaTeX style
 
+### Vault (Frontend) Scroll Timeline Components
+- **`farmer_vault/components/Timeline/`** - Scroll-driven timeline experience
+  - `HeroSection.tsx` - 100vh hero with case name, doc count, AI disclaimer, scroll chevron
+  - `ScrollTimeline.tsx` - Client container merging events + gaps with sticky spine
+  - `ScrollEventNode.tsx` - 60vh+ progressive reveal (IntersectionObserver, 4 stages)
+  - `ScrollGap.tsx` - 20vh amber-pulsed documentary gap indicator
+  - `StickySpine.tsx` - Sticky left-edge year markers with active highlight
+  - `PlaceholderSection.tsx` - Reusable "coming soon" section for geo/graph
+
+### Vault (Frontend) Shared Modules
+- **`farmer_vault/lib/document-groups.ts`** - Document group utilities (shared by all API routes)
+  - `loadDocumentGroups()` - Load and validate `document_groups.yaml`
+  - `buildFileToGroupMap()` - Map file stems to groups
+  - `matchExtractionToGroup()` - Match extraction basenames to groups
+  - `findGroupForDocId()` - Resolve `doc_` prefixed IDs to groups
+  - `findGroupExtractionFiles()` - Find and sort extraction JSONs for a group
+  - `inferType()` - Heuristic document type inference
+
+**API routes using shared module:**
+- `api/cases/[caseId]/documents/` - Document list (grouped aggregation)
+- `api/cases/[caseId]/document/[docId]/` - Document detail (multi-page)
+- `api/cases/[caseId]/document/[docId]/image/` - Image serving (`?page=N`)
+- `api/cases/[caseId]/timeline/` - Timeline periods (grouped documents)
+- `api/cases/[caseId]/entity/[entityId]/` - Entity detail (source document resolution)
+
 ### Implementation Plans
 - **`docs/plans/`** - Dated design and implementation docs
   - `2026-01-27-latex-dossier-module-design.md` - Dossier module design
@@ -207,10 +232,14 @@ python -m farmer_factory.cli process CASE-ID --domain cuban_property --force-typ
 
 ### Train entity deduplication
 ```bash
+# Interactive labeling (default)
 python -m farmer_factory.cli train-deduplication CASE-ID --domain cuban_property --entity-type PERSON
 python -m farmer_factory.cli train-deduplication CASE-ID --entity-type LOCATION
 python -m farmer_factory.cli train-deduplication CASE-ID --entity-type PROPERTY
 python -m farmer_factory.cli train-deduplication CASE-ID --entity-type ORGANIZATION
+
+# From CONFIRMED entity groups (no interactive prompts)
+python -m farmer_factory.cli train-deduplication CASE-ID --entity-type PERSON --from-groups
 ```
 
 ### Rebuild graph from existing extractions (no OCR/LLM cost)
@@ -254,8 +283,8 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 
 **See:** `.claude/ROADMAP.md` for current implementation status.
 
-**Recent:** Phase 9C + 9D (✅ COMPLETE - 2026-01-29)
-**Status:** Entity merge authority, rebuild-graph CLI, frontend document grouping integration
+**Recent:** Phase 9E (✅ COMPLETE - 2026-01-30)
+**Status:** Scroll-driven AI Analysis experience
 
 ### Completed Phases
 - Phase 6 - Narrative Generation (✅ 2026-01-25)
@@ -293,11 +322,26 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - Graph surgery engine (node merge, relation rewrite, metadata recompute)
   - CLI: `apply-merges`, `merge-entities`, `rebuild-graph` commands
   - Merge conflict provenance via `_merge_conflicts` dict (not list-valued fields)
+  - **Dedupe merge log:** `GraphBuilder.merge_log` records all dedupe merge decisions; `_generate_merge_files()` writes real DRAFT clusters (not empty `clusters=[]`)
+  - **document_id injection:** `rebuild_graph` and `process_case` inject `document_id` into processing_metadata so `_create_document_entity` doesn't produce phantom `doc_N` nodes
   - Pipeline integration + 54 tests
 - Phase 9D - Frontend Document Grouping (✅ COMPLETE - 2026-01-29)
-  - All Vault API routes support `document_groups.yaml` (documents list, single doc, image, timeline)
+- Phase 9E - Scroll-Driven AI Analysis (✅ COMPLETE - 2026-01-30)
+  - Scroll experience: 100vh hero → progressive timeline → placeholder sections
+  - `ScrollEventNode` with IntersectionObserver 4-stage progressive reveal
+  - CONFISCATED events: red pulse + `era-expropriation` tint
+  - `StickySpine` with year markers and active highlight
+  - `ScrollGap` with amber pulse for documentary gaps
+  - Sidebar restructured: 4 top-level items, nested sub-items under AI Analysis
+  - New routes: `/narrative/chronological`, `/narrative/geolocation`, `/narrative/graph`
+  - Old `/graph` route redirects to `/narrative/graph`
+  - `prefers-reduced-motion`: all content visible immediately, no animations
+  - Removed stale `lib/graph-api.ts`
+  - All Vault API routes support `document_groups.yaml` (documents list, single doc, image, timeline, entity detail)
+  - **Shared `lib/document-groups.ts` utility** — single source of truth for YAML loading, file-to-group mapping, extraction matching, group-by-ID lookup, and type inference. Used by all 5 API routes.
   - Multi-page document viewer with page navigation (prev/next)
   - Grouped documents aggregated as single entries in document list
+  - Entity source documents resolve to group names (not raw extraction stems)
   - `js-yaml` dependency for YAML parsing in API routes
   - Expanded `inferType()` heuristics (Property, Survey, Financial, Inheritance)
   - Date sort order toggle (ascending/descending)
@@ -322,6 +366,7 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 3. **Never** display TIER_3_AI data without disclaimer
 4. **Never** skip the verification field on any node/link
 5. **Never** expose raw AI inference to clients without context
+6. **Never** run tests that call the Anthropic API (`tests/extract/test_integration.py`, `tests/golden/`) without asking first — these use streaming API calls and burn through credits quickly. Safe to run: all other test files (they use mock extraction)
 
 ---
 
