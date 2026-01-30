@@ -1,22 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
+import { findGroupForDocId } from '@/lib/document-groups';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
-
-interface DocumentGroup {
-  id: string;
-  name: string;
-  files: string[];
-}
-
-interface DocumentGroupsConfig {
-  status: string;
-  groups: DocumentGroup[];
-}
 
 export async function GET(
   request: NextRequest,
@@ -26,7 +15,6 @@ export async function GET(
     const { caseId, docId } = await params;
     const decodedDocId = decodeURIComponent(docId);
 
-    // Validate caseId to prevent path traversal
     if (!CASE_ID_PATTERN.test(caseId)) {
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
@@ -49,23 +37,12 @@ export async function GET(
     let matchingFile: string | undefined;
 
     if (decodedDocId.startsWith('doc_')) {
-      const groupsPath = path.join(caseDir, 'document_groups.yaml');
-      try {
-        const content = await fs.readFile(groupsPath, 'utf-8');
-        const config = yaml.load(content) as DocumentGroupsConfig;
-        if (config?.status === 'CONFIRMED' && config.groups) {
-          const targetId = decodedDocId.replace(/^doc_/, '');
-          const group = config.groups.find(g => g.id === targetId);
-          if (group && group.files.length > 0) {
-            // Get the file at the requested page index
-            const targetFile = group.files[pageIndex] || group.files[0];
-            if (intakeFiles.includes(targetFile)) {
-              matchingFile = targetFile;
-            }
-          }
+      const group = await findGroupForDocId(caseDir, decodedDocId);
+      if (group && group.files.length > 0) {
+        const targetFile = group.files[pageIndex] || group.files[0];
+        if (intakeFiles.includes(targetFile)) {
+          matchingFile = targetFile;
         }
-      } catch {
-        // Fall through to standard matching
       }
     }
 

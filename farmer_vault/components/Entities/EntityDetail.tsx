@@ -289,7 +289,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
                 <div className="space-y-2">
                   {conns.map((conn, index) => (
                     <Link
-                      key={conn.targetEntity.id}
+                      key={`${conn.targetEntity.id}-${index}`}
                       href={`/case/${caseId}/entity/${encodeURIComponent(conn.targetEntity.id)}`}
                       className="flex items-center gap-3 p-3 bg-slate-800/50 rounded
                                  hover:bg-slate-800 transition-colors

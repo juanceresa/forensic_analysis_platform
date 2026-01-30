@@ -1,9 +1,9 @@
 # Farmer House Forensic Intelligence Platform — Frontend Specification (The Vault)
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 3.0.0
-> **Last Updated:** 2026-01-26
-> **Status:** MVP1 Active Implementation (Document-First Architecture)
+> **Version:** 4.0.0
+> **Last Updated:** 2026-01-29
+> **Status:** MVP1 Active Implementation (Document-First + Document Grouping)
 
 ---
 
@@ -18,8 +18,13 @@ Zone B (The Vault) is the client-facing read-only interface for viewing forensic
 - **Intelligence Aesthetic**: Dark mode, monospace, high-stakes professional
 - **Performance-First**: Server-side rendering with client-side interactivity
 
-**Data Source:**
-All views consume `graph_data.json` from Zone A (The Factory), accessed through case-specific API routes.
+**Data Sources:**
+- `graph_data.json` from Zone A — entities, relationships, verification tiers
+- `document_groups.yaml` — multi-part document grouping (maps extraction files to logical documents)
+- `extractions/*.json` — per-page extraction data (OCR text, entities, confidence)
+- `case_narrative.json` — optional narrative periods with highlighted events
+
+All accessed through case-specific API routes. A shared utility module (`lib/document-groups.ts`) provides document group resolution across all routes.
 
 **Graph Data Contract (Aligned to `graph_data.json`):**
 - **Nodes** use `entity_type` and `name` (not `type`/`label`).
@@ -161,11 +166,106 @@ interface TimePeriod {
 | 1950-1958 | "Pre-Revolutionary Period" |
 | Default | "[Decade] - [Decade+9]" |
 
+### GET `/api/cases/[caseId]/documents`
+
+Returns all documents for a case, with multi-part documents aggregated into single entries.
+
+**Response:**
+```typescript
+interface DocumentsResponse {
+  documents: {
+    id: string;           // "doc_<groupId>" for grouped, stem for standalone
+    filename: string;     // Group name or original filename
+    date: string | null;
+    type: string | null;  // Inferred from filename heuristics
+    entityCount: number;
+    confidence: number;   // Max OCR confidence across pages
+    partCount: number;    // Number of pages/parts
+    imagePath: string;
+  }[];
+}
+```
+
+### GET `/api/cases/[caseId]/document/[docId]`
+
+Returns document detail with per-page data for grouped documents.
+
+**Response:**
+```typescript
+interface DocumentDetailResponse {
+  id: string;
+  filename: string;
+  date: string | null;
+  type: string | null;
+  entityCount: number;
+  confidence: number;
+  imagePath: string;
+  ocrText: string;            // First page OCR text
+  translatedText: string | null;
+  entities: Entity[];         // All entities across pages
+  detectedLanguage: string;
+  pages?: {                   // Present for grouped documents
+    ocrText: string;
+    translatedText: string | null;
+    imagePath: string;        // Includes ?page=N param
+    entities: Entity[];
+  }[];
+}
+```
+
+### GET `/api/cases/[caseId]/document/[docId]/image`
+
+Serves the intake file (PDF/JPG/PNG) for a document. Supports `?page=N` for grouped documents.
+
+### GET `/api/cases/[caseId]/entity/[entityId]`
+
+Returns entity detail with source documents resolved to document groups.
+
+**Response:**
+```typescript
+interface EntityDetailResponse {
+  entity: BaseNode;
+  sourceDocuments: {
+    id: string;       // "doc_<groupId>" or extraction stem
+    filename: string; // Group name or "<stem>.pdf"
+  }[];
+  connections: {
+    relation_type: string;
+    targetEntity: EntityInfo | null;
+  }[];
+}
+```
+
 ### GET `/api/cases/[caseId]/graph`
 
 Returns the full graph data for visualization.
 
 **Response:** Complete `GraphData` object as defined in `/lib/types.ts`.
+
+---
+
+## Shared Modules
+
+### `lib/document-groups.ts`
+
+Single source of truth for document group operations, used by all 5 API routes that deal with documents.
+
+**Exports:**
+| Function | Purpose |
+|----------|---------|
+| `loadDocumentGroups(caseDir)` | Load and validate `document_groups.yaml` (returns null if missing or not CONFIRMED) |
+| `buildFileToGroupMap(groups)` | Map file stems + full filenames → `DocumentGroup` |
+| `matchExtractionToGroup(baseName, map)` | Match extraction basename (strips `_page_N`) to group |
+| `findGroupForDocId(caseDir, docId)` | Resolve `doc_`-prefixed ID directly to its group |
+| `findGroupExtractionFiles(extractionsDir, group)` | Find and sort extraction JSONs matching a group's files |
+| `inferType(name)` | Heuristic document type inference from filename |
+
+**Consumers:**
+- `/api/cases/[caseId]/documents/` — document list aggregation
+- `/api/cases/[caseId]/document/[docId]/` — grouped document detail + pages
+- `/api/cases/[caseId]/document/[docId]/image/` — page-aware image serving
+- `/api/cases/[caseId]/timeline/` — timeline period grouping
+- `/api/cases/[caseId]/entity/[entityId]/` — source document name resolution
 
 ---
 
@@ -1077,6 +1177,16 @@ module.exports = {
 ---
 
 ## Changelog
+
+### Version 4.0.0 (2026-01-29)
+- **Document Grouping**: All API routes support `document_groups.yaml` for multi-part documents
+- **Shared `lib/document-groups.ts`**: Consolidated YAML loading, file-to-group mapping, extraction matching, and type inference into a single module used by 5 API routes
+- New API endpoints: `/documents`, `/document/[docId]`, `/document/[docId]/image`
+- Entity source documents resolve to group names (not raw extraction stems)
+- Multi-page document viewer with prev/next page navigation
+- `?page=N` support on image endpoint for grouped documents
+- Iframe-based PDF viewer (replaced manual zoom controls)
+- `js-yaml` dependency for server-side YAML parsing
 
 ### Version 3.0.0 (2026-01-26)
 - **Document-First Architecture**: Complete navigation redesign

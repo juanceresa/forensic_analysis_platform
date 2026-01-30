@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import type { GraphData } from '@/lib/types';
+import {
+  loadDocumentGroups,
+  buildFileToGroupMap,
+  matchExtractionToGroup,
+} from '@/lib/document-groups';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+interface NarrativeInlineEntity {
+  name: string;
+  entity_id: string;
+  entity_type: string;
+}
 
 interface CaseNarrativeData {
   metadata: Record<string, unknown>;
@@ -13,9 +23,11 @@ interface CaseNarrativeData {
   periods: Array<{
     period_id: string;
     label: string;
+    title?: string;
     narrative: string;
     document_ids: string[];
     entity_ids: string[];
+    inline_entities?: NarrativeInlineEntity[];
     highlighted_events: Array<{
       event_type: string;
       summary: string;
@@ -42,6 +54,26 @@ interface EntityInfo {
   };
 }
 
+interface TimelineEvent {
+  id: string;
+  year: number;
+  date: string | null;
+  eventType: 'CONFISCATED' | 'SOLD' | 'INHERITED' | 'FILED';
+  summary: string;
+  parties: string[];
+  documentIds: string[];
+  entityIds: string[];
+  periodId: string;
+}
+
+interface TimelineGap {
+  id: string;
+  startYear: number;
+  endYear: number;
+  duration: number;
+  contextHint: string;
+}
+
 interface TimePeriod {
   id: string;
   dateRange: string;
@@ -53,6 +85,12 @@ interface TimePeriod {
   documentCount: number;
   entityCount: number;
   narrative: string | null;
+  inlineEntities: Array<{
+    name: string;
+    entityId: string;
+    entityType: string;
+    verificationTier: string;
+  }>;
   highlightedEvents: Array<{
     event_type: string;
     summary: string;
@@ -62,7 +100,6 @@ interface TimePeriod {
 }
 
 function getPeriodTitle(startYear: number, endYear: number): string {
-  // Generate contextual titles based on Cuban history
   if (startYear >= 1959 && endYear <= 1961) {
     return 'Expropriation Period';
   } else if (startYear >= 1945 && endYear < 1959) {
@@ -74,6 +111,22 @@ function getPeriodTitle(startYear: number, endYear: number): string {
   } else {
     return `${startYear}-${endYear}`;
   }
+}
+
+function getGapContextHint(startYear: number, endYear: number): string {
+  if (startYear <= 1959 && endYear >= 1959) {
+    return 'Cuban Revolution occurred in 1959';
+  }
+  if (startYear >= 1959 && endYear <= 1975) {
+    return 'Expropriation period — many property records lost or destroyed';
+  }
+  if (startYear <= 1940 && endYear >= 1940) {
+    return 'World War II era — international documentation disrupted';
+  }
+  if (startYear >= 1898 && endYear <= 1910) {
+    return 'Post-independence transition — Spanish colonial records archived';
+  }
+  return 'No documents available for this period';
 }
 
 function groupByTimePeriod(documents: DocumentInfo[], periodYears: number = 10): Map<string, DocumentInfo[]> {
@@ -103,7 +156,6 @@ export async function GET(
   try {
     const { caseId } = await params;
 
-    // Validate caseId to prevent path traversal
     if (!CASE_ID_PATTERN.test(caseId)) {
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
@@ -114,42 +166,29 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
 
+    const caseDir = path.join(CASES_DIR, caseId);
+
     // Read graph data for entities
-    const graphDataPath = path.join(CASES_DIR, caseId, 'output', 'graph_data.json');
+    const graphDataPath = path.join(caseDir, 'output', 'graph_data.json');
     const graphDataContent = await fs.readFile(graphDataPath, 'utf-8');
     const graphData: GraphData = JSON.parse(graphDataContent);
 
-    // Read case narrative (optional — timeline works without it)
+    // Read case narrative (optional)
     let caseNarrative: CaseNarrativeData | null = null;
     try {
-      const narrativePath = path.join(CASES_DIR, caseId, 'output', 'case_narrative.json');
+      const narrativePath = path.join(caseDir, 'output', 'case_narrative.json');
       const narrativeContent = await fs.readFile(narrativePath, 'utf-8');
       caseNarrative = JSON.parse(narrativeContent);
     } catch {
-      // case_narrative.json not yet generated — proceed without it
+      // case_narrative.json not yet generated
     }
 
-    // Load document groups config
-    const caseDir = path.join(CASES_DIR, caseId);
-    interface DocGroup { id: string; name: string; document_type?: string; date?: string; files: string[]; }
-    interface DocGroupsConfig { status: string; groups: DocGroup[]; standalone?: string[]; }
-    let fileToGroup: Map<string, DocGroup> | null = null;
-    try {
-      const groupsContent = await fs.readFile(path.join(caseDir, 'document_groups.yaml'), 'utf-8');
-      const groupsConfig = yaml.load(groupsContent) as DocGroupsConfig;
-      if (groupsConfig?.status === 'CONFIRMED' && groupsConfig.groups) {
-        fileToGroup = new Map();
-        for (const group of groupsConfig.groups) {
-          for (const file of group.files) {
-            fileToGroup.set(file, group);
-            fileToGroup.set(file.replace(/\.(pdf|jpg|png)$/i, ''), group);
-          }
-        }
-      }
-    } catch { /* no groups file */ }
+    // Load document groups
+    const groupConfig = await loadDocumentGroups(caseDir);
+    const fileToGroup = groupConfig ? buildFileToGroupMap(groupConfig.groups) : null;
 
     // Read documents from extractions directory, respecting groups
-    const extractionsDir = path.join(CASES_DIR, caseId, 'extractions');
+    const extractionsDir = path.join(caseDir, 'extractions');
     const extractionFiles = await fs.readdir(extractionsDir);
     const jsonFiles = extractionFiles.filter(f => f.endsWith('.json'));
 
@@ -163,10 +202,9 @@ export async function GET(
       const extraction = JSON.parse(content);
 
       const baseName = filename.replace(/\.json$/i, '');
-      const stripped = baseName.replace(/_page_\d+$/i, '');
 
       // Check if this file belongs to a group
-      const group = fileToGroup?.get(stripped) || null;
+      const group = fileToGroup ? matchExtractionToGroup(baseName, fileToGroup) : null;
 
       let docId: string;
       let docFilename: string;
@@ -194,7 +232,6 @@ export async function GET(
 
       documents.push({ id: docId, filename: docFilename, date });
 
-      // Track entities in this document
       const entityIds = new Set<string>();
       for (const entity of (extraction.entities || [])) {
         if (entity.id) entityIds.add(entity.id);
@@ -213,7 +250,6 @@ export async function GET(
       const startYear = parseInt(startStr, 10);
       const endYear = parseInt(endStr, 10);
 
-      // Collect unique entities from all documents in this period
       const periodEntityIds = new Set<string>();
       for (const doc of periodDocs) {
         const docEntityIds = entityIdsByDoc.get(doc.id);
@@ -224,7 +260,6 @@ export async function GET(
         }
       }
 
-      // Look up entity details from graph
       const periodEntities: EntityInfo[] = [];
       for (const entityId of periodEntityIds) {
         const node = graphData.nodes.find(n => n.id === entityId);
@@ -241,7 +276,6 @@ export async function GET(
         }
       }
 
-      // Sort documents by date
       periodDocs.sort((a, b) => {
         if (!a.date && !b.date) return 0;
         if (!a.date) return 1;
@@ -249,29 +283,104 @@ export async function GET(
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
 
-      // Match narrative period by period_id
       const narrativePeriod = caseNarrative?.periods.find(p => p.period_id === periodKey);
+
+      // Resolve inline entities against graph nodes for verification data
+      const inlineEntities = (narrativePeriod?.inline_entities || []).map(ie => {
+        const node = graphData.nodes.find(n => n.id === ie.entity_id);
+        return {
+          name: ie.name,
+          entityId: ie.entity_id,
+          entityType: ie.entity_type,
+          verificationTier: node?.verification?.tier || 'TIER_3_AI',
+        };
+      });
 
       periods.push({
         id: periodKey,
         dateRange: periodKey,
         startYear,
         endYear,
-        title: narrativePeriod?.label || getPeriodTitle(startYear, endYear),
+        title: narrativePeriod?.title || narrativePeriod?.label || getPeriodTitle(startYear, endYear),
         documents: periodDocs,
-        entities: periodEntities.slice(0, 10), // Limit to top 10 entities per period
+        entities: periodEntities.slice(0, 10),
         documentCount: periodDocs.length,
         entityCount: periodEntities.length,
         narrative: narrativePeriod?.narrative || null,
+        inlineEntities,
         highlightedEvents: narrativePeriod?.highlighted_events || [],
       });
     }
 
-    // Sort periods chronologically
     periods.sort((a, b) => a.startYear - b.startYear);
+
+    // Build events array from highlighted_events + document FILED events
+    const events: TimelineEvent[] = [];
+    let eventCounter = 0;
+
+    for (const period of periods) {
+      // Highlighted events from narrative
+      const highlightedDates = new Set<string>();
+      for (const he of period.highlightedEvents) {
+        const year = he.date ? new Date(he.date).getFullYear() : period.startYear;
+        const eventType = (['CONFISCATED', 'SOLD', 'INHERITED', 'FILED'].includes(he.event_type)
+          ? he.event_type
+          : 'FILED') as TimelineEvent['eventType'];
+        highlightedDates.add(he.date || '');
+        events.push({
+          id: `evt_${eventCounter++}`,
+          year,
+          date: he.date,
+          eventType,
+          summary: he.summary,
+          parties: he.parties_involved,
+          documentIds: period.documents.map(d => d.id),
+          entityIds: period.entities.map(e => e.id),
+          periodId: period.id,
+        });
+      }
+
+      // Implicit FILED events for documents not already covered by a highlighted event
+      for (const doc of period.documents) {
+        if (!doc.date || highlightedDates.has(doc.date)) continue;
+        const year = new Date(doc.date).getFullYear();
+        events.push({
+          id: `evt_${eventCounter++}`,
+          year,
+          date: doc.date,
+          eventType: 'FILED',
+          summary: `${doc.filename} entered the record`,
+          parties: [],
+          documentIds: [doc.id],
+          entityIds: [],
+          periodId: period.id,
+        });
+      }
+    }
+
+    events.sort((a, b) => a.year - b.year || (a.date || '').localeCompare(b.date || ''));
+
+    // Build gaps array: intervals ≥3 years between consecutive events
+    const gaps: TimelineGap[] = [];
+    for (let i = 1; i < events.length; i++) {
+      const duration = events[i].year - events[i - 1].year;
+      if (duration >= 3) {
+        const startYear = events[i - 1].year;
+        const endYear = events[i].year;
+        gaps.push({
+          id: `gap_${startYear}_${endYear}`,
+          startYear,
+          endYear,
+          duration,
+          contextHint: getGapContextHint(startYear, endYear),
+        });
+      }
+    }
 
     return NextResponse.json({
       periods,
+      events,
+      gaps,
       totalDocuments: documents.length,
       dateRange: graphData.metadata.date_range,
       caseSummary: caseNarrative?.case_summary || null,

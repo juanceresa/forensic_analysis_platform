@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { GraphData } from '@/lib/types';
+import {
+  loadDocumentGroups,
+  buildFileToGroupMap,
+  matchExtractionToGroup,
+} from '@/lib/document-groups';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
@@ -15,7 +20,6 @@ export async function GET(
   try {
     const { caseId, entityId } = await params;
 
-    // Validate caseId to prevent path traversal
     if (!CASE_ID_PATTERN.test(caseId)) {
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
@@ -26,17 +30,16 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
 
-    // Validate entityId
     const decodedEntityId = decodeURIComponent(entityId);
     if (!ENTITY_ID_PATTERN.test(decodedEntityId)) {
       return NextResponse.json({ error: 'Invalid entityId' }, { status: 400 });
     }
 
-    const graphDataPath = path.join(CASES_DIR, caseId, 'output', 'graph_data.json');
+    const caseDir = path.join(CASES_DIR, caseId);
+    const graphDataPath = path.join(caseDir, 'output', 'graph_data.json');
     const graphDataContent = await fs.readFile(graphDataPath, 'utf-8');
     const graphData: GraphData = JSON.parse(graphDataContent);
 
-    // Find the entity
     const entity = graphData.nodes.find(n => n.id === decodedEntityId);
 
     if (!entity) {
@@ -46,12 +49,44 @@ export async function GET(
       );
     }
 
-    // Find source documents (from extracted_from field) with null-safety
-    const sourceDocIds = entity.extracted_from?.split(',').map(s => s.trim()) || [];
-    const sourceDocuments = sourceDocIds.map(docId => ({
-      id: docId,
-      filename: `${docId}.pdf`, // Simplified for now
-    }));
+    // Resolve source documents, mapping raw extraction stems to document groups
+    const groupConfig = await loadDocumentGroups(caseDir);
+    const fileToGroup = groupConfig ? buildFileToGroupMap(groupConfig.groups) : null;
+
+    const rawDocIds = entity.extracted_from?.split(',').map(s => s.trim()) || [];
+    const seenIds = new Set<string>();
+    const sourceDocuments: { id: string; filename: string }[] = [];
+
+    // Build a quick group-by-id lookup
+    const groupById = new Map<string, { id: string; name: string }>();
+    if (groupConfig) {
+      for (const g of groupConfig.groups) {
+        groupById.set(g.id, g);
+      }
+    }
+
+    for (const rawId of rawDocIds) {
+      let docId: string;
+      let filename: string;
+
+      if (rawId.startsWith('doc_')) {
+        // Already a merged group ID — look up group directly
+        const gid = rawId.replace(/^doc_/, '');
+        const group = groupById.get(gid);
+        docId = rawId;
+        filename = group ? group.name : `${rawId}.pdf`;
+      } else {
+        // Raw extraction stem — try matching to a group
+        const stem = rawId.replace(/_page_\d+$/i, '');
+        const group = fileToGroup ? matchExtractionToGroup(stem, fileToGroup) : null;
+        docId = group ? `doc_${group.id}` : stem;
+        filename = group ? group.name : `${stem}.pdf`;
+      }
+
+      if (seenIds.has(docId)) continue;
+      seenIds.add(docId);
+      sourceDocuments.push({ id: docId, filename });
+    }
 
     // Find connections (links where this entity is source or target)
     const connections = graphData.links.filter(

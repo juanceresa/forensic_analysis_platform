@@ -1,83 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
+import {
+  findGroupForDocId,
+  findGroupExtractionFiles,
+  inferType,
+  type DocumentGroup,
+} from '@/lib/document-groups';
 
 const CASES_DIR = path.join(process.cwd(), '../cases');
 const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 // Doc IDs can contain spaces, periods, alphanumerics, underscores, and hyphens
 const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
-
-interface DocumentGroup {
-  id: string;
-  name: string;
-  document_type?: string;
-  date?: string;
-  files: string[];
-}
-
-interface DocumentGroupsConfig {
-  status: string;
-  groups: DocumentGroup[];
-  standalone?: string[];
-}
-
-/**
- * Find the document group matching a doc_ prefixed ID.
- */
-async function findGroupForDocId(
-  caseDir: string,
-  docId: string
-): Promise<DocumentGroup | null> {
-  if (!docId.startsWith('doc_')) return null;
-  const groupsPath = path.join(caseDir, 'document_groups.yaml');
-  try {
-    const content = await fs.readFile(groupsPath, 'utf-8');
-    const config = yaml.load(content) as DocumentGroupsConfig;
-    if (config?.status !== 'CONFIRMED' || !config.groups) return null;
-    const targetId = docId.replace(/^doc_/, '');
-    return config.groups.find(g => g.id === targetId) || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Find extraction files that belong to a document group.
- * Group files like "Some Doc.1pdf.pdf" produce extractions like "Some Doc.1pdf_page_0.json".
- */
-async function findGroupExtractionFiles(
-  extractionsDir: string,
-  group: DocumentGroup
-): Promise<string[]> {
-  const allFiles = await fs.readdir(extractionsDir);
-  const jsonFiles = allFiles.filter(f => f.endsWith('.json'));
-
-  // Build stems from group files for matching
-  const groupStems = new Set(
-    group.files.map(f => f.replace(/\.(pdf|jpg|png)$/i, ''))
-  );
-
-  return jsonFiles.filter(f => {
-    const baseName = f.replace(/\.json$/i, '');
-    const stripped = baseName.replace(/_page_\d+$/i, '');
-    return groupStems.has(stripped);
-  });
-}
-
-function inferType(name: string): string | null {
-  const lower = name.toLowerCase();
-  if (lower.includes('will') || lower.includes('testament')) return 'Will';
-  if (lower.includes('contract')) return 'Contract';
-  if (lower.includes('transfer') || lower.includes('trans')) return 'Transfer';
-  if (lower.includes('deed')) return 'Deed';
-  if (lower.includes('report')) return 'Report';
-  if (lower.includes('hacienda') || lower.includes('finca')) return 'Property';
-  if (lower.includes('millage') || lower.includes('survey')) return 'Survey';
-  if (lower.includes('credit')) return 'Financial';
-  if (lower.includes('heir') || lower.includes('herencia')) return 'Inheritance';
-  return null;
-}
 
 export async function GET(
   request: NextRequest,
@@ -87,7 +21,6 @@ export async function GET(
     const { caseId, docId } = await params;
     const decodedDocId = decodeURIComponent(docId);
 
-    // Validate caseId to prevent path traversal
     if (!CASE_ID_PATTERN.test(caseId)) {
       return NextResponse.json({ error: 'Invalid caseId' }, { status: 400 });
     }
@@ -196,16 +129,6 @@ async function handleGroupedDocument(
     );
   }
 
-  // Sort extraction files to match group.files YAML order
-  const groupStemOrder = group.files.map(f => f.replace(/\.(pdf|jpg|png)$/i, ''));
-  extractionFiles.sort((a, b) => {
-    const stemA = a.replace(/\.json$/i, '').replace(/_page_\d+$/i, '');
-    const stemB = b.replace(/\.json$/i, '').replace(/_page_\d+$/i, '');
-    const idxA = groupStemOrder.indexOf(stemA);
-    const idxB = groupStemOrder.indexOf(stemB);
-    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-  });
-
   // Build per-page data from all extraction files
   const pages: {
     ocrText: string;
@@ -240,7 +163,6 @@ async function handleGroupedDocument(
         'unknown';
     }
 
-    // Read OCR text for this page
     const partDocId = extFile.replace(/\.json$/i, '');
     let ocrText = '';
     try {
@@ -249,7 +171,6 @@ async function handleGroupedDocument(
       ocrText = extraction.ocr_result?.text || '';
     }
 
-    // Read translated text for this page
     let translatedText: string | null = null;
     try {
       translatedText = await fs.readFile(path.join(caseDir, 'ocr_translated', `${partDocId}.txt`), 'utf-8');
