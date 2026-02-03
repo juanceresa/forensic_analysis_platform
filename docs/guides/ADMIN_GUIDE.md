@@ -659,11 +659,10 @@ python -m farmer_factory.cli generate-dossier CASE-XXX --property-id "ID" --fami
 python -m farmer_factory.cli apply-merges CASE-XXX
 python -m farmer_factory.cli apply-merges CASE-XXX --include-drafts  # Preview with drafts
 
-# Merge two entities manually (analyst-driven, writes CONFIRMED + applies immediately)
-python -m farmer_factory.cli merge-entities CASE-XXX \
-  --entity-type PERSON \
-  --canonical-id "person_abc" \
-  --member-id "person_xyz"
+# Merge entities manually (analyst-driven, writes CONFIRMED + applies immediately)
+# First ID becomes canonical; all others merge into it
+python -m farmer_factory.cli merge-entities CASE-XXX person_abc person_xyz
+python -m farmer_factory.cli merge-entities CASE-XXX person_abc person_xyz person_def  # 3-way merge
 
 # Rebuild graph from existing extractions (no OCR/LLM, uses current dedupe models)
 python -m farmer_factory.cli rebuild-graph CASE-XXX

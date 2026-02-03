@@ -48,6 +48,13 @@ HISTORICAL CONTEXT - CONFISCATION:
 - MRBM (Ministerio de Recuperación de Bienes Malversados): Seized "ill-gotten" property
 - Look for references to "intervención", "confiscación", "expropiación", "nacionalización"
 
+ENTITY DISAMBIGUATION:
+- Cuban naming: people carry patronymic (father's surname) + matronymic (mother's surname), e.g., "Ramiro Rodríguez Queral" = father's name Rodríguez, mother's name Queral
+- A father and son often share a surname. Distinguish them using titles (Dr., Don), matronymics, roles, birth dates, or contextual references like "hijo de" / "sucesión de"
+- If a document references multiple people with overlapping names, create SEPARATE entities for each distinct person. Never merge them into one.
+- Titles like "Dr." or "Don" are identity signals, not decorations. "Dr. Francisco Rodríguez" and "Ramiro Rodríguez" are two people, not one.
+- "Sucesión de [person]" refers to the estate/succession of a deceased person — the deceased is a separate entity from the heirs managing the succession.
+
 OCR QUALITY CONSIDERATIONS:
 - If text is unclear, lower the confidence score and note in "notes"
 - Common OCR errors in Spanish handwriting: ñ→n, á→a, rn→m, ll→U, ae→x

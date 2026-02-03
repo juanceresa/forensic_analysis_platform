@@ -8,8 +8,9 @@ from farmer_factory.narrative.generator import (
     _get_period_label,
     _estimate_cost,
     _prompt_hash,
+    _parse_observations,
 )
-from farmer_factory.narrative.models import CaseNarrative
+from farmer_factory.narrative.models import CaseNarrative, ForensicObservation
 
 
 # ── Helper function tests ─────────────────────────────────────────
@@ -125,7 +126,7 @@ class TestCostGuards:
         mock_client = Mock()
         mock_client_cls.return_value = mock_client
         # First call (sonnet) fails, second call (haiku) succeeds
-        mock_client.call_with_retry.side_effect = [
+        mock_client.call_standard.side_effect = [
             Exception("rate limit"),
             "fallback response",
         ]
@@ -139,7 +140,7 @@ class TestCostGuards:
     def test_cost_accumulates(self, mock_client_cls):
         mock_client = Mock()
         mock_client_cls.return_value = mock_client
-        mock_client.call_with_retry.return_value = "response"
+        mock_client.call_standard.return_value = "response"
         gen = CaseNarrativeGenerator(api_key="test", max_cost=10.0)
         gen._call_llm("prompt one")
         cost_after_first = gen.total_cost
@@ -175,3 +176,88 @@ class TestEvidence:
         assert len(highlights) == 2
         types = {h.event_type for h in highlights}
         assert types == {"SOLD", "INHERITED"}
+
+
+# ── Enriched response parsing tests ──────────────────────────────
+
+
+class TestEnrichedResponseParsing:
+    def _make_gen(self) -> CaseNarrativeGenerator:
+        with patch("farmer_factory.narrative.generator.ClaudeAPIClient"):
+            return CaseNarrativeGenerator(api_key="test")
+
+    def test_parse_full_response(self):
+        gen = self._make_gen()
+        raw = (
+            "The Confiscation\n"
+            "---\n"
+            "Villa Aurelia was seized by INRA in 1960.\n"
+            "---\n"
+            "OBSERVATIONS:\n"
+            "Tax record shows 24 cab but deed shows 60 | HIGH\n"
+            "No inheritance filing found for 1955 transfer | MEDIUM"
+        )
+        title, narrative, obs = gen._parse_enriched_response(raw, "fallback")
+        assert title == "The Confiscation"
+        assert "Villa Aurelia" in narrative
+        assert len(obs) == 2
+        assert obs[0].severity == "HIGH"
+        assert obs[1].severity == "MEDIUM"
+
+    def test_parse_no_observations(self):
+        gen = self._make_gen()
+        raw = "A Legacy Divided\n---\nThe family estate was split in 1948."
+        title, narrative, obs = gen._parse_enriched_response(raw, "fallback")
+        assert title == "A Legacy Divided"
+        assert "1948" in narrative
+        assert len(obs) == 0
+
+    def test_parse_no_delimiters(self):
+        gen = self._make_gen()
+        raw = "Just plain narrative text with no structure."
+        title, narrative, obs = gen._parse_enriched_response(raw, "fallback")
+        assert title == "fallback"
+        assert narrative == raw
+        assert len(obs) == 0
+
+    def test_parse_observations_only_no_severity(self):
+        obs_text = "Missing notarial record\nInconsistent dates"
+        result = _parse_observations(obs_text)
+        assert len(result) == 2
+        assert all(o.severity == "MEDIUM" for o in result)
+
+    def test_parse_observations_with_severity(self):
+        obs_text = "Critical gap in records | HIGH\nMinor date issue | LOW"
+        result = _parse_observations(obs_text)
+        assert result[0].severity == "HIGH"
+        assert result[1].severity == "LOW"
+
+
+# ── Period generation tests ───────────────────────────────────────
+
+
+class TestPeriodGeneration:
+    @patch("farmer_factory.narrative.generator.ClaudeAPIClient")
+    def test_generate_period_parses_title_and_observations(self, mock_client_cls):
+        """Period generation parses enriched response into title, narrative, observations."""
+        mock_client = Mock()
+        mock_client_cls.return_value = mock_client
+        mock_client.call_standard.return_value = (
+            "The Confiscation\n---\nVilla Aurelia was seized.\n---\n"
+            "OBSERVATIONS:\nMissing deed | HIGH"
+        )
+
+        gen = CaseNarrativeGenerator(api_key="test", max_cost=10.0)
+        gen.domain_context = ""
+        period = gen._generate_period(
+            case_id="TEST",
+            period_key="1950-1959",
+            label="Test Period",
+            documents=[{"id": "d1", "name": "Doc1", "date": "1952"}],
+            entities=[],
+            relations=[],
+        )
+        assert period.title == "The Confiscation"
+        assert "Villa Aurelia" in period.narrative
+        assert len(period.forensic_observations) == 1
+        assert period.forensic_observations[0].severity == "HIGH"

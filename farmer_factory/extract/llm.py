@@ -175,7 +175,7 @@ class LLMExtractionService:
             logger.info(
                 f"Calling Claude API for relation extraction from {document_id}..."
             )
-            response_text = self.api_client.call_with_retry(
+            response_text = self.api_client.call_standard(
                 prompt=prompt,
                 max_retries=settings.max_retries,
                 retry_delay=settings.retry_delay,
@@ -231,7 +231,7 @@ class LLMExtractionService:
 
         # Call Claude API
         logger.info(f"Calling Claude API for entity extraction from {document_id}...")
-        response_text = self.api_client.call_with_retry(
+        response_text = self.api_client.call_standard(
             prompt=prompt,
             max_retries=settings.max_retries,
             retry_delay=settings.retry_delay,

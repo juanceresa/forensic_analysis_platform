@@ -434,15 +434,8 @@ def rebuild_graph(
     exporter = GraphExporter(knowledge_graph=graph)
     exporter.save(output_dir / "graph_data.json", factory_version="1.0.0")
 
-    # Clear stale entity_groups (entity IDs change on rebuild)
+    # Generate merge files (writer preserves CONFIRMED groups) and apply confirmed merges
     entity_groups_dir = case_dir / "entity_groups"
-    if entity_groups_dir.exists():
-        for f in entity_groups_dir.iterdir():
-            if f.suffix == ".yaml":
-                f.unlink()
-        logger.info("Cleared stale entity group files")
-
-    # Generate merge files and apply confirmed merges
     try:
         _generate_merge_files(case_dir, graph, builder)
         if entity_groups_dir.exists() and any(entity_groups_dir.iterdir()):
