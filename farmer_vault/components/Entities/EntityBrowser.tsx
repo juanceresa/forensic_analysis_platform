@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { VerificationBadge } from '@/components/shared';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 import type { EntityType } from '@/lib/types';
 
 interface EntitySummary {
@@ -153,37 +155,31 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
           />
         </div>
 
-        {/* Type filter chips */}
+        {/* Type filter */}
         {availableTypes.length > 1 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground font-mono mr-1">Filter:</span>
-            <button
-              onClick={() => setSelectedType(null)}
-              className={`px-3 py-1 text-xs font-mono rounded border transition-colors
-                focus-visible:ring-2 focus-visible:ring-ring
-                ${
-                  selectedType === null
-                    ? 'bg-primary border-primary text-primary-foreground'
-                    : 'border-[var(--border)] text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-            >
-              All
-            </button>
-            {availableTypes.map(type => (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type)}
-                className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors
-                  focus-visible:ring-2 focus-visible:ring-ring
-                  ${
-                    selectedType === type
-                      ? 'bg-primary border-primary text-primary-foreground'
-                      : 'border-[var(--border)] text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-sm text-muted-foreground font-mono">Filter:</span>
+            <ButtonGroup>
+              <Button
+                variant={selectedType === null ? 'default' : 'outline'}
+                size="xs"
+                onClick={() => setSelectedType(null)}
+                className="font-mono"
               >
-                {ENTITY_TYPE_CONFIG[type].label} ({(entities[type] || []).length})
-              </button>
-            ))}
+                All
+              </Button>
+              {availableTypes.map(type => (
+                <Button
+                  key={type}
+                  variant={selectedType === type ? 'default' : 'outline'}
+                  size="xs"
+                  onClick={() => setSelectedType(type)}
+                  className="font-mono"
+                >
+                  {ENTITY_TYPE_CONFIG[type].label} ({(entities[type] || []).length})
+                </Button>
+              ))}
+            </ButtonGroup>
           </div>
         )}
 
