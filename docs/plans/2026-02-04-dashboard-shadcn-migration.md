@@ -30,30 +30,37 @@ Migrate the Farmer Vault dashboard from custom inline-styled components to shadc
 
 ### CSS Variables
 
-Customize shadcn's CSS variables in `globals.css` to implement Dark Editorial:
+Customize shadcn's CSS variables in `globals.css` to implement Dark Editorial.
+
+**Note:** The codebase uses `oklch()` format (Tailwind v4). Values below are converted accordingly.
+
+Update the `.dark` selector in `globals.css`:
 
 ```css
-:root {
-  /* Dark Editorial palette mapped to shadcn variables */
-  --background: 0 0% 5%;           /* #0D0D0D */
-  --foreground: 210 40% 96%;       /* slate-100 text */
+.dark {
+  /* Dark Editorial palette - deeper blacks than shadcn defaults */
+  --background: oklch(0.035 0 0);    /* #0D0D0D - near black */
+  --foreground: oklch(0.93 0.01 250); /* slate-100 text */
 
-  --card: 0 0% 9%;                 /* #161616 */
-  --card-foreground: 210 40% 96%;
+  --card: oklch(0.065 0 0);          /* #161616 - panel surface */
+  --card-foreground: oklch(0.93 0.01 250);
 
-  --muted: 0 0% 13%;               /* #222222 */
-  --muted-foreground: 215 20% 55%;
+  --muted: oklch(0.10 0 0);          /* #222222 - borders/dividers */
+  --muted-foreground: oklch(0.55 0.01 250);
 
-  --border: 0 0% 13%;              /* #222222 */
+  --border: oklch(0.10 0 0);         /* #222222 */
 
-  /* Forensic accent colors */
-  --primary: 160 84% 80%;          /* Mint #A7F3D0 */
-  --accent-amber: 38 92% 50%;      /* AI tier */
-  --accent-blue: 217 91% 60%;      /* Analyst tier */
-  --accent-emerald: 160 84% 39%;   /* Certified tier */
-  --accent-purple: 271 81% 56%;    /* Source tier */
+  /* Primary = Mint accent (already exists as --color-tier-certified) */
+  --primary: oklch(0.85 0.15 160);   /* Mint #A7F3D0 */
+  --primary-foreground: oklch(0.15 0 0);
 }
 ```
+
+**Existing tier colors** are already defined in `@theme inline` block:
+- `--color-tier-ai`, `--color-tier-analyst`, `--color-tier-certified`, `--color-tier-source`
+- Background/border/text variants for each tier
+
+No changes needed to tier colors — they align with the design.
 
 ### Glow Utilities
 
@@ -135,7 +142,9 @@ All cards:
 
 ### Donut Chart
 
-Replace stacked progress bar with shadcn `Chart` (Recharts):
+Replace stacked progress bar with a donut chart using the existing `chart.tsx` component.
+
+**Note:** `recharts` is already installed. The shadcn `chart.tsx` provides a `ChartContainer` wrapper with theming support. We'll use `PieChart` from Recharts directly within the container.
 - Center shows total entity count
 - Tier segments with glow on hover
 - Horizontal legend using `Badge` components
@@ -211,6 +220,23 @@ When stage is expanded, show task rows with:
 Keep at bottom, style button with:
 - `variant="outline"` with mint border
 - Download icon
+
+### Data Requirements
+
+**Current API response** (`/api/cases/[caseId]/dashboard`):
+- `workflowStages` includes `items[]` with `label` and `complete` boolean
+- Does NOT include reviewer assignment per task
+
+**Reviewer column approach:**
+1. **Phase 1 (this migration):** Display read-only, show "—" for all tasks (data not yet available)
+2. **Phase 2 (future):** Extend API to include `reviewer` field per task item
+
+This keeps the migration focused on UI while preparing the column for future data.
+
+**State management:**
+- WorkflowTable is **read-only display** — no task completion toggling
+- Collapsible state managed client-side (component state)
+- Requires `"use client"` directive for interactivity
 
 ---
 
@@ -290,8 +316,16 @@ farmer_vault/
 
 ### Dependencies
 
-- `framer-motion` — AnimatedNumber, view transitions
-- shadcn CLI: `npx shadcn@latest add table checkbox`
+**Install commands:**
+```bash
+# Animation library for AnimatedNumber
+npm install framer-motion
+
+# shadcn components (table already includes checkbox dependency)
+npx shadcn@latest add table checkbox
+```
+
+**Bundle note:** `framer-motion` adds ~30KB gzipped. If bundle size becomes a concern, consider `use-count-up` (~2KB) as a lighter alternative for number animation only.
 
 ---
 
@@ -315,19 +349,40 @@ farmer_vault/
 
 ## Implementation Order
 
-1. Update `globals.css` with Dark Editorial CSS variables
-2. Install shadcn components: `table`, `checkbox`
-3. Install `framer-motion`
-4. Create Dashboard components:
-   - AnimatedNumber
-   - AmbientHero
-   - MetricCard
-   - VerificationChart
-   - WorkflowTable
-5. Refactor `page.tsx` to use new components
-6. Test all interactions
-7. Cleanup old code
-8. Document patterns for Vault-wide migration
+1. **Dependencies & Setup**
+   ```bash
+   cd farmer_vault
+   npm install framer-motion
+   npx shadcn@latest add table checkbox
+   mkdir -p components/Dashboard
+   ```
+
+2. **Update `globals.css`** with Dark Editorial CSS variables (oklch format)
+
+3. **Create component directory structure**
+   - `components/Dashboard/index.ts` — Re-exports
+   - Ensures clean import paths: `import { MetricCard } from '@/components/Dashboard'`
+
+4. **Build Dashboard components** (order by dependency):
+   - `AnimatedNumber.tsx` — No dependencies, pure animation
+   - `AmbientHero.tsx` — Uses Badge from shadcn
+   - `MetricCard.tsx` — Uses Card, Progress, Tooltip, HoverCard, AnimatedNumber
+   - `VerificationChart.tsx` — Uses Chart, Badge
+   - `WorkflowTable.tsx` — Uses Table, Collapsible, Progress, Badge, Checkbox
+
+5. **Refactor `page.tsx`** to use new components
+
+6. **Test all interactions**
+   - Verify animations respect `prefers-reduced-motion`
+   - Check hover states, tooltips, collapsible behavior
+   - Run `npm run build` to catch SSR issues
+
+7. **Cleanup old code**
+   - Remove inline `WorkflowChecklist` function
+   - Remove `TIER_COLORS` constant (use CSS variables)
+   - Grep for old Card imports, update as needed
+
+8. **Document patterns** for Vault-wide migration
 
 ---
 
