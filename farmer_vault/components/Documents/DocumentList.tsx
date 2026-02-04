@@ -20,6 +20,8 @@ import {
   ComboboxValue,
   useComboboxAnchor,
 } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 
 interface EntitySummary {
   id: string;
@@ -54,7 +56,6 @@ const ENTITY_TYPE_LABELS: Record<string, string> = {
 export function DocumentList({ documents, entities, caseId }: DocumentListProps) {
   const [sortBy, setSortBy] = useState<SortBy>('date');
   const [dateOrder, setDateOrder] = useState<'asc' | 'desc'>('asc');
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
   const comboboxAnchor = useComboboxAnchor();
@@ -116,12 +117,6 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
   const filteredDocuments = useMemo(() => {
     let docs = [...documents];
 
-    // Apply search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      docs = docs.filter(d => d.filename.toLowerCase().includes(term));
-    }
-
     // Apply type filter
     if (selectedType) {
       docs = docs.filter(d => d.type === selectedType);
@@ -156,7 +151,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
     }
-  }, [documents, searchTerm, selectedType, selectedEntityIds, sortBy, dateOrder]);
+  }, [documents, selectedType, selectedEntityIds, sortBy, dateOrder]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -290,103 +285,83 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
           </div>
         )}
 
-        {/* Search input */}
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Search documents..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 bg-card border border-border rounded
-                       text-foreground placeholder-muted-foreground font-mono text-sm
-                       focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-          />
-        </div>
-
         {/* Sort controls */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground font-mono mr-2">Sort by:</span>
-          <button
-            onClick={() => { setSortBy('date'); setSelectedType(null); }}
-            className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
-              focus-visible:ring-2 focus-visible:ring-primary
-              ${
-                sortBy === 'date'
-                  ? 'bg-sidebar-accent border-border text-foreground'
-                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
-              }`}
-          >
-            By Date
-          </button>
-          <button
-            onClick={() => setSortBy('type')}
-            className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
-              focus-visible:ring-2 focus-visible:ring-primary
-              ${
-                sortBy === 'type'
-                  ? 'bg-sidebar-accent border-border text-foreground'
-                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
-              }`}
-          >
-            By Type
-          </button>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground font-mono">Sort:</span>
+            <ButtonGroup>
+              <Button
+                variant={sortBy === 'date' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setSortBy('date'); setSelectedType(null); }}
+                className="font-mono"
+              >
+                By Date
+              </Button>
+              <Button
+                variant={sortBy === 'type' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSortBy('type')}
+                className="font-mono"
+              >
+                By Type
+              </Button>
+            </ButtonGroup>
+          </div>
+
+          {/* Date order (only when sorting by date) */}
+          {sortBy === 'date' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono">Order:</span>
+              <ButtonGroup>
+                <Button
+                  variant={dateOrder === 'asc' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDateOrder('asc')}
+                  className="font-mono"
+                >
+                  Ascending
+                </Button>
+                <Button
+                  variant={dateOrder === 'desc' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setDateOrder('desc')}
+                  className="font-mono"
+                >
+                  Descending
+                </Button>
+              </ButtonGroup>
+            </div>
+          )}
+
+          {/* Type filter (only when sorting by type) */}
+          {sortBy === 'type' && documentTypes.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono">Type:</span>
+              <ButtonGroup>
+                <Button
+                  variant={selectedType === null ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedType(null)}
+                  className="font-mono"
+                >
+                  All
+                </Button>
+                {documentTypes.map(type => (
+                  <Button
+                    key={type}
+                    variant={selectedType === type ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedType(type)}
+                    className="font-mono uppercase"
+                  >
+                    {type}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </div>
+          )}
         </div>
-
-        {/* Date order chips (only when sorting by date) */}
-        {sortBy === 'date' && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground font-mono mr-1">Order:</span>
-            {(['asc', 'desc'] as const).map(order => (
-              <button
-                key={order}
-                onClick={() => setDateOrder(order)}
-                className={`px-3 py-1 text-xs font-mono rounded border transition-colors
-                  focus-visible:ring-2 focus-visible:ring-primary
-                  ${
-                    dateOrder === order
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
-                  }`}
-              >
-                {order === 'asc' ? 'Ascending' : 'Descending'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Type filter chips (only when sorting by type) */}
-        {sortBy === 'type' && documentTypes.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground font-mono mr-1">Filter:</span>
-            <button
-              onClick={() => setSelectedType(null)}
-              className={`px-3 py-1 text-xs font-mono rounded border transition-colors
-                focus-visible:ring-2 focus-visible:ring-primary
-                ${
-                  selectedType === null
-                    ? 'bg-primary text-primary-foreground border-primary'
-                    : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
-                }`}
-            >
-              All
-            </button>
-            {documentTypes.map(type => (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type)}
-                className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors
-                  focus-visible:ring-2 focus-visible:ring-primary
-                  ${
-                    selectedType === type
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
-                  }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        )}
       </header>
 
       {/* Document grid */}
@@ -441,10 +416,9 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
               ? 'No documents found'
               : 'No documents match your filters'}
           </p>
-          {(searchTerm || selectedType || selectedEntityIds.length > 0) && documents.length > 0 && (
+          {(selectedType || selectedEntityIds.length > 0) && documents.length > 0 && (
             <button
               onClick={() => {
-                setSearchTerm('');
                 setSelectedType(null);
                 setSelectedEntityIds([]);
               }}
