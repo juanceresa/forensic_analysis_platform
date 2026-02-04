@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -93,23 +94,25 @@ export function HeaderBreadcrumbs({ caseId }: HeaderBreadcrumbsProps) {
     <Breadcrumb>
       <BreadcrumbList>
         {items.map((item, index) => (
-          <BreadcrumbItem key={index}>
+          <Fragment key={index}>
             {index > 0 && <BreadcrumbSeparator className="text-muted-foreground/40" />}
-            {item.href ? (
-              <BreadcrumbLink asChild>
-                <Link
-                  href={item.href}
-                  className="font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-                >
+            <BreadcrumbItem>
+              {item.href ? (
+                <BreadcrumbLink asChild>
+                  <Link
+                    href={item.href}
+                    className="font-mono text-xs uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage className="font-mono text-xs uppercase tracking-wider text-foreground">
                   {item.label}
-                </Link>
-              </BreadcrumbLink>
-            ) : (
-              <BreadcrumbPage className="font-mono text-xs uppercase tracking-wider text-foreground">
-                {item.label}
-              </BreadcrumbPage>
-            )}
-          </BreadcrumbItem>
+                </BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+          </Fragment>
         ))}
       </BreadcrumbList>
     </Breadcrumb>
