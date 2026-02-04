@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home,
   FileText,
@@ -148,33 +149,54 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
                       </Link>
                     </SidebarMenuButton>
 
-                    {/* AI Analysis Sub-items */}
-                    {hasSubItems && showSubItems && (
-                      <SidebarMenuSub className="border-border">
-                        {item.subItems!.map((sub) => {
-                          const subActive = isSubActive(sub.href);
-                          return (
-                            <SidebarMenuSubItem key={sub.href}>
-                              <SidebarMenuSubButton
-                                asChild
-                                isActive={subActive}
-                                className={cn(
-                                  'rounded-lg transition-all duration-200',
-                                  'hover:scale-[1.01] hover:shadow-[0_0_8px_rgba(167,243,208,0.08)]',
-                                  subActive && 'bg-sidebar-accent text-primary',
-                                  !subActive && 'text-muted-foreground hover:text-foreground'
-                                )}
-                              >
-                                <Link href={sub.href}>
-                                  <sub.icon className="h-4 w-4" />
-                                  <span>{sub.label}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    )}
+                    {/* AI Analysis Sub-items with fall-down animation */}
+                    <AnimatePresence>
+                      {hasSubItems && showSubItems && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }}
+                          className="overflow-hidden"
+                        >
+                          <SidebarMenuSub className="border-border">
+                            {item.subItems!.map((sub, index) => {
+                              const subActive = isSubActive(sub.href);
+                              return (
+                                <motion.div
+                                  key={sub.href}
+                                  initial={{ opacity: 0, y: -8 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{
+                                    duration: 0.15,
+                                    delay: index * 0.05,
+                                    ease: 'easeOut',
+                                  }}
+                                >
+                                  <SidebarMenuSubItem>
+                                    <SidebarMenuSubButton
+                                      asChild
+                                      isActive={subActive}
+                                      className={cn(
+                                        'rounded-lg transition-all duration-200',
+                                        'hover:scale-[1.01] hover:shadow-[0_0_8px_rgba(167,243,208,0.08)]',
+                                        subActive && 'bg-sidebar-accent text-primary',
+                                        !subActive && 'text-muted-foreground hover:text-foreground'
+                                      )}
+                                    >
+                                      <Link href={sub.href}>
+                                        <sub.icon className="h-4 w-4" />
+                                        <span>{sub.label}</span>
+                                      </Link>
+                                    </SidebarMenuSubButton>
+                                  </SidebarMenuSubItem>
+                                </motion.div>
+                              );
+                            })}
+                          </SidebarMenuSub>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </SidebarMenuItem>
                 );
               })}
