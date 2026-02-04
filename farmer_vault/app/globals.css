@@ -207,6 +207,45 @@
   box-shadow: 0 0 10px rgba(167, 243, 208, 0.3);
 }
 
+/* Live status indicator - pulsing glow */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    box-shadow: 0 0 4px var(--primary);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 12px var(--primary);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-live {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+}
+
+/* Glow shadow utilities for cards and progress bars */
+.shadow-glow-mint {
+  box-shadow: 0 0 12px rgba(167, 243, 208, 0.35);
+}
+
+.shadow-glow-blue {
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+}
+
+.shadow-glow-amber {
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+.shadow-glow-emerald {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+
+.shadow-glow-purple {
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.5);
+}
+
 .hover-glow-lg:hover {
   box-shadow: 0 0 14px rgba(167, 243, 208, 0.4);
 }
@@ -490,37 +529,51 @@ code, .font-mono, pre {
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  /* Dark Editorial palette - deeper blacks for forensic intelligence aesthetic */
+  --background: oklch(0.035 0 0);      /* #0D0D0D - near black */
+  --foreground: oklch(0.93 0.01 250);  /* slate-100 text */
+
+  --card: oklch(0.065 0 0);            /* #161616 - panel surface */
+  --card-foreground: oklch(0.93 0.01 250);
+
+  --popover: oklch(0.065 0 0);
+  --popover-foreground: oklch(0.93 0.01 250);
+
+  /* Primary = Mint accent for forensic actions */
+  --primary: oklch(0.85 0.15 160);     /* Mint #A7F3D0 */
+  --primary-foreground: oklch(0.15 0 0);
+
+  --secondary: oklch(0.12 0 0);
+  --secondary-foreground: oklch(0.93 0.01 250);
+
+  --muted: oklch(0.10 0 0);            /* #222222 - borders/dividers */
+  --muted-foreground: oklch(0.55 0.01 250);
+
+  --accent: oklch(0.12 0 0);
+  --accent-foreground: oklch(0.93 0.01 250);
+
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+
+  --border: oklch(0.10 0 0);           /* #222222 */
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
+  --ring: oklch(0.85 0.15 160);        /* Mint ring for focus states */
+
+  /* Chart colors - forensic tier aligned */
+  --chart-1: oklch(0.75 0.18 85);      /* Amber - AI tier */
+  --chart-2: oklch(0.62 0.2 250);      /* Blue - Analyst tier */
+  --chart-3: oklch(0.72 0.17 160);     /* Emerald - Certified tier */
+  --chart-4: oklch(0.65 0.25 300);     /* Purple - Source tier */
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+
+  /* Sidebar */
+  --sidebar: oklch(0.05 0 0);
+  --sidebar-foreground: oklch(0.93 0.01 250);
+  --sidebar-primary: oklch(0.85 0.15 160);
+  --sidebar-primary-foreground: oklch(0.15 0 0);
+  --sidebar-accent: oklch(0.10 0 0);
+  --sidebar-accent-foreground: oklch(0.93 0.01 250);
+  --sidebar-border: oklch(0.10 0 0);
+  --sidebar-ring: oklch(0.85 0.15 160);
 }
 
 @layer base {
