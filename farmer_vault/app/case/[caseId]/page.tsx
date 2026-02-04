@@ -52,7 +52,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
               <MetricCard
                 label="Current Stage"
                 value={data.metrics.stage}
-                tooltip="Current workflow stage for this case"
                 progress={{
                   value: data.metrics.stageProgress,
                   glowColor: 'blue',
@@ -67,14 +66,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 href={`/case/${caseId}/documents`}
                 subtitle="View all →"
                 animationDelay={0.1}
-                hoverContent={
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Source Documents</p>
-                    <p className="text-xs text-muted-foreground">
-                      {data.metrics.documents} documents processed and analyzed
-                    </p>
-                  </div>
-                }
               />
 
               {/* Entities Card */}
@@ -87,28 +78,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                   .slice(0, 2)
                   .join(', ')}
                 animationDelay={0.2}
-                hoverContent={
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Entity Breakdown</p>
-                    <div className="space-y-1">
-                      {Object.entries(data.entityTypeSummary).map(
-                        ([type, count]) => (
-                          <div
-                            key={type}
-                            className="flex items-center justify-between text-xs"
-                          >
-                            <span className="text-muted-foreground capitalize">
-                              {type.toLowerCase()}
-                            </span>
-                            <span className="font-mono tabular-nums">
-                              {count as number}
-                            </span>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </div>
-                }
               />
 
               {/* Relationships Card */}
@@ -118,14 +87,6 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
                 href={`/case/${caseId}/graph`}
                 subtitle="View graph →"
                 animationDelay={0.3}
-                hoverContent={
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Knowledge Graph</p>
-                    <p className="text-xs text-muted-foreground">
-                      {data.metrics.relationships} connections between entities
-                    </p>
-                  </div>
-                }
               />
             </div>
 
