@@ -59,18 +59,14 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
   const comboboxAnchor = useComboboxAnchor();
 
-  // Build entity groups for combobox
+  // Build entity groups for combobox - items must be strings (like timezone example)
   const entityGroups = useMemo(() => {
     return ENTITY_TYPE_ORDER
       .filter(type => entities[type]?.length > 0)
       .map(type => ({
         value: type,
         label: ENTITY_TYPE_LABELS[type],
-        items: entities[type].map(e => ({
-          id: e.id,
-          name: e.name,
-          value: `${e.id}|${e.name}`, // Composite value for combobox
-        })),
+        items: entities[type].map(e => `${e.id}|${e.name}`), // Simple strings
       }));
   }, [entities]);
 
@@ -277,11 +273,11 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
                       <ComboboxCollection>
                         {(item) => (
                           <ComboboxItem
-                            key={item.value}
-                            value={item.value}
+                            key={item}
+                            value={item}
                             className="font-mono text-sm"
                           >
-                            {item.name}
+                            {item.split('|')[1]}
                           </ComboboxItem>
                         )}
                       </ComboboxCollection>
