@@ -5,6 +5,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { AppSidebar } from '@/components/shared/AppSidebar';
+import { HeaderBreadcrumbs } from '@/components/shared/HeaderBreadcrumbs';
 
 interface CaseLayoutProps {
   children: React.ReactNode;
@@ -27,13 +28,14 @@ export default async function CaseLayout({ children, params }: CaseLayoutProps) 
       >
         <AppSidebar caseId={caseId} />
         <SidebarInset className="bg-background">
-          {/* Minimal header with just the trigger */}
-          <header className="flex h-12 shrink-0 items-center gap-2 px-4">
+          {/* Header with trigger and breadcrumbs */}
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 px-4">
             <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent" />
             <Separator
               orientation="vertical"
               className="mr-2 h-4 bg-border"
             />
+            <HeaderBreadcrumbs caseId={caseId} />
           </header>
 
           {/* Main content */}

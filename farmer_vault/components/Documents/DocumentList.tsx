@@ -3,19 +3,87 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import type { Document } from '@/lib/document-types';
+import React from 'react';
+import {
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxCollection,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxItem,
+  ComboboxLabel,
+  ComboboxList,
+  ComboboxSeparator,
+  ComboboxValue,
+  useComboboxAnchor,
+} from '@/components/ui/combobox';
+
+interface EntitySummary {
+  id: string;
+  name: string;
+  entity_type: string;
+}
+
+interface GroupedEntities {
+  PERSON: EntitySummary[];
+  PROPERTY: EntitySummary[];
+  ORGANIZATION: EntitySummary[];
+  LOCATION: EntitySummary[];
+}
 
 interface DocumentListProps {
   documents: Document[];
+  entities: GroupedEntities;
   caseId: string;
 }
 
 type SortBy = 'date' | 'type';
 
-export function DocumentList({ documents, caseId }: DocumentListProps) {
+// Entity type display order and labels
+const ENTITY_TYPE_ORDER = ['PERSON', 'PROPERTY', 'LOCATION', 'ORGANIZATION'] as const;
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  PERSON: 'People',
+  PROPERTY: 'Properties',
+  LOCATION: 'Locations',
+  ORGANIZATION: 'Organizations',
+};
+
+export function DocumentList({ documents, entities, caseId }: DocumentListProps) {
   const [sortBy, setSortBy] = useState<SortBy>('date');
   const [dateOrder, setDateOrder] = useState<'asc' | 'desc'>('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
+  const comboboxAnchor = useComboboxAnchor();
+
+  // Build entity groups for combobox
+  const entityGroups = useMemo(() => {
+    return ENTITY_TYPE_ORDER
+      .filter(type => entities[type]?.length > 0)
+      .map(type => ({
+        value: type,
+        label: ENTITY_TYPE_LABELS[type],
+        items: entities[type].map(e => ({
+          id: e.id,
+          name: e.name,
+          value: `${e.id}|${e.name}`, // Composite value for combobox
+        })),
+      }));
+  }, [entities]);
+
+  // Flatten all entities for lookup
+  const entityLookup = useMemo(() => {
+    const lookup = new Map<string, EntitySummary>();
+    for (const type of ENTITY_TYPE_ORDER) {
+      for (const entity of entities[type] || []) {
+        lookup.set(entity.id, entity);
+      }
+    }
+    return lookup;
+  }, [entities]);
 
   // Get unique document types for filter chips
   const documentTypes = useMemo(() => {
@@ -63,6 +131,14 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
       docs = docs.filter(d => d.type === selectedType);
     }
 
+    // Apply entity filter - document must contain ALL selected entities
+    if (selectedEntityIds.length > 0) {
+      docs = docs.filter(doc => {
+        const docEntitySet = new Set(doc.entityIds || []);
+        return selectedEntityIds.every(entityId => docEntitySet.has(entityId));
+      });
+    }
+
     // Sort
     if (sortBy === 'date') {
       const dir = dateOrder === 'asc' ? 1 : -1;
@@ -84,7 +160,7 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
     }
-  }, [documents, searchTerm, selectedType, sortBy, dateOrder]);
+  }, [documents, searchTerm, selectedType, selectedEntityIds, sortBy, dateOrder]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'No date';
@@ -96,6 +172,21 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
     });
   };
 
+  // Handle combobox value changes
+  const handleEntityChange = (values: string[]) => {
+    // Extract entity IDs from composite values
+    const ids = values.map(v => v.split('|')[0]);
+    setSelectedEntityIds(ids);
+  };
+
+  // Get composite values for combobox from selected IDs
+  const selectedComboboxValues = useMemo(() => {
+    return selectedEntityIds.map(id => {
+      const entity = entityLookup.get(id);
+      return entity ? `${entity.id}|${entity.name}` : id;
+    });
+  }, [selectedEntityIds, entityLookup]);
+
   return (
     <>
       {/* Header */}
@@ -104,23 +195,102 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
 
         {/* Summary stats */}
         {stats && (
-          <div className="mb-4 p-3 bg-slate-900 border border-slate-800 rounded flex flex-wrap gap-6 text-sm">
+          <div className="mb-4 p-3 bg-card border border-border rounded flex flex-wrap gap-6 text-sm">
             <div>
-              <span className="text-slate-500">Total:</span>{' '}
-              <span className="font-mono text-slate-300">{stats.total}</span>
+              <span className="text-muted-foreground">Total:</span>{' '}
+              <span className="font-mono text-foreground">{stats.total}</span>
             </div>
             {stats.dateRange && (
               <div>
-                <span className="text-slate-500">Date range:</span>{' '}
-                <span className="font-mono text-slate-300">
+                <span className="text-muted-foreground">Date range:</span>{' '}
+                <span className="font-mono text-foreground">
                   {stats.dateRange.earliest.getFullYear()} – {stats.dateRange.latest.getFullYear()}
                 </span>
               </div>
             )}
             <div>
-              <span className="text-slate-500">Avg OCR:</span>{' '}
-              <span className="font-mono text-slate-300">{stats.avgConfidence}%</span>
+              <span className="text-muted-foreground">Avg OCR:</span>{' '}
+              <span className="font-mono text-foreground">{stats.avgConfidence}%</span>
             </div>
+          </div>
+        )}
+
+        {/* Entity filter combobox */}
+        {entityGroups.length > 0 && (
+          <div className="mb-4">
+            <label className="block text-sm text-muted-foreground font-mono mb-2">
+              Filter by entities:
+            </label>
+            <Combobox
+              items={entityGroups}
+              multiple
+              autoHighlight
+              value={selectedComboboxValues}
+              onValueChange={handleEntityChange}
+            >
+              <ComboboxChips ref={comboboxAnchor} className="min-h-[42px] bg-card border-border">
+                <ComboboxValue>
+                  {(values: string[]) => (
+                    <React.Fragment>
+                      {values.map((value) => {
+                        const name = value.split('|')[1] || value;
+                        return (
+                          <ComboboxChip
+                            key={value}
+                            className="bg-primary/10 text-primary border-primary/20"
+                          >
+                            {name}
+                          </ComboboxChip>
+                        );
+                      })}
+                      <ComboboxChipsInput
+                        placeholder={values.length === 0 ? "Search entities..." : "Add more..."}
+                        className="placeholder:text-muted-foreground"
+                      />
+                    </React.Fragment>
+                  )}
+                </ComboboxValue>
+                {selectedEntityIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedEntityIds([]);
+                    }}
+                    className="ml-1 p-1 text-muted-foreground hover:text-foreground rounded hover:bg-sidebar-accent transition-colors"
+                    aria-label="Clear all filters"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                )}
+              </ComboboxChips>
+              <ComboboxContent anchor={comboboxAnchor} className="bg-card border-border">
+                <ComboboxEmpty>No entities found.</ComboboxEmpty>
+                <ComboboxList>
+                  {(group, index) => (
+                    <ComboboxGroup key={group.value} items={group.items}>
+                      <ComboboxLabel className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
+                        {group.label}
+                      </ComboboxLabel>
+                      <ComboboxCollection>
+                        {(item) => (
+                          <ComboboxItem
+                            key={item.value}
+                            value={item.value}
+                            className="font-mono text-sm"
+                          >
+                            {item.name}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxCollection>
+                      {index < entityGroups.length - 1 && <ComboboxSeparator />}
+                    </ComboboxGroup>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
           </div>
         )}
 
@@ -131,23 +301,23 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
             placeholder="Search documents..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded
-                       text-slate-100 placeholder-slate-500 font-mono text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 bg-card border border-border rounded
+                       text-foreground placeholder-muted-foreground font-mono text-sm
+                       focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
           />
         </div>
 
         {/* Sort controls */}
         <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-500 font-mono mr-2">Sort by:</span>
+          <span className="text-sm text-muted-foreground font-mono mr-2">Sort by:</span>
           <button
             onClick={() => { setSortBy('date'); setSelectedType(null); }}
             className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
-              focus-visible:ring-2 focus-visible:ring-blue-500
+              focus-visible:ring-2 focus-visible:ring-primary
               ${
                 sortBy === 'date'
-                  ? 'bg-slate-800 border-slate-600 text-slate-100'
-                  : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                  ? 'bg-sidebar-accent border-border text-foreground'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
               }`}
           >
             By Date
@@ -155,11 +325,11 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
           <button
             onClick={() => setSortBy('type')}
             className={`px-3 py-1.5 text-sm font-mono rounded border transition-colors
-              focus-visible:ring-2 focus-visible:ring-blue-500
+              focus-visible:ring-2 focus-visible:ring-primary
               ${
                 sortBy === 'type'
-                  ? 'bg-slate-800 border-slate-600 text-slate-100'
-                  : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                  ? 'bg-sidebar-accent border-border text-foreground'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
               }`}
           >
             By Type
@@ -169,17 +339,17 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
         {/* Date order chips (only when sorting by date) */}
         {sortBy === 'date' && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-slate-500 font-mono mr-1">Order:</span>
+            <span className="text-sm text-muted-foreground font-mono mr-1">Order:</span>
             {(['asc', 'desc'] as const).map(order => (
               <button
                 key={order}
                 onClick={() => setDateOrder(order)}
                 className={`px-3 py-1 text-xs font-mono rounded border transition-colors
-                  focus-visible:ring-2 focus-visible:ring-blue-500
+                  focus-visible:ring-2 focus-visible:ring-primary
                   ${
                     dateOrder === order
-                      ? 'bg-blue-600 border-blue-500 text-white'
-                      : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
                   }`}
               >
                 {order === 'asc' ? 'Ascending' : 'Descending'}
@@ -191,15 +361,15 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
         {/* Type filter chips (only when sorting by type) */}
         {sortBy === 'type' && documentTypes.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-slate-500 font-mono mr-1">Filter:</span>
+            <span className="text-sm text-muted-foreground font-mono mr-1">Filter:</span>
             <button
               onClick={() => setSelectedType(null)}
               className={`px-3 py-1 text-xs font-mono rounded border transition-colors
-                focus-visible:ring-2 focus-visible:ring-blue-500
+                focus-visible:ring-2 focus-visible:ring-primary
                 ${
                   selectedType === null
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
                 }`}
             >
               All
@@ -209,11 +379,11 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
                 key={type}
                 onClick={() => setSelectedType(type)}
                 className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors
-                  focus-visible:ring-2 focus-visible:ring-blue-500
+                  focus-visible:ring-2 focus-visible:ring-primary
                   ${
                     selectedType === type
-                      ? 'bg-blue-600 border-blue-500 text-white'
-                      : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-border text-muted-foreground hover:text-foreground hover:bg-card'
                   }`}
               >
                 {type}
@@ -229,37 +399,37 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
           <Link
             key={doc.id}
             href={`/case/${caseId}/document/${encodeURIComponent(doc.id)}`}
-            className="group block p-4 bg-slate-900 border border-slate-800 rounded
-                       hover:border-slate-700 hover:bg-slate-800/50 transition-colors
-                       focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
-                       focus-visible:ring-offset-slate-950 animate-fade-in-up"
+            className="group block p-4 bg-card border border-border rounded
+                       hover:border-primary/30 hover:bg-sidebar-accent/50 transition-colors
+                       focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2
+                       focus-visible:ring-offset-background animate-fade-in-up"
             style={{ animationDelay: `${index * 0.03}s` } as React.CSSProperties}
           >
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 {/* Document name */}
-                <h3 className="font-mono text-slate-100 truncate group-hover:text-blue-400 transition-colors">
+                <h3 className="font-mono text-foreground truncate group-hover:text-primary transition-colors">
                   {doc.filename}
                 </h3>
 
                 {/* Metadata */}
-                <div className="mt-2 flex items-center gap-4 text-sm text-slate-400">
+                <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
                   <time dateTime={doc.date || undefined} className="font-mono tabular-nums">
                     {formatDate(doc.date)}
                   </time>
                   {doc.type && (
-                    <span className="px-2 py-0.5 bg-slate-800 rounded text-xs uppercase tracking-wider">
+                    <span className="px-2 py-0.5 bg-sidebar-accent rounded text-xs uppercase tracking-wider">
                       {doc.type}
                     </span>
                   )}
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-muted-foreground/60">
                     {Math.round(doc.confidence * 100)}% OCR confidence
                   </span>
                 </div>
               </div>
 
               {/* Entity count badge */}
-              <div className="flex items-center gap-1.5 text-slate-400">
+              <div className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="font-mono tabular-nums">{doc.entityCount}</span>
                 <span className="text-xs">entities</span>
               </div>
@@ -269,19 +439,20 @@ export function DocumentList({ documents, caseId }: DocumentListProps) {
       </div>
 
       {filteredDocuments.length === 0 && (
-        <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
-          <p className="text-slate-500 font-mono text-sm">
+        <div className="p-8 bg-card border border-border border-dashed rounded text-center">
+          <p className="text-muted-foreground font-mono text-sm">
             {documents.length === 0
               ? 'No documents found'
-              : 'No documents match your search'}
+              : 'No documents match your filters'}
           </p>
-          {(searchTerm || selectedType) && documents.length > 0 && (
+          {(searchTerm || selectedType || selectedEntityIds.length > 0) && documents.length > 0 && (
             <button
               onClick={() => {
                 setSearchTerm('');
                 setSelectedType(null);
+                setSelectedEntityIds([]);
               }}
-              className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+              className="mt-2 text-sm text-primary hover:text-primary/80"
             >
               Clear filters
             </button>

@@ -48,6 +48,7 @@ export async function GET(
       confidence: number;
       partCount: number;
       imagePath: string;
+      entityIds: Set<string>;
     }>();
 
     for (const filename of jsonFiles) {
@@ -60,6 +61,14 @@ export async function GET(
 
       const group = fileToGroup ? matchExtractionToGroup(baseName, fileToGroup) : null;
 
+      // Collect entity IDs from this extraction
+      const extractionEntityIds = new Set<string>();
+      if (extraction.entities && Array.isArray(extraction.entities)) {
+        for (const entity of extraction.entities) {
+          if (entity.id) extractionEntityIds.add(entity.id);
+        }
+      }
+
       if (group) {
         const groupKey = `group:${group.id}`;
         const existing = docMap.get(groupKey);
@@ -70,6 +79,10 @@ export async function GET(
           existing.entityCount += entityCount;
           existing.confidence = Math.max(existing.confidence, confidence);
           existing.partCount += 1;
+          // Merge entity IDs
+          for (const id of extractionEntityIds) {
+            existing.entityIds.add(id);
+          }
           if (!existing.date && extraction.processing_metadata?.llm_metadata?.document_date) {
             existing.date = extraction.processing_metadata.llm_metadata.document_date;
           }
@@ -88,6 +101,7 @@ export async function GET(
             confidence,
             partCount: 1,
             imagePath: `/api/cases/${caseId}/documents/${encodeURIComponent(`doc_${group.id}`)}/image`,
+            entityIds: extractionEntityIds,
           });
         }
       } else {
@@ -112,12 +126,17 @@ export async function GET(
             confidence: extraction.confidence_scores?.ocr_confidence || 0,
             partCount: 1,
             imagePath: `/api/cases/${caseId}/documents/${encodeURIComponent(docId)}/image`,
+            entityIds: extractionEntityIds,
           });
         }
       }
     }
 
-    const documents = Array.from(docMap.values());
+    // Convert Sets to arrays for JSON serialization
+    const documents = Array.from(docMap.values()).map(doc => ({
+      ...doc,
+      entityIds: Array.from(doc.entityIds),
+    }));
 
     documents.sort((a, b) => {
       if (!a.date && !b.date) return 0;
