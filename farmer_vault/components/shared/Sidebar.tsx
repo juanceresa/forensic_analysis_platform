@@ -66,7 +66,7 @@ export function Sidebar({ caseId }: SidebarProps) {
   };
 
   return (
-    <aside className="w-60 border-r border-slate-800 bg-slate-950 overflow-y-auto">
+    <aside className="w-60 overflow-y-auto" style={{ backgroundColor: '#0D0D0D', borderRight: '1px solid #222222' }}>
       <nav className="p-4" aria-label="Main navigation">
         <ul className="space-y-1">
           {navItems.map((item) => {
@@ -75,15 +75,14 @@ export function Sidebar({ caseId }: SidebarProps) {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`
-                    flex items-center gap-3 px-3 py-2 rounded font-mono text-sm transition-colors
-                    focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950
-                    ${
-                      active
-                        ? 'bg-slate-800 text-slate-100 border border-slate-700'
-                        : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900'
-                    }
-                  `}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg font-mono text-sm transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  style={active ? {
+                    backgroundColor: '#161616',
+                    border: '1px solid #222222',
+                    color: '#f1f5f9',
+                  } : {
+                    color: '#9ca3af',
+                  }}
                   aria-current={active ? 'page' : undefined}
                 >
                   {item.icon}
