@@ -25,6 +25,11 @@
 }
 
 @theme inline {
+  /* Sidebar glow shadows */
+  --shadow-glow: 0 0 12px rgba(167, 243, 208, 0.35);
+  --shadow-glow-sm: 0 0 10px rgba(167, 243, 208, 0.3);
+  --shadow-glow-lg: 0 0 14px rgba(167, 243, 208, 0.4);
+
   /* Verification tier colors - Forensic Intelligence */
   --color-tier-ai: #f59e0b;         /* Amber - TIER_3_AI */
   --color-tier-analyst: #3b82f6;    /* Blue - TIER_2_ANALYST */
@@ -120,12 +125,40 @@
   transform: scale(1.15);
 }
 
+/* Premium hover glow utilities */
+.hover-glow:hover {
+  box-shadow: 0 0 12px rgba(167, 243, 208, 0.35);
+}
+
+.hover-glow-sm:hover {
+  box-shadow: 0 0 10px rgba(167, 243, 208, 0.3);
+}
+
+.hover-glow-lg:hover {
+  box-shadow: 0 0 14px rgba(167, 243, 208, 0.4);
+}
+
+/* AI Analysis tabs - premium hover */
+.ai-tab {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-tab:hover {
+  color: #A7F3D0 !important;
+}
+
+.ai-tab:hover svg {
+  transform: scale(1.15);
+}
+
+
 html {
   color-scheme: dark;
 }
 
 body {
-  @apply bg-slate-950 text-slate-100;
+  background-color: #0D0D0D;
+  color: #f1f5f9;
   font-family: var(--font-body);
 }
 
