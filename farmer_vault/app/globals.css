@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../node_modules/tw-animate-css/dist/tw-animate.css";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -565,14 +566,14 @@ code, .font-mono, pre {
   --chart-4: oklch(0.65 0.25 300);     /* Purple - Source tier */
   --chart-5: oklch(0.645 0.246 16.439);
 
-  /* Sidebar */
-  --sidebar: oklch(0.05 0 0);
+  /* Sidebar - Dark Editorial */
+  --sidebar: oklch(0.035 0 0);             /* #0D0D0D - matches background */
   --sidebar-foreground: oklch(0.93 0.01 250);
-  --sidebar-primary: oklch(0.85 0.15 160);
+  --sidebar-primary: oklch(0.85 0.15 160); /* Mint accent */
   --sidebar-primary-foreground: oklch(0.15 0 0);
-  --sidebar-accent: oklch(0.10 0 0);
+  --sidebar-accent: oklch(0.065 0 0);      /* #161616 - active state */
   --sidebar-accent-foreground: oklch(0.93 0.01 250);
-  --sidebar-border: oklch(0.10 0 0);
+  --sidebar-border: oklch(0.10 0 0);       /* #222222 */
   --sidebar-ring: oklch(0.85 0.15 160);
 }
 

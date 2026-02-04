@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, FileDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -11,11 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+// Note: Can't use Radix Collapsible inside tables (renders div, breaks HTML semantics)
+// Using simple state-based conditional rendering instead
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -129,35 +126,28 @@ export function WorkflowTable({ stages, caseId }: WorkflowTableProps) {
                 const isOpen = openStages.has(stageKey);
 
                 return (
-                  <Collapsible
-                    key={stageKey}
-                    open={isOpen}
-                    onOpenChange={() => toggleStage(stageKey)}
-                    asChild
-                  >
-                    <>
-                      {/* Stage Row */}
-                      <TableRow
-                        className={cn(
-                          'cursor-pointer transition-colors',
-                          isOpen && 'bg-muted/30'
-                        )}
-                      >
-                        <TableCell>
-                          <CollapsibleTrigger asChild>
-                            <button className="flex items-center gap-2 w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded">
-                              <ChevronRight
-                                className={cn(
-                                  'w-4 h-4 text-muted-foreground transition-transform duration-200',
-                                  isOpen && 'rotate-90'
-                                )}
-                              />
-                              <span className="text-sm font-medium">
-                                {STAGE_LABELS[stageKey]}
-                              </span>
-                            </button>
-                          </CollapsibleTrigger>
-                        </TableCell>
+                  <React.Fragment key={stageKey}>
+                    {/* Stage Row */}
+                    <TableRow
+                      className={cn(
+                        'cursor-pointer transition-colors',
+                        isOpen && 'bg-muted/30'
+                      )}
+                      onClick={() => toggleStage(stageKey)}
+                    >
+                      <TableCell>
+                        <button className="flex items-center gap-2 w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded">
+                          <ChevronRight
+                            className={cn(
+                              'w-4 h-4 text-muted-foreground transition-transform duration-200',
+                              isOpen && 'rotate-90'
+                            )}
+                          />
+                          <span className="text-sm font-medium">
+                            {STAGE_LABELS[stageKey]}
+                          </span>
+                        </button>
+                      </TableCell>
 
                         <TableCell>
                           <div className="flex items-center justify-center">
@@ -219,52 +209,51 @@ export function WorkflowTable({ stages, caseId }: WorkflowTableProps) {
                         </TableCell>
                       </TableRow>
 
-                      {/* Expanded Tasks */}
-                      <CollapsibleContent asChild>
-                        <tr>
-                          <td colSpan={4} className="p-0">
-                            <div className="ml-6 mr-4 mb-3 mt-1 border-l-2 border-border/50 pl-4">
-                              {stage.items.map((item, itemIndex) => (
-                                <div
-                                  key={itemIndex}
+                    {/* Expanded Tasks */}
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={4} className="p-0">
+                          <div className="ml-6 mr-4 mb-3 mt-1 border-l-2 border-border/50 pl-4">
+                            {stage.items.map((item, itemIndex) => (
+                              <div
+                                key={itemIndex}
+                                className={cn(
+                                  'flex items-center gap-3 py-2 transition-colors',
+                                  itemIndex < stage.items.length - 1 &&
+                                    'border-b border-border/20'
+                                )}
+                              >
+                                <Checkbox
+                                  checked={item.complete}
+                                  disabled
                                   className={cn(
-                                    'flex items-center gap-3 py-2 transition-colors',
-                                    itemIndex < stage.items.length - 1 &&
-                                      'border-b border-border/20'
+                                    'h-4 w-4',
+                                    item.complete &&
+                                      'data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500'
+                                  )}
+                                />
+                                <span
+                                  className={cn(
+                                    'text-sm flex-1',
+                                    item.complete
+                                      ? 'text-muted-foreground line-through decoration-muted-foreground/30'
+                                      : 'text-foreground/80'
                                   )}
                                 >
-                                  <Checkbox
-                                    checked={item.complete}
-                                    disabled
-                                    className={cn(
-                                      'h-4 w-4',
-                                      item.complete &&
-                                        'data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500'
-                                    )}
-                                  />
-                                  <span
-                                    className={cn(
-                                      'text-sm flex-1',
-                                      item.complete
-                                        ? 'text-muted-foreground line-through decoration-muted-foreground/30'
-                                        : 'text-foreground/80'
-                                    )}
-                                  >
-                                    {item.label}
+                                  {item.label}
+                                </span>
+                                {item.reviewer && (
+                                  <span className="text-xs text-muted-foreground/60">
+                                    {item.reviewer}
                                   </span>
-                                  {item.reviewer && (
-                                    <span className="text-xs text-muted-foreground/60">
-                                      {item.reviewer}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      </CollapsibleContent>
-                    </>
-                  </Collapsible>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               }
             )}

@@ -1,4 +1,10 @@
-import { Header } from '@/components/shared';
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+import { AppSidebar } from '@/components/shared/AppSidebar';
 
 interface CaseLayoutProps {
   children: React.ReactNode;
@@ -9,14 +15,33 @@ export default async function CaseLayout({ children, params }: CaseLayoutProps) 
   const { caseId } = await params;
 
   return (
-    <div className="h-screen flex" style={{ backgroundColor: '#0D0D0D' }}>
-      {/* Slim sidebar (64px) */}
-      <Header caseId={caseId} />
+    <div className="dark">
+      <SidebarProvider
+        defaultOpen={true}
+        style={
+          {
+            '--sidebar-width': '16rem',
+            '--sidebar-width-icon': '4rem',
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar caseId={caseId} />
+        <SidebarInset className="bg-background">
+          {/* Minimal header with just the trigger */}
+          <header className="flex h-12 shrink-0 items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 h-4 bg-border"
+            />
+          </header>
 
-      {/* Main content */}
-      <main id="main-content" className="flex-1 overflow-y-auto">
-        {children}
-      </main>
+          {/* Main content */}
+          <main id="main-content" className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
     </div>
   );
 }
