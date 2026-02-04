@@ -1,4 +1,4 @@
-import { Header, Sidebar } from '@/components/shared';
+import { Header } from '@/components/shared';
 
 interface CaseLayoutProps {
   children: React.ReactNode;
@@ -9,16 +9,14 @@ export default async function CaseLayout({ children, params }: CaseLayoutProps) 
   const { caseId } = await params;
 
   return (
-    <div className="h-screen flex flex-col bg-slate-950">
-      <Header caseName={caseId} />
+    <div className="h-screen flex" style={{ backgroundColor: '#0D0D0D' }}>
+      {/* Slim sidebar (64px) */}
+      <Header caseId={caseId} />
 
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar caseId={caseId} />
-
-        <main id="main-content" className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-      </div>
+      {/* Main content */}
+      <main id="main-content" className="flex-1 overflow-y-auto">
+        {children}
+      </main>
     </div>
   );
 }
