@@ -58,7 +58,7 @@ export function DossierDownload({ caseId }: DossierDownloadProps) {
       {/* Status indicator */}
       <div
         className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0
-                   ${dossierAvailable ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}
+                   ${dossierAvailable ? 'bg-emerald-500/20 text-emerald-400' : 'bg-muted text-muted-foreground'}`}
       >
         {checkingDossier ? (
           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -96,7 +96,7 @@ export function DossierDownload({ caseId }: DossierDownloadProps) {
       <div className="flex-1 flex items-center justify-between">
         <span
           className={`font-mono text-sm uppercase tracking-wider
-                     ${dossierAvailable ? 'text-slate-200' : 'text-slate-500'}`}
+                     ${dossierAvailable ? 'text-foreground' : 'text-muted-foreground'}`}
         >
           {checkingDossier
             ? 'Checking dossier...'
@@ -120,9 +120,9 @@ export function DossierDownload({ caseId }: DossierDownloadProps) {
             ) : (
               <button
                 onClick={checkAvailability}
-                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600
-                         text-slate-300 text-xs font-mono uppercase tracking-wider rounded
-                         transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="px-3 py-1.5 bg-secondary hover:bg-secondary/80
+                         text-muted-foreground text-xs font-mono uppercase tracking-wider rounded
+                         transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 Check again
               </button>
