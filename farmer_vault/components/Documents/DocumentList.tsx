@@ -292,7 +292,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
             <ButtonGroup>
               <Button
                 variant={sortBy === 'date' ? 'default' : 'outline'}
-                size="sm"
+                size="xs"
                 onClick={() => { setSortBy('date'); setSelectedType(null); }}
                 className="font-mono"
               >
@@ -300,7 +300,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
               </Button>
               <Button
                 variant={sortBy === 'type' ? 'default' : 'outline'}
-                size="sm"
+                size="xs"
                 onClick={() => setSortBy('type')}
                 className="font-mono"
               >
@@ -316,7 +316,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
               <ButtonGroup>
                 <Button
                   variant={dateOrder === 'asc' ? 'default' : 'outline'}
-                  size="sm"
+                  size="xs"
                   onClick={() => setDateOrder('asc')}
                   className="font-mono"
                 >
@@ -324,7 +324,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
                 </Button>
                 <Button
                   variant={dateOrder === 'desc' ? 'default' : 'outline'}
-                  size="sm"
+                  size="xs"
                   onClick={() => setDateOrder('desc')}
                   className="font-mono"
                 >
@@ -341,7 +341,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
               <ButtonGroup>
                 <Button
                   variant={selectedType === null ? 'default' : 'outline'}
-                  size="sm"
+                  size="xs"
                   onClick={() => setSelectedType(null)}
                   className="font-mono"
                 >
@@ -351,7 +351,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
                   <Button
                     key={type}
                     variant={selectedType === type ? 'default' : 'outline'}
-                    size="sm"
+                    size="xs"
                     onClick={() => setSelectedType(type)}
                     className="font-mono uppercase"
                   >

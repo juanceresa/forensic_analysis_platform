@@ -14,7 +14,14 @@ import {
   Network,
   Bell,
   Settings,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 import {
   Sidebar,
@@ -40,9 +47,17 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
   const pathname = usePathname();
+  const [aiAnalysisOpen, setAiAnalysisOpen] = React.useState(false);
 
   const narrativeBase = `/case/${caseId}/narrative`;
   const isNarrativeActive = pathname.startsWith(narrativeBase);
+
+  // Auto-open AI Analysis when on a narrative route
+  React.useEffect(() => {
+    if (isNarrativeActive) {
+      setAiAnalysisOpen(true);
+    }
+  }, [isNarrativeActive]);
 
   const navItems = [
     {
@@ -56,7 +71,7 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
       icon: FileText,
     },
     {
-      label: 'Entities',
+      label: 'Dictionary',
       href: `/case/${caseId}/entities`,
       icon: Users,
     },
@@ -65,6 +80,7 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
       href: narrativeBase,
       icon: Monitor,
       subItems: [
+        { label: 'Explore', href: narrativeBase, icon: Sparkles },
         { label: 'Timeline', href: `${narrativeBase}/chronological`, icon: Clock },
         { label: 'Geolocation', href: `${narrativeBase}/geolocation`, icon: MapPin },
         { label: 'Knowledge Graph', href: `${narrativeBase}/graph`, icon: Network },
@@ -82,8 +98,13 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
     return pathname.startsWith(href);
   };
 
-  const isSubActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + '/');
+  const isSubActive = (href: string) => {
+    // For "Explore" (narrativeBase), require exact match only
+    if (href === narrativeBase) {
+      return pathname === href;
+    }
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   return (
     <Sidebar
@@ -128,8 +149,90 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
               {navItems.map((item) => {
                 const active = isActive(item.href);
                 const hasSubItems = item.subItems && item.subItems.length > 0;
-                const showSubItems = hasSubItems && isNarrativeActive;
 
+                // AI Analysis uses Collapsible
+                if (hasSubItems) {
+                  return (
+                    <Collapsible
+                      key={item.href}
+                      open={aiAnalysisOpen}
+                      onOpenChange={setAiAnalysisOpen}
+                      className="group/collapsible"
+                    >
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton
+                            isActive={active}
+                            tooltip={item.label}
+                            className={cn(
+                              'rounded-xl transition-all duration-200 ease-out',
+                              'hover:scale-[1.02] hover:shadow-[0_0_12px_rgba(167,243,208,0.1)]',
+                              active && 'bg-sidebar-accent text-foreground',
+                              !active && 'text-muted-foreground hover:bg-sidebar-accent/50'
+                            )}
+                          >
+                            <item.icon className="h-5 w-5" />
+                            <span>{item.label}</span>
+                            <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+
+                        {/* AI Analysis Sub-items with fall-down animation */}
+                        <CollapsibleContent>
+                          <AnimatePresence>
+                            {aiAnalysisOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                className="overflow-hidden"
+                              >
+                                <SidebarMenuSub className="border-border">
+                                  {item.subItems!.map((sub, index) => {
+                                    const subActive = isSubActive(sub.href);
+                                    return (
+                                      <motion.div
+                                        key={sub.href}
+                                        initial={{ opacity: 0, y: -8 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{
+                                          duration: 0.15,
+                                          delay: index * 0.05,
+                                          ease: 'easeOut',
+                                        }}
+                                      >
+                                        <SidebarMenuSubItem>
+                                          <SidebarMenuSubButton
+                                            asChild
+                                            isActive={subActive}
+                                            className={cn(
+                                              'rounded-lg transition-all duration-200',
+                                              'hover:scale-[1.01] hover:shadow-[0_0_8px_rgba(167,243,208,0.08)]',
+                                              subActive && 'bg-sidebar-accent text-primary',
+                                              !subActive && 'text-muted-foreground hover:text-foreground'
+                                            )}
+                                          >
+                                            <Link href={sub.href}>
+                                              <sub.icon className="h-4 w-4" />
+                                              <span>{sub.label}</span>
+                                            </Link>
+                                          </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                      </motion.div>
+                                    );
+                                  })}
+                                </SidebarMenuSub>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  );
+                }
+
+                // Regular nav items (no sub-items)
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
@@ -148,55 +251,6 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
                         <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>
-
-                    {/* AI Analysis Sub-items with fall-down animation */}
-                    <AnimatePresence>
-                      {hasSubItems && showSubItems && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2, ease: 'easeOut' }}
-                          className="overflow-hidden"
-                        >
-                          <SidebarMenuSub className="border-border">
-                            {item.subItems!.map((sub, index) => {
-                              const subActive = isSubActive(sub.href);
-                              return (
-                                <motion.div
-                                  key={sub.href}
-                                  initial={{ opacity: 0, y: -8 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  transition={{
-                                    duration: 0.15,
-                                    delay: index * 0.05,
-                                    ease: 'easeOut',
-                                  }}
-                                >
-                                  <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton
-                                      asChild
-                                      isActive={subActive}
-                                      className={cn(
-                                        'rounded-lg transition-all duration-200',
-                                        'hover:scale-[1.01] hover:shadow-[0_0_8px_rgba(167,243,208,0.08)]',
-                                        subActive && 'bg-sidebar-accent text-primary',
-                                        !subActive && 'text-muted-foreground hover:text-foreground'
-                                      )}
-                                    >
-                                      <Link href={sub.href}>
-                                        <sub.icon className="h-4 w-4" />
-                                        <span>{sub.label}</span>
-                                      </Link>
-                                    </SidebarMenuSubButton>
-                                  </SidebarMenuSubItem>
-                                </motion.div>
-                              );
-                            })}
-                          </SidebarMenuSub>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </SidebarMenuItem>
                 );
               })}
