@@ -57,7 +57,7 @@ function EntitySection({
     <section className="mb-8">
       <h2 className="text-lg font-mono uppercase tracking-wider mb-4 flex items-center gap-3">
         <span>{config.label}</span>
-        <span className="px-2 py-0.5 bg-slate-800 rounded text-sm font-mono tabular-nums">
+        <span className="px-2 py-0.5 bg-muted rounded text-sm font-mono tabular-nums">
           {entities.length}
         </span>
       </h2>
@@ -67,23 +67,23 @@ function EntitySection({
           <Link
             key={entity.id}
             href={`/case/${caseId}/entity/${encodeURIComponent(entity.id)}`}
-            className="flex items-center gap-4 p-4 bg-slate-900 border border-slate-800 rounded
-                       hover:border-slate-700 hover:bg-slate-800/50 transition-colors
-                       focus-visible:ring-2 focus-visible:ring-blue-500 animate-fade-in-up"
+            className="flex items-center gap-4 p-4 bg-[var(--card)] border border-[var(--border)] rounded
+                       hover:border-primary/30 hover:bg-muted/50 transition-colors
+                       focus-visible:ring-2 focus-visible:ring-ring animate-fade-in-up"
             style={{ animationDelay: `${index * 0.03}s` } as React.CSSProperties}
           >
             {/* Entity type icon */}
-            <div className="w-10 h-10 flex items-center justify-center bg-slate-800 rounded shrink-0">
-              <span className="text-sm font-mono text-slate-400">{config.icon}</span>
+            <div className="w-10 h-10 flex items-center justify-center bg-muted rounded shrink-0">
+              <span className="text-sm font-mono text-muted-foreground">{config.icon}</span>
             </div>
 
             {/* Entity info */}
             <div className="flex-1 min-w-0">
-              <h3 className="font-mono text-slate-100 truncate">{entity.name}</h3>
+              <h3 className="font-mono text-foreground truncate">{entity.name}</h3>
               {entity.roleLabel && (
-                <p className="text-sm text-slate-400 italic truncate">{entity.roleLabel}</p>
+                <p className="text-sm text-muted-foreground italic truncate">{entity.roleLabel}</p>
               )}
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground/70 mt-1">
                 {entity.documentCount} document{entity.documentCount !== 1 ? 's' : ''}
               </p>
             </div>
@@ -92,7 +92,7 @@ function EntitySection({
             <VerificationBadge tier={entity.verification.tier as any} size="small" />
 
             {/* Arrow */}
-            <div className="text-slate-500">
+            <div className="text-muted-foreground">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
@@ -135,8 +135,8 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
   return (
     <div className="max-w-4xl mx-auto p-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-mono mb-2">Entities</h1>
-        <p className="text-slate-400">
+        <h1 className="text-3xl font-mono mb-2">Dictionary</h1>
+        <p className="text-muted-foreground">
           {totalCount} entities across {documentCount} documents
         </p>
 
@@ -147,24 +147,24 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
             placeholder="Search entities by name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded
-                       text-slate-100 placeholder-slate-500 font-mono text-sm
-                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded
+                       text-foreground placeholder-muted-foreground font-mono text-sm
+                       focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
         {/* Type filter chips */}
         {availableTypes.length > 1 && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-slate-500 font-mono mr-1">Filter:</span>
+            <span className="text-sm text-muted-foreground font-mono mr-1">Filter:</span>
             <button
               onClick={() => setSelectedType(null)}
               className={`px-3 py-1 text-xs font-mono rounded border transition-colors
-                focus-visible:ring-2 focus-visible:ring-blue-500
+                focus-visible:ring-2 focus-visible:ring-ring
                 ${
                   selectedType === null
-                    ? 'bg-blue-600 border-blue-500 text-white'
-                    : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                    ? 'bg-primary border-primary text-primary-foreground'
+                    : 'border-[var(--border)] text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
             >
               All
@@ -174,11 +174,11 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
                 key={type}
                 onClick={() => setSelectedType(type)}
                 className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors
-                  focus-visible:ring-2 focus-visible:ring-blue-500
+                  focus-visible:ring-2 focus-visible:ring-ring
                   ${
                     selectedType === type
-                      ? 'bg-blue-600 border-blue-500 text-white'
-                      : 'border-slate-700 text-slate-400 hover:text-slate-300 hover:bg-slate-900'
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : 'border-[var(--border)] text-muted-foreground hover:text-foreground hover:bg-muted'
                   }`}
               >
                 {ENTITY_TYPE_CONFIG[type].label} ({(entities[type] || []).length})
@@ -188,22 +188,22 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
         )}
 
         {(searchTerm || selectedType) && (
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             Showing {filteredCount} of {totalCount} entities
           </p>
         )}
       </header>
 
       {totalCount === 0 ? (
-        <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
-          <p className="text-slate-500 font-mono text-sm">No entities found</p>
+        <div className="p-8 bg-[var(--card)] border border-[var(--border)] border-dashed rounded text-center">
+          <p className="text-muted-foreground font-mono text-sm">No entities found</p>
         </div>
       ) : filteredCount === 0 ? (
-        <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
-          <p className="text-slate-500 font-mono text-sm">No entities match your filters</p>
+        <div className="p-8 bg-[var(--card)] border border-[var(--border)] border-dashed rounded text-center">
+          <p className="text-muted-foreground font-mono text-sm">No entities match your filters</p>
           <button
             onClick={() => { setSearchTerm(''); setSelectedType(null); }}
-            className="mt-2 text-sm text-blue-400 hover:text-blue-300"
+            className="mt-2 text-sm text-primary hover:text-primary/80"
           >
             Clear filters
           </button>

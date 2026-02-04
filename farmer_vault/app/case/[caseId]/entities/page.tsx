@@ -36,11 +36,11 @@ export default async function EntitiesPage({ params }: EntitiesPageProps) {
       <div className="p-8">
         <div className="max-w-4xl mx-auto">
           <header className="mb-8">
-            <h1 className="text-2xl font-mono mb-2">Entities</h1>
-            <p className="text-slate-400">Case: {caseId}</p>
+            <h1 className="text-2xl font-mono mb-2">Dictionary</h1>
+            <p className="text-muted-foreground">Case: {caseId}</p>
           </header>
 
-          <div className="p-8 bg-slate-900 border border-red-800/50 rounded text-center">
+          <div className="p-8 bg-[var(--card)] border border-red-800/50 rounded text-center">
             <p className="text-red-400 font-mono text-sm">Failed to load entities</p>
           </div>
         </div>
