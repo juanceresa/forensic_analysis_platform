@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Document } from '@/lib/document-types';
 import React from 'react';
 import {
@@ -105,9 +106,9 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
       total: documents.length,
       dateRange: dates.length > 0
         ? {
-            earliest: new Date(Math.min(...dates)),
-            latest: new Date(Math.max(...dates))
-          }
+          earliest: new Date(Math.min(...dates)),
+          latest: new Date(Math.max(...dates))
+        }
         : null,
       avgConfidence: Math.round(avgConfidence * 100),
     };
@@ -182,36 +183,102 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
     <>
       {/* Header */}
       <header className="mb-6">
-        <h1 className="text-2xl font-mono mb-4">Documents</h1>
+        <p className="text-sm text-muted-foreground mb-4">
+          Source materials with AI-extracted text.{' '}
+          {stats && (
+            <>
+              <span className="tabular-nums">{stats.total}</span> document{stats.total !== 1 ? 's' : ''}
+              {stats.dateRange && (
+                <> spanning <span className="tabular-nums">{stats.dateRange.earliest.getFullYear()}–{stats.dateRange.latest.getFullYear()}</span></>
+              )}
+              {stats.avgConfidence && (
+                <>, <span className="tabular-nums">{stats.avgConfidence}%</span> avg OCR confidence</>
+              )}.
+            </>
+          )}
+        </p>
 
-        {/* Summary stats */}
-        {stats && (
-          <div className="mb-4 p-3 bg-card border border-border rounded flex flex-wrap gap-6 text-sm">
-            <div>
-              <span className="text-muted-foreground">Total:</span>{' '}
-              <span className="font-mono text-foreground">{stats.total}</span>
-            </div>
-            {stats.dateRange && (
-              <div>
-                <span className="text-muted-foreground">Date range:</span>{' '}
-                <span className="font-mono text-foreground">
-                  {stats.dateRange.earliest.getFullYear()} – {stats.dateRange.latest.getFullYear()}
-                </span>
-              </div>
-            )}
-            <div>
-              <span className="text-muted-foreground">Avg OCR:</span>{' '}
-              <span className="font-mono text-foreground">{stats.avgConfidence}%</span>
-            </div>
+        {/* Sort controls */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground font-mono">Sort:</span>
+            <ButtonGroup>
+              <Button
+                variant={sortBy === 'date' ? 'default' : 'outline'}
+                size="xs"
+                onClick={() => { setSortBy('date'); setSelectedType(null); }}
+                className="font-mono"
+              >
+                Date
+              </Button>
+              <Button
+                variant={sortBy === 'type' ? 'default' : 'outline'}
+                size="xs"
+                onClick={() => setSortBy('type')}
+                className="font-mono"
+              >
+                Type
+              </Button>
+            </ButtonGroup>
           </div>
-        )}
+
+          {/* Date order (only when sorting by date) */}
+          {sortBy === 'date' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono">Order:</span>
+              <ButtonGroup>
+                <Button
+                  variant={dateOrder === 'asc' ? 'default' : 'outline'}
+                  size="xs"
+                  onClick={() => setDateOrder('asc')}
+                  className="font-mono"
+                >
+                  ASCENDING
+                </Button>
+                <Button
+                  variant={dateOrder === 'desc' ? 'default' : 'outline'}
+                  size="xs"
+                  onClick={() => setDateOrder('desc')}
+                  className="font-mono"
+                >
+                  DESCENDING
+                </Button>
+              </ButtonGroup>
+            </div>
+          )}
+
+          {/* Type filter (only when sorting by type) */}
+          {sortBy === 'type' && documentTypes.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono">Type:</span>
+              <ButtonGroup>
+                <Button
+                  variant={selectedType === null ? 'default' : 'outline'}
+                  size="xs"
+                  onClick={() => setSelectedType(null)}
+                  className="font-mono"
+                >
+                  All
+                </Button>
+                {documentTypes.map(type => (
+                  <Button
+                    key={type}
+                    variant={selectedType === type ? 'default' : 'outline'}
+                    size="xs"
+                    onClick={() => setSelectedType(type)}
+                    className="font-mono uppercase"
+                  >
+                    {type}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </div>
+          )}
+        </div>
 
         {/* Entity filter combobox */}
         {entityGroups.length > 0 && (
-          <div className="mb-4">
-            <label className="block text-sm text-muted-foreground font-mono mb-2">
-              Filter by entities:
-            </label>
+          <div className="space-y-3 mt-4">
             <Combobox
               items={entityGroups}
               multiple
@@ -235,7 +302,7 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
                         );
                       })}
                       <ComboboxChipsInput
-                        placeholder={values.length === 0 ? "Search entities..." : "Add more..."}
+                        placeholder={values.length === 0 ? "Query documents by grouping..." : "Add more..."}
                         className="placeholder:text-muted-foreground"
                       />
                     </React.Fragment>
@@ -285,84 +352,8 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
           </div>
         )}
 
-        {/* Sort controls */}
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground font-mono">Sort:</span>
-            <ButtonGroup>
-              <Button
-                variant={sortBy === 'date' ? 'default' : 'outline'}
-                size="xs"
-                onClick={() => { setSortBy('date'); setSelectedType(null); }}
-                className="font-mono"
-              >
-                By Date
-              </Button>
-              <Button
-                variant={sortBy === 'type' ? 'default' : 'outline'}
-                size="xs"
-                onClick={() => setSortBy('type')}
-                className="font-mono"
-              >
-                By Type
-              </Button>
-            </ButtonGroup>
-          </div>
-
-          {/* Date order (only when sorting by date) */}
-          {sortBy === 'date' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground font-mono">Order:</span>
-              <ButtonGroup>
-                <Button
-                  variant={dateOrder === 'asc' ? 'default' : 'outline'}
-                  size="xs"
-                  onClick={() => setDateOrder('asc')}
-                  className="font-mono"
-                >
-                  Ascending
-                </Button>
-                <Button
-                  variant={dateOrder === 'desc' ? 'default' : 'outline'}
-                  size="xs"
-                  onClick={() => setDateOrder('desc')}
-                  className="font-mono"
-                >
-                  Descending
-                </Button>
-              </ButtonGroup>
-            </div>
-          )}
-
-          {/* Type filter (only when sorting by type) */}
-          {sortBy === 'type' && documentTypes.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground font-mono">Type:</span>
-              <ButtonGroup>
-                <Button
-                  variant={selectedType === null ? 'default' : 'outline'}
-                  size="xs"
-                  onClick={() => setSelectedType(null)}
-                  className="font-mono"
-                >
-                  All
-                </Button>
-                {documentTypes.map(type => (
-                  <Button
-                    key={type}
-                    variant={selectedType === type ? 'default' : 'outline'}
-                    size="xs"
-                    onClick={() => setSelectedType(type)}
-                    className="font-mono uppercase"
-                  >
-                    {type}
-                  </Button>
-                ))}
-              </ButtonGroup>
-            </div>
-          )}
-        </div>
       </header>
+
 
       {/* Document grid */}
       <div className="grid gap-3">

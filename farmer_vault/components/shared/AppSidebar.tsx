@@ -71,7 +71,7 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
       icon: FileText,
     },
     {
-      label: 'Dictionary',
+      label: 'Index',
       href: `/case/${caseId}/entities`,
       icon: Users,
     },

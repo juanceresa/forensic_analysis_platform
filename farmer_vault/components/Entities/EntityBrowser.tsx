@@ -35,11 +35,11 @@ interface EntityBrowserProps {
 }
 
 const ENTITY_TYPE_CONFIG: Record<keyof GroupedEntities, { label: string; icon: string }> = {
-  PERSON: { label: 'People', icon: 'P' },
-  PROPERTY: { label: 'Properties', icon: 'Pr' },
-  ORGANIZATION: { label: 'Organizations', icon: 'O' },
-  LOCATION: { label: 'Locations', icon: 'L' },
-  DOCUMENT: { label: 'Documents', icon: 'D' },
+  PERSON: { label: 'PEOPLE', icon: 'P' },
+  PROPERTY: { label: 'PROPERTIES', icon: 'Pr' },
+  ORGANIZATION: { label: 'ORGANIZATIONS', icon: 'O' },
+  LOCATION: { label: 'LOCATIONS', icon: 'L' },
+  DOCUMENT: { label: 'DOCUMENTS', icon: 'D' },
 };
 
 function EntitySection({
@@ -129,7 +129,7 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
     };
   }, [entities, searchTerm]);
 
-  // Count filtered results
+  // Count filtered results for empty state check
   const filteredCount = useMemo(() => {
     return Object.values(filteredEntities).reduce((sum, arr) => sum + arr.length, 0);
   }, [filteredEntities]);
@@ -137,16 +137,17 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
   return (
     <div className="max-w-4xl mx-auto p-8">
       <header className="mb-8">
-        <h1 className="text-3xl font-mono mb-2">Dictionary</h1>
-        <p className="text-muted-foreground">
-          {totalCount} entities across {documentCount} documents
+        <p className="text-sm text-muted-foreground">
+          People, places, and organizations extracted from{' '}
+          <span className="tabular-nums">{documentCount}</span> document{documentCount !== 1 ? 's' : ''} —{' '}
+          <span className="tabular-nums">{totalCount}</span> entities identified.
         </p>
 
         {/* Search input */}
         <div className="mt-4">
           <input
             type="text"
-            placeholder="Search entities by name..."
+            placeholder="Search Index by name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 bg-[var(--card)] border border-[var(--border)] rounded
@@ -176,18 +177,13 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
                   onClick={() => setSelectedType(type)}
                   className="font-mono"
                 >
-                  {ENTITY_TYPE_CONFIG[type].label} ({(entities[type] || []).length})
+                  {ENTITY_TYPE_CONFIG[type].label}
                 </Button>
               ))}
             </ButtonGroup>
           </div>
         )}
 
-        {(searchTerm || selectedType) && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            Showing {filteredCount} of {totalCount} entities
-          </p>
-        )}
       </header>
 
       {totalCount === 0 ? (
