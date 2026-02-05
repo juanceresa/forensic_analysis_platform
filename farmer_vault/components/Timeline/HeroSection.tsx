@@ -16,26 +16,26 @@ export default function HeroSection({ caseName, totalDocuments, dateRange }: Her
     : null;
 
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-8">
+    <section className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 sm:px-8">
       {/* Void atmosphere */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-950/95 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-background/95 to-transparent pointer-events-none" />
 
-      <div className="relative z-10 max-w-3xl space-y-6">
+      <div className="relative z-10 max-w-3xl space-y-4 sm:space-y-6">
         {/* Classification marker */}
-        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-slate-600">
+        <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground/60">
           Forensic Intelligence Report
         </p>
 
         {/* Case name */}
-        <h1 className="text-5xl md:text-6xl font-display tracking-tight text-slate-50 leading-[1.1]">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl font-display tracking-tight text-foreground leading-[1.1]">
           {caseName}
         </h1>
 
         {/* Dossier rule */}
-        <hr className="dossier-rule mx-auto w-48" />
+        <hr className="dossier-rule mx-auto w-32 sm:w-48" />
 
         {/* Stats */}
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-slate-500 tabular-nums">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground tabular-nums">
           {totalDocuments} document{totalDocuments !== 1 ? 's' : ''}
           {earliest && latest && (
             <> &middot; {earliest} – {latest}</>
@@ -43,8 +43,8 @@ export default function HeroSection({ caseName, totalDocuments, dateRange }: Her
         </p>
 
         {/* AI Disclaimer */}
-        <div className="inline-block px-4 py-2 bg-amber-500/5 border border-amber-500/15 rounded">
-          <p className="text-[11px] text-amber-500/70 italic">
+        <div className="inline-block px-3 sm:px-4 py-2 bg-amber-500/5 border border-amber-500/15 rounded">
+          <p className="text-[10px] sm:text-[11px] text-amber-500/70 italic">
             <svg
               className="inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 text-amber-400"
               fill="none"
@@ -64,9 +64,9 @@ export default function HeroSection({ caseName, totalDocuments, dateRange }: Her
       </div>
 
       {/* Scroll chevron */}
-      <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-10">
+      <div className="absolute bottom-8 sm:bottom-12 left-1/2 -translate-x-1/2 z-10">
         <svg
-          className="w-6 h-6 text-slate-600 animate-chevron-bounce"
+          className="w-6 h-6 text-muted-foreground/60 animate-chevron-bounce"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

@@ -76,13 +76,13 @@ export default async function NarrativePage({ params }: NarrativePageProps) {
     );
   } catch {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto">
           <header className="mb-8">
-            <h1 className="text-4xl font-display tracking-tight text-slate-50">AI Analysis</h1>
+            <h1 className="text-2xl sm:text-4xl font-display tracking-tight text-foreground">AI Analysis</h1>
             <hr className="dossier-rule mt-4 mb-2" />
           </header>
-          <div className="p-8 bg-slate-900 border border-red-800/50 rounded text-center">
+          <div className="p-8 bg-[var(--card)] border border-red-800/50 rounded text-center">
             <p className="text-red-400 font-mono text-sm">Failed to load timeline data</p>
           </div>
         </div>

@@ -22,7 +22,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   const document = await fetchDocument(caseId, decodeURIComponent(docId));
 
   return (
-    <div className="h-screen">
+    <div className="h-[calc(100vh-3rem)]">
       <DocumentViewer document={document} caseId={caseId} />
     </div>
   );

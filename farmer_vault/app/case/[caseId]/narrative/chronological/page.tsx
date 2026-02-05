@@ -24,14 +24,14 @@ export default async function ChronologicalPage({ params }: ChronologicalPagePro
     const data = await getTimeline(caseId);
 
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto">
           <header className="mb-6">
-            <h1 className="text-4xl font-display tracking-tight text-slate-50 mb-1">
+            <h1 className="text-2xl sm:text-4xl font-display tracking-tight text-foreground mb-1">
               Chronological View
             </h1>
             <hr className="dossier-rule mt-4 mb-2" />
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-slate-500">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
               {data.totalDocuments} documents spanning{' '}
               {data.dateRange?.earliest_document && data.dateRange?.latest_document
                 ? `${new Date(data.dateRange.earliest_document).getFullYear()} – ${new Date(data.dateRange.latest_document).getFullYear()}`
@@ -39,7 +39,7 @@ export default async function ChronologicalPage({ params }: ChronologicalPagePro
             </p>
           </header>
 
-          <div className="mb-8 px-4 py-2 bg-amber-500/5 border border-amber-500/15 rounded">
+          <div className="mb-6 sm:mb-8 px-4 py-2 bg-amber-500/5 border border-amber-500/15 rounded">
             <p className="text-xs text-amber-500/70 italic">
               <svg
                 className="inline-block w-3.5 h-3.5 mr-1.5 -mt-0.5 text-amber-400"
@@ -59,12 +59,12 @@ export default async function ChronologicalPage({ params }: ChronologicalPagePro
           </div>
 
           {(!data.events || data.events.length === 0) ? (
-            <div className="p-8 bg-slate-900 border border-slate-800 border-dashed rounded text-center">
-              <p className="text-slate-500 font-mono text-sm">No timeline data available</p>
+            <div className="p-8 bg-[var(--card)] border border-[var(--border)] border-dashed rounded text-center">
+              <p className="text-muted-foreground font-mono text-sm">No timeline data available</p>
             </div>
           ) : (
             <section>
-              <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-slate-500 border-l-2 border-slate-600 pl-3 mb-6">
+              <h2 className="text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground border-l-2 border-border pl-3 mb-6">
                 Chronological Analysis
               </h2>
               <TimelineView
@@ -80,13 +80,13 @@ export default async function ChronologicalPage({ params }: ChronologicalPagePro
     );
   } catch {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 lg:p-8">
         <div className="max-w-5xl mx-auto">
           <header className="mb-8">
-            <h1 className="text-4xl font-display tracking-tight text-slate-50">Chronological View</h1>
+            <h1 className="text-2xl sm:text-4xl font-display tracking-tight text-foreground">Chronological View</h1>
             <hr className="dossier-rule mt-4 mb-2" />
           </header>
-          <div className="p-8 bg-slate-900 border border-red-800/50 rounded text-center">
+          <div className="p-8 bg-[var(--card)] border border-red-800/50 rounded text-center">
             <p className="text-red-400 font-mono text-sm">Failed to load timeline data</p>
           </div>
         </div>

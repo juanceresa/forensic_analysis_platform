@@ -135,7 +135,7 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
   }, [filteredEntities]);
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
       <header className="mb-8">
         <p className="text-sm text-muted-foreground">
           People, places, and organizations extracted from{' '}
@@ -158,9 +158,9 @@ export function EntityBrowser({ entities, totalCount, documentCount, caseId }: E
 
         {/* Type filter */}
         {availableTypes.length > 1 && (
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-sm text-muted-foreground font-mono">Filter:</span>
-            <ButtonGroup>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground font-mono shrink-0">Filter:</span>
+            <ButtonGroup className="flex-wrap">
               <Button
                 variant={selectedType === null ? 'default' : 'outline'}
                 size="xs"

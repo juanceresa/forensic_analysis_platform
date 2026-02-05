@@ -200,8 +200,8 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
 
         {/* Sort controls */}
         <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground font-mono">Sort:</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground font-mono shrink-0">Sort:</span>
             <ButtonGroup>
               <Button
                 variant={sortBy === 'date' ? 'default' : 'outline'}
@@ -224,8 +224,8 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
 
           {/* Date order (only when sorting by date) */}
           {sortBy === 'date' && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground font-mono">Order:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono shrink-0">Order:</span>
               <ButtonGroup>
                 <Button
                   variant={dateOrder === 'asc' ? 'default' : 'outline'}
@@ -249,8 +249,8 @@ export function DocumentList({ documents, entities, caseId }: DocumentListProps)
 
           {/* Type filter (only when sorting by type) */}
           {sortBy === 'type' && documentTypes.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground font-mono">Type:</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground font-mono shrink-0">Type:</span>
               <ButtonGroup>
                 <Button
                   variant={selectedType === null ? 'default' : 'outline'}

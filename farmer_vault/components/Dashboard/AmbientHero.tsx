@@ -131,9 +131,9 @@ export function AmbientHero({
       />
 
       {/* Content */}
-      <div className="relative z-10 max-w-6xl mx-auto px-8 pt-10 pb-8">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-10 pb-6 sm:pb-8">
         {/* Badge Cluster */}
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
           <Badge
             variant="outline"
             className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-border/50 bg-background/50"
@@ -150,12 +150,12 @@ export function AmbientHero({
         </div>
 
         {/* Case Name */}
-        <h1 className="font-mono text-4xl font-semibold text-foreground leading-tight tracking-tight">
+        <h1 className="font-mono text-2xl sm:text-3xl lg:text-4xl font-semibold text-foreground leading-tight tracking-tight">
           {caseId}
         </h1>
 
         {/* Stat Pills Row */}
-        <div className="flex items-center gap-6 mt-4">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-6 mt-3 sm:mt-4">
           {statPills.map((stat, index) => (
             <HoverCard key={stat.label} openDelay={200} closeDelay={100}>
               <HoverCardTrigger asChild>

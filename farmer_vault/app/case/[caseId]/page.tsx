@@ -44,10 +44,10 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
         />
 
         {/* Main Content */}
-        <div className="px-8 pb-8">
+        <div className="px-4 sm:px-6 lg:px-8 pb-8">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Metrics Grid */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Stage Card */}
               <MetricCard
                 label="Current Stage"
