@@ -13,6 +13,30 @@ const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 // Doc IDs can contain spaces, periods, alphanumerics, underscores, and hyphens
 const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
 
+/**
+ * Normalize OCR text for better readability.
+ * Joins hard line breaks from OCR into flowing paragraphs.
+ */
+function normalizeOcrText(text: string): string {
+  if (!text) return text;
+
+  return text
+    // Fix hyphenated line breaks (word-\n continuation)
+    .replace(/-\s*\n\s*/g, '')
+    // Normalize line endings
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    // Mark paragraph breaks (2+ newlines) with placeholder
+    .replace(/\n{2,}/g, '¶¶')
+    // Join all remaining single newlines with space
+    .replace(/\n/g, ' ')
+    // Restore paragraph breaks
+    .replace(/¶¶/g, '\n\n')
+    // Collapse multiple spaces
+    .replace(/  +/g, ' ')
+    .trim();
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ caseId: string; docId: string }> }
@@ -59,9 +83,9 @@ export async function GET(
 
     let ocrText = '';
     try {
-      ocrText = await fs.readFile(ocrPath, 'utf-8');
+      ocrText = normalizeOcrText(await fs.readFile(ocrPath, 'utf-8'));
     } catch {
-      ocrText = extraction.ocr_result?.text || '';
+      ocrText = normalizeOcrText(extraction.ocr_result?.text || '');
     }
 
     const intakeFiles = await fs.readdir(intakeDir);
@@ -166,9 +190,9 @@ async function handleGroupedDocument(
     const partDocId = extFile.replace(/\.json$/i, '');
     let ocrText = '';
     try {
-      ocrText = await fs.readFile(path.join(caseDir, 'ocr', `${partDocId}.txt`), 'utf-8');
+      ocrText = normalizeOcrText(await fs.readFile(path.join(caseDir, 'ocr', `${partDocId}.txt`), 'utf-8'));
     } catch {
-      ocrText = extraction.ocr_result?.text || '';
+      ocrText = normalizeOcrText(extraction.ocr_result?.text || '');
     }
 
     let translatedText: string | null = null;

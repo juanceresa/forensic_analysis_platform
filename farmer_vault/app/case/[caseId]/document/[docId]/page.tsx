@@ -21,5 +21,9 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   const { caseId, docId } = await params;
   const document = await fetchDocument(caseId, decodeURIComponent(docId));
 
-  return <DocumentViewer document={document} caseId={caseId} />;
+  return (
+    <div className="h-screen">
+      <DocumentViewer document={document} caseId={caseId} />
+    </div>
+  );
 }
