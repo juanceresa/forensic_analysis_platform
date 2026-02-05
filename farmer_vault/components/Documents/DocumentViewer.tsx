@@ -16,6 +16,7 @@ import {
   ResizableHandle,
 } from '@/components/ui/resizable';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { BookmarkButton } from '@/components/Bookmarks';
 
 interface DocumentViewerProps {
   document: DocumentDetail;
@@ -142,9 +143,12 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
     <section className={`flex flex-col bg-background overflow-hidden ${isMobile ? 'flex-1' : 'h-full'}`}>
       {/* Document header */}
       <header className="p-4 sm:p-6">
-        <h1 className="text-base sm:text-lg font-mono mb-2 truncate text-foreground" title={document.filename}>
-          {document.filename}
-        </h1>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <h1 className="text-base sm:text-lg font-mono truncate text-foreground" title={document.filename}>
+            {document.filename}
+          </h1>
+          <BookmarkButton type="document" id={document.id} />
+        </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-muted-foreground">
           <time dateTime={document.date || undefined} className="font-mono tabular-nums">
             {formatDate(document.date)}
@@ -166,7 +170,7 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="ocr" className="flex-1 flex flex-col min-h-0">
-        <TabsList variant="line" className="w-full justify-start px-4 sm:px-6 pt-2 overflow-x-auto">
+        <TabsList variant="line" className="w-full justify-start px-4 sm:px-6 pt-2 overflow-x-auto scrollbar-hide">
           <TabsTrigger value="ocr" className="font-mono text-sm shrink-0">
             OCR {languageDisplayName && <span className="text-xs opacity-60">({languageDisplayName})</span>}
           </TabsTrigger>

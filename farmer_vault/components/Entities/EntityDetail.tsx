@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { BaseNode } from '@/lib/types';
 import { VerificationBadge } from '@/components/shared';
+import { BookmarkButton } from '@/components/Bookmarks';
 
 interface SourceDocument {
   id: string;
@@ -169,11 +170,12 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
       <header className="mb-6 sm:mb-8 p-4 sm:p-6 bg-[var(--card)] border border-[var(--border)] rounded">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
           <div className="flex-1">
-            {/* Entity type badge */}
-            <div className="mb-2">
+            {/* Entity type badge + bookmark */}
+            <div className="mb-2 flex items-center justify-between">
               <span className="px-2 py-1 bg-muted rounded text-xs uppercase tracking-wider text-muted-foreground font-mono">
                 {entity.entity_type}
               </span>
+              <BookmarkButton type="entity" id={entity.id} />
             </div>
 
             {/* Entity name */}

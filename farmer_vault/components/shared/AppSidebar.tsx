@@ -16,6 +16,7 @@ import {
   Settings,
   ChevronDown,
   Sparkles,
+  Bookmark,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -85,6 +86,11 @@ export function AppSidebar({ caseId, ...props }: AppSidebarProps) {
         { label: 'Geolocation', href: `${narrativeBase}/geolocation`, icon: MapPin },
         { label: 'Knowledge Graph', href: `${narrativeBase}/graph`, icon: Network },
       ],
+    },
+    {
+      label: 'Bookmarks',
+      href: `/case/${caseId}/bookmarks`,
+      icon: Bookmark,
     },
   ];
 
