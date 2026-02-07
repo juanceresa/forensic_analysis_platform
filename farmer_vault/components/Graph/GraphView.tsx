@@ -85,7 +85,7 @@ export function GraphView({ caseId }: GraphViewProps) {
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col bg-background">
+      <div className="h-full min-h-0 flex flex-col overflow-hidden bg-background">
         {/* Toolbar */}
         <div className="shrink-0 border-b border-border">
           <div className="px-3 py-1.5 flex items-center gap-1 flex-wrap">
@@ -187,8 +187,8 @@ export function GraphView({ caseId }: GraphViewProps) {
         </div>
 
         {/* Graph + Sidebar */}
-        <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 min-w-0 relative">
+        <div className="flex-1 min-h-0 flex overflow-hidden">
+          <div className="flex-1 min-h-0 min-w-0 relative overflow-hidden">
             <KnowledgeGraph
               data={graphData}
               selectedNodeId={selectedNodeId}
