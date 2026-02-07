@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const COOKIE_NAME = 'vault_session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow: login page, all API routes (called internally by server components), static assets
