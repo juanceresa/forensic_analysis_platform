@@ -8,7 +8,7 @@ export default async function NarrativeGraphPage({ params }: GraphPageProps) {
   const { caseId } = await params;
 
   return (
-    <div className="h-full">
+    <div className="absolute inset-0 overflow-hidden">
       <GraphView caseId={caseId} />
     </div>
   );

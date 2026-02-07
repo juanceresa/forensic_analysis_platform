@@ -65,6 +65,7 @@ export function KnowledgeGraph({
   const selectedAlphaRef = useRef(0);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [graphTheme, setGraphTheme] = useState(defaultGraphTheme);
+  const initialForcesApplied = useRef(false);
 
   const settings = useMemo(
     () => ({ ...DEFAULT_SETTINGS, ...userSettings }),
@@ -116,18 +117,26 @@ export function KnowledgeGraph({
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
+    let rafId: number | null = null;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      const { width, height } = entry.contentRect;
-      const dpr = window.devicePixelRatio || 1;
-      setDimensions({
-        width: Math.floor(width * dpr) / dpr,
-        height: Math.floor(height * dpr) / dpr,
+      // Debounce via rAF to avoid thrashing during layout shifts
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const { width, height } = entry.contentRect;
+        const dpr = window.devicePixelRatio || 1;
+        setDimensions({
+          width: Math.floor(width * dpr) / dpr,
+          height: Math.floor(height * dpr) / dpr,
+        });
       });
     });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   useEffect(() => {
@@ -193,8 +202,8 @@ export function KnowledgeGraph({
     [onNodeClick]
   );
 
-  // Apply physics forces
-  const applyForces = useCallback(() => {
+  // Apply physics forces — only reheat simulation on initial load
+  const applyForces = useCallback((reheat: boolean) => {
     if (!graphRef.current) return;
     if (dimensions.width === 0 || dimensions.height === 0) return;
     const maxDistance = Math.max(dimensions.width, dimensions.height, 600);
@@ -205,14 +214,16 @@ export function KnowledgeGraph({
     graphRef.current.d3Force('link')?.distance(LINK_FORCE).strength(0.7);
     graphRef.current.d3Force('x', forceX(0).strength(CENTER_FORCE));
     graphRef.current.d3Force('y', forceY(0).strength(CENTER_FORCE));
-    graphRef.current.d3ReheatSimulation();
+    if (reheat) graphRef.current.d3ReheatSimulation();
   }, [dimensions.width, dimensions.height]);
 
   useEffect(() => {
     let rafId: number | null = null;
     const tryApply = () => {
       if (graphRef.current && dimensions.width > 0 && dimensions.height > 0) {
-        applyForces();
+        const shouldReheat = !initialForcesApplied.current;
+        applyForces(shouldReheat);
+        initialForcesApplied.current = true;
         return;
       }
       rafId = requestAnimationFrame(tryApply);
@@ -460,7 +471,7 @@ export function KnowledgeGraph({
   return (
     <div
       ref={containerRef}
-      className="vault-graph w-full h-full relative overflow-hidden"
+      className="vault-graph w-full h-full min-h-0 min-w-0 relative overflow-hidden"
       role="application"
       aria-label="Knowledge graph visualization of entities and relationships"
       style={{ zIndex: 0 }}

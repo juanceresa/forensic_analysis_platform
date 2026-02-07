@@ -62,7 +62,7 @@ export function EntitySidebar({ selectedNodeId, caseId }: EntitySidebarProps) {
 
   if (collapsed) {
     return (
-      <div className="shrink-0 border-l border-border flex items-start pt-2 px-1">
+      <div className="w-8 h-full min-h-0 shrink-0 overflow-hidden border-l border-border flex items-start justify-center pt-2">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -82,7 +82,7 @@ export function EntitySidebar({ selectedNodeId, caseId }: EntitySidebarProps) {
   }
 
   return (
-    <div className="w-[420px] shrink-0 border-l border-border flex flex-col bg-background">
+    <div className="w-[460px] max-w-[45vw] min-h-0 shrink-0 overflow-hidden border-l border-border flex flex-col bg-background">
       <div className="px-4 py-2 border-b border-border flex items-center justify-between">
         <h2 className="text-sm font-mono font-medium text-foreground">Entity Detail</h2>
         <Tooltip>
@@ -101,40 +101,42 @@ export function EntitySidebar({ selectedNodeId, caseId }: EntitySidebarProps) {
         </Tooltip>
       </div>
 
-      <ScrollArea className="flex-1">
-        {!selectedNodeId && (
-          <div className="flex items-center justify-center h-64 p-8">
-            <p className="text-muted-foreground font-mono text-sm text-center">
-              Click a node to view details
-            </p>
-          </div>
-        )}
-
-        {selectedNodeId && loading && (
-          <div className="flex items-center justify-center h-64 p-8">
-            <div className="text-center">
-              <div className="animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3" />
-              <p className="text-muted-foreground font-mono text-sm">Loading entity...</p>
+      <ScrollArea className="flex-1 min-h-0 [&>[data-slot=scroll-area-viewport]]:!overflow-x-hidden">
+        <div className="w-full">
+          {!selectedNodeId && (
+            <div className="flex items-center justify-center h-64 p-8">
+              <p className="text-muted-foreground font-mono text-sm text-center">
+                Click a node to view details
+              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {selectedNodeId && error && (
-          <div className="p-6">
-            <div className="p-4 bg-card border border-destructive/30 rounded-lg">
-              <p className="text-destructive font-mono text-sm">{error}</p>
+          {selectedNodeId && loading && (
+            <div className="flex items-center justify-center h-64 p-8">
+              <div className="text-center">
+                <div className="animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3" />
+                <p className="text-muted-foreground font-mono text-sm">Loading entity...</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {selectedNodeId && !loading && !error && entityData && (
-          <EntityDetail
-            entity={entityData.entity}
-            sourceDocuments={entityData.sourceDocuments}
-            connections={entityData.connections}
-            caseId={caseId}
-          />
-        )}
+          {selectedNodeId && error && (
+            <div className="p-6">
+              <div className="p-4 bg-card border border-destructive/30 rounded-lg">
+                <p className="text-destructive font-mono text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {selectedNodeId && !loading && !error && entityData && (
+            <EntityDetail
+              entity={entityData.entity}
+              sourceDocuments={entityData.sourceDocuments}
+              connections={entityData.connections}
+              caseId={caseId}
+            />
+          )}
+        </div>
       </ScrollArea>
     </div>
   );

@@ -27,7 +27,7 @@ export default async function CaseLayout({ children, params }: CaseLayoutProps) 
         }
       >
         <AppSidebar caseId={caseId} />
-        <SidebarInset className="bg-background">
+        <SidebarInset className="bg-background min-w-0 overflow-x-hidden">
           {/* Header with trigger and breadcrumbs */}
           <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/50 px-4">
             <SidebarTrigger className="-ml-1 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent" />
@@ -39,7 +39,7 @@ export default async function CaseLayout({ children, params }: CaseLayoutProps) 
           </header>
 
           {/* Main content */}
-          <main id="main-content" className="flex-1 overflow-y-auto">
+          <main id="main-content" className="relative flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             {children}
           </main>
         </SidebarInset>

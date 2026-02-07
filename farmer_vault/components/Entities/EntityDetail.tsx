@@ -50,7 +50,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
     switch (entity.entity_type) {
       case 'PERSON':
         return (
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             {entity.birth_date ? (
               <>
                 <dt className="text-muted-foreground font-mono uppercase tracking-wider text-xs">Birth Date</dt>
@@ -79,7 +79,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
         );
       case 'PROPERTY':
         return (
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             {entity.address ? (
               <>
                 <dt className="text-muted-foreground font-mono uppercase tracking-wider text-xs">Address</dt>
@@ -104,7 +104,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
         );
       case 'ORGANIZATION':
         return (
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             {entity.org_type ? (
               <>
                 <dt className="text-muted-foreground font-mono uppercase tracking-wider text-xs">Type</dt>
@@ -121,7 +121,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
         );
       case 'LOCATION':
         return (
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             {entity.location_type ? (
               <>
                 <dt className="text-muted-foreground font-mono uppercase tracking-wider text-xs">Type</dt>
@@ -138,7 +138,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
         );
       case 'DOCUMENT':
         return (
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             {entity.document_type ? (
               <>
                 <dt className="text-muted-foreground font-mono uppercase tracking-wider text-xs">Type</dt>
@@ -165,11 +165,11 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div className="p-4 overflow-hidden">
       {/* Entity Header Card */}
-      <header className="mb-6 sm:mb-8 p-4 sm:p-6 bg-[var(--card)] border border-[var(--border)] rounded">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-6">
-          <div className="flex-1">
+      <header className="mb-6 p-4 bg-[var(--card)] border border-[var(--border)] rounded">
+        <div className="flex flex-col gap-4">
+          <div className="min-w-0">
             {/* Entity type badge + bookmark */}
             <div className="mb-2 flex items-center justify-between">
               <span className="px-2 py-1 bg-muted rounded text-xs uppercase tracking-wider text-muted-foreground font-mono">
@@ -179,22 +179,20 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
             </div>
 
             {/* Entity name */}
-            <h1 className="text-2xl sm:text-3xl font-mono mb-3 text-foreground">{entity.name || entity.id}</h1>
-
-            {/* TODO: Role label when available */}
+            <h1 className="text-2xl font-mono mb-3 text-foreground break-words">{entity.name || entity.id}</h1>
 
             {/* Metadata grid */}
             {renderMetadata()}
           </div>
 
-          {/* Verification badge (prominent) */}
-          <div className="sm:text-right">
-            <div className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-2">
+          {/* Verification badge */}
+          <div className="flex items-center gap-3 pt-2 border-t border-border/50">
+            <div className="text-xs text-muted-foreground font-mono uppercase tracking-wider">
               Verification
             </div>
             <VerificationBadge tier={entity.verification.tier as any} size="large" />
-            <div className="mt-2 text-xs text-muted-foreground font-mono tabular-nums">
-              {Math.round(entity.verification.confidence * 100)}% confidence
+            <div className="text-xs text-muted-foreground font-mono tabular-nums">
+              {Math.round(entity.verification.confidence * 100)}%
             </div>
           </div>
         </div>
@@ -202,20 +200,20 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
 
       {/* AI-Generated Description */}
       {entity.description ? (
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <span className="font-mono text-sm uppercase tracking-wider text-foreground">About</span>
             <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-400 font-mono">
               TIER_3_AI
             </span>
           </div>
-          <div className="p-4 sm:p-6 bg-[var(--card)] border border-[var(--border)] rounded">
-            <p className="text-foreground/80 leading-relaxed">
+          <div className="p-4 bg-[var(--card)] border border-[var(--border)] rounded">
+            <p className="text-foreground/80 leading-relaxed text-sm">
               {String(entity.description)}
             </p>
-            <div className="mt-4 p-3 bg-amber-500/5 border border-amber-500/20 rounded">
+            <div className="mt-3 p-2 bg-amber-500/5 border border-amber-500/20 rounded">
               <p className="text-xs text-amber-400/80 leading-relaxed">
-                AI-generated from document analysis. Not verified by human analysts.
+                AI-generated. Not verified by human analysts.
               </p>
             </div>
           </div>
@@ -223,7 +221,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
       ) : null}
 
       {/* Source Documents Section */}
-      <section className="mb-6 sm:mb-8">
+      <section className="mb-6">
         <h2 className="text-lg font-mono uppercase tracking-wider mb-4 flex items-center gap-3 text-foreground">
           <span>Source Documents</span>
           <span className="px-2 py-0.5 bg-muted rounded text-sm font-mono tabular-nums text-muted-foreground">
@@ -243,7 +241,7 @@ export function EntityDetail({ entity, sourceDocuments, connections, caseId }: E
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-mono text-foreground truncate">{doc.filename}</h3>
+                  <h3 className="font-mono text-sm text-foreground truncate">{doc.filename}</h3>
                 </div>
                 <div className="text-muted-foreground">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
