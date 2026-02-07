@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { DocumentDetail } from '@/lib/document-types';
+import type { DocumentDetail, DocumentAnalysis } from '@/lib/document-types';
 import type { BaseNode } from '@/lib/types';
 import { VerificationBadge } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -36,6 +36,131 @@ const LANGUAGE_NAMES: Record<string, string> = {
   ko: 'Korean',
   ar: 'Arabic',
 };
+
+const RELEVANCE_COLORS: Record<string, string> = {
+  CRITICAL: 'bg-red-500/20 text-red-400 border-red-500/30',
+  HIGH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  MEDIUM: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  LOW: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+};
+
+const OCR_QUALITY_COLORS: Record<string, string> = {
+  EXCELLENT: 'text-green-400',
+  GOOD: 'text-blue-400',
+  FAIR: 'text-yellow-400',
+  POOR: 'text-red-400',
+};
+
+function AnalysisContent({ analysis }: { analysis: DocumentAnalysis }) {
+  const relevanceColor = RELEVANCE_COLORS[analysis.claim_relevance.level] || RELEVANCE_COLORS.LOW;
+  const ocrColor = OCR_QUALITY_COLORS[analysis.quality_notes.ocr_quality] || '';
+
+  return (
+    <>
+      {/* TIER_3_AI Disclaimer */}
+      <div className="rounded border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+        <p className="text-xs text-amber-400 font-mono leading-relaxed">
+          AI-Generated Analysis — This commentary is produced by AI and has not been verified.
+          It may contain errors or misinterpretations. Always refer to the original document text.
+        </p>
+      </div>
+
+      {/* Document Type */}
+      <div>
+        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Document Type</span>
+        <p className="mt-1 text-sm text-foreground">{analysis.document_type}</p>
+      </div>
+
+      {/* Executive Summary */}
+      <div>
+        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Executive Summary</span>
+        <p className="mt-1 text-sm text-foreground leading-relaxed">{analysis.executive_summary}</p>
+      </div>
+
+      {/* Claim Relevance */}
+      <div>
+        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Claim Relevance</span>
+        <div className="mt-2 flex items-start gap-3">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-mono font-semibold border ${relevanceColor}`}>
+            {analysis.claim_relevance.level}
+          </span>
+          <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+            {analysis.claim_relevance.reasoning}
+          </p>
+        </div>
+      </div>
+
+      {/* Key Facts */}
+      {analysis.key_facts.length > 0 && (
+        <div>
+          <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Key Facts</span>
+          <ul className="mt-2 space-y-1.5">
+            {analysis.key_facts.map((fact, i) => (
+              <li key={i} className="flex gap-2 text-sm text-foreground">
+                <span className="text-muted-foreground shrink-0 mt-0.5">•</span>
+                <span className="leading-relaxed">{fact}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Cross-References */}
+      {analysis.cross_references.length > 0 && (
+        <div>
+          <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Cross-References</span>
+          <ul className="mt-2 space-y-1.5">
+            {analysis.cross_references.map((ref, i) => (
+              <li key={i} className="flex gap-2 text-sm text-foreground">
+                <span className="text-muted-foreground shrink-0 mt-0.5">→</span>
+                <span className="leading-relaxed">{ref}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Quality Notes */}
+      <div>
+        <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">Quality Notes</span>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">OCR Quality:</span>
+            <span className={`font-mono font-semibold ${ocrColor}`}>
+              {analysis.quality_notes.ocr_quality}
+            </span>
+          </div>
+          {analysis.quality_notes.missing_information.length > 0 && (
+            <div>
+              <span className="text-xs text-muted-foreground">Missing Information:</span>
+              <ul className="mt-1 space-y-1">
+                {analysis.quality_notes.missing_information.map((item, i) => (
+                  <li key={i} className="text-sm text-yellow-400/80 flex gap-2">
+                    <span className="shrink-0">⚠</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {analysis.quality_notes.verification_needed.length > 0 && (
+            <div>
+              <span className="text-xs text-muted-foreground">Verification Needed:</span>
+              <ul className="mt-1 space-y-1">
+                {analysis.quality_notes.verification_needed.map((item, i) => (
+                  <li key={i} className="text-sm text-orange-400/80 flex gap-2">
+                    <span className="shrink-0">?</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
 
 export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
   const [currentPage, setCurrentPage] = useState(0);
@@ -187,6 +312,11 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
           <TabsTrigger value="entities" className="font-mono text-sm shrink-0">
             Entities ({(currentEntities || []).length})
           </TabsTrigger>
+          {document.analysis && (
+            <TabsTrigger value="analysis" className="font-mono text-sm shrink-0">
+              Analysis
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* OCR Panel */}
@@ -282,6 +412,17 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
             </div>
           </ScrollArea>
         </TabsContent>
+
+        {/* Analysis Panel */}
+        {document.analysis && (
+          <TabsContent value="analysis" className="flex-1 min-h-0">
+            <ScrollArea className="h-full">
+              <div className="p-4 sm:p-6 space-y-6">
+                <AnalysisContent analysis={document.analysis} />
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        )}
       </Tabs>
     </section>
   );

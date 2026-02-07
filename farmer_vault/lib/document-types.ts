@@ -19,6 +19,28 @@ export interface DocumentPage {
   entities: BaseNode[];
 }
 
+export interface DocumentAnalysis {
+  document_type: string;
+  executive_summary: string;
+  claim_relevance: {
+    level: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+    reasoning: string;
+  };
+  key_facts: string[];
+  cross_references: string[];
+  quality_notes: {
+    ocr_quality: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR';
+    missing_information: string[];
+    verification_needed: string[];
+  };
+  source_docs: string[];
+  _metadata: {
+    generated_at: string;
+    model: string;
+    prompt_version: string;
+  };
+}
+
 export interface DocumentDetail extends Document {
   ocrText: string;
   rawOcrText?: string;
@@ -26,6 +48,7 @@ export interface DocumentDetail extends Document {
   detectedLanguage?: string;
   entities: BaseNode[];
   pages?: DocumentPage[];
+  analysis?: DocumentAnalysis | null;
 }
 
 export interface ExtractionData {

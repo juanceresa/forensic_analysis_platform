@@ -14,6 +14,26 @@ const CASE_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 const DOC_ID_PATTERN = /^[A-Za-z0-9_. -]+$/;
 
 /**
+ * Load document analysis from document_analyses.json if it exists.
+ * Returns the analysis object for the given key, or null.
+ */
+async function loadDocumentAnalysis(
+  caseDir: string,
+  analysisKey: string
+): Promise<Record<string, unknown> | null> {
+  try {
+    const analysesPath = path.join(caseDir, 'output', 'document_analyses.json');
+    const content = await fs.readFile(analysesPath, 'utf-8');
+    const analyses = JSON.parse(content);
+    const analysis = analyses[analysisKey];
+    if (!analysis || analysis._error) return null;
+    return analysis;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Normalize OCR text for better readability.
  * Joins hard line breaks from OCR into flowing paragraphs.
  */
@@ -183,6 +203,9 @@ export async function GET(
       // No translation available
     }
 
+    // Load document analysis (keyed by extraction stem)
+    const analysis = await loadDocumentAnalysis(caseDir, extractionDocId);
+
     const document = {
       id: decodedDocId,
       filename: matchingIntake || `${baseDocName}.pdf`,
@@ -196,6 +219,7 @@ export async function GET(
       translatedText,
       entities: extraction.entities || [],
       detectedLanguage,
+      analysis,
     };
 
     return NextResponse.json(document);
@@ -299,6 +323,9 @@ async function handleGroupedDocument(
     });
   }
 
+  // Load document analysis (keyed by group ID e.g., "doc_12")
+  const analysis = await loadDocumentAnalysis(caseDir, groupDocId);
+
   const document = {
     id: groupDocId,
     filename: group.name,
@@ -313,6 +340,7 @@ async function handleGroupedDocument(
     entities: allEntities,
     detectedLanguage,
     pages,
+    analysis,
   };
 
   return NextResponse.json(document);
