@@ -17,11 +17,31 @@ async function getEntities(caseId: string) {
   return res.json();
 }
 
+async function getTimelineEvents(caseId: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  try {
+    const res = await fetch(`${baseUrl}/api/cases/${caseId}/timeline`, {
+      cache: 'no-store',
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    // Only return high-signal events, not FILED
+    return (data.events || []).filter(
+      (e: any) => e.eventType !== 'FILED'
+    );
+  } catch {
+    return [];
+  }
+}
+
 export default async function EntitiesPage({ params }: EntitiesPageProps) {
   const { caseId } = await params;
 
   try {
-    const data = await getEntities(caseId);
+    const [data, events] = await Promise.all([
+      getEntities(caseId),
+      getTimelineEvents(caseId),
+    ]);
 
     return (
       <EntityBrowser
@@ -29,6 +49,7 @@ export default async function EntitiesPage({ params }: EntitiesPageProps) {
         totalCount={data.totalCount}
         documentCount={data.documentCount}
         caseId={caseId}
+        events={events}
       />
     );
   } catch (error) {

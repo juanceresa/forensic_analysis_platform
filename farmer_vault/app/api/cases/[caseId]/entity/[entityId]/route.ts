@@ -88,6 +88,17 @@ export async function GET(
       sourceDocuments.push({ id: docId, filename });
     }
 
+    // Load entity description from separate file (survives graph rebuilds)
+    let description: string | null = null;
+    try {
+      const descriptionsPath = path.join(caseDir, 'output', 'entity_descriptions.json');
+      const descriptionsContent = await fs.readFile(descriptionsPath, 'utf-8');
+      const descriptions: Record<string, string> = JSON.parse(descriptionsContent);
+      description = descriptions[decodedEntityId] ?? null;
+    } catch {
+      // entity_descriptions.json doesn't exist yet — that's fine
+    }
+
     // Find connections (links where this entity is source or target)
     const connections = graphData.links.filter(
       link => link.source === entity.id || link.target === entity.id
@@ -108,7 +119,7 @@ export async function GET(
     }).filter(conn => conn.targetEntity !== null);
 
     return NextResponse.json({
-      entity,
+      entity: { ...entity, description },
       sourceDocuments,
       connections,
     });
