@@ -1,8 +1,8 @@
 # CLAUDE.md — Instructions for Claude Code
 
-> **Version:** 2.9.0
-> **Last Updated:** 2026-01-30
-> **Status:** Master instructions file (Scroll-driven AI Analysis experience complete)
+> **Version:** 2.10.0
+> **Last Updated:** 2026-02-07
+> **Status:** Master instructions file (LLM-powered OCR cleanup pipeline)
 
 ---
 
@@ -31,7 +31,7 @@ The system has TWO ZONES that must remain separate:
 
 **Zone A (The Factory)** — Python backend
 - Internal processing only
-- OCR, AI inference, entity extraction
+- OCR, LLM text cleanup, AI entity/relation extraction
 - Clients NEVER see this zone
 
 **Zone B (The Vault)** — Next.js frontend
@@ -75,6 +75,7 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 
 ### Vault (Next.js)
 - Next.js 16, TypeScript, Tailwind CSS
+- shadcn/ui (Radix primitives + Tailwind)
 - react-force-graph-2d (visualization)
 - Clerk (OAuth authentication) - planned
 - Supabase (PostgreSQL with RLS) - planned
@@ -129,6 +130,12 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
   - `PROMPTS.md` - LLM extraction prompts
   - `chunker.py` - Document text chunking (5000-char chunks, 10% overlap)
 
+- **`farmer_factory/narrative/`**
+  - `generator.py` - Batch case narrative generation (period-based, uses Sonnet)
+  - `entity_descriptions.py` - Per-entity descriptions (uses Haiku, writes `entity_descriptions.json`)
+  - `prompts.py` - LLM prompts for narrative and summary generation
+  - `models.py` - Pydantic models for CaseNarrative, NarrativePeriod, etc.
+
 - **`farmer_factory/structure/`**
   - `README.md` - Graph construction & deduplication
   - `SCHEMA.md` - Complete JSON/Pydantic schema
@@ -173,7 +180,12 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 - `api/cases/[caseId]/document/[docId]/` - Document detail (multi-page)
 - `api/cases/[caseId]/document/[docId]/image/` - Image serving (`?page=N`)
 - `api/cases/[caseId]/timeline/` - Timeline periods (grouped documents)
-- `api/cases/[caseId]/entity/[entityId]/` - Entity detail (source document resolution)
+- `api/cases/[caseId]/entity/[entityId]/` - Entity detail (source document resolution, merges `entity_descriptions.json`)
+
+**Output file layout** (`cases/{caseId}/output/`):
+- `graph_data.json` - Knowledge graph (entities, relations, metadata)
+- `case_narrative.json` - Period-based case narrative (Sonnet)
+- `entity_descriptions.json` - Per-entity prose descriptions (Haiku) — separate file, survives graph rebuilds
 
 ### Implementation Plans
 - **`docs/plans/`** - Dated design and implementation docs
@@ -270,6 +282,14 @@ python -m farmer_factory.cli clean CASE-ID --confirm
 python -m farmer_factory.cli list-entities CASE-ID [--type PERSON|PROPERTY|ORGANIZATION|LOCATION|DOCUMENT]
 ```
 
+### Generate entity descriptions (cheap, uses Haiku)
+```bash
+python -m farmer_factory.cli generate-descriptions CASE-ID
+# Writes output/entity_descriptions.json — separate from graph_data.json
+# Incremental: re-running skips entities that already have descriptions
+# Survives rebuild-graph and apply-merges
+```
+
 ### Generate forensic dossier PDF
 ```bash
 python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-member-id Y --domain cuban_property [--dry-run]
@@ -283,8 +303,8 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 
 **See:** `.claude/ROADMAP.md` for current implementation status.
 
-**Recent:** Phase 9E (✅ COMPLETE - 2026-01-30)
-**Status:** Scroll-driven AI Analysis experience
+**Recent:** Phase 9F - LLM OCR Cleanup (✅ COMPLETE - 2026-02-07)
+**Status:** OCR text cleanup pipeline integrated
 
 ### Completed Phases
 - Phase 6 - Narrative Generation (✅ 2026-01-25)
@@ -346,6 +366,17 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - Expanded `inferType()` heuristics (Property, Survey, Financial, Inheritance)
   - Date sort order toggle (ascending/descending)
   - Iframe-based PDF viewer replacing manual zoom controls
+- Phase 9F - LLM OCR Cleanup (✅ COMPLETE - 2026-02-07)
+  - LLM-powered OCR text cleanup step inserted before entity extraction (Haiku, ~$0.0016/doc)
+  - Fixes broken words, removes artifacts, restores paragraph structure
+  - Preserves original language — no translation, no paraphrasing
+  - Graceful degradation: falls back to raw OCR on failure
+  - New pipeline flow: OCR → Cleanup (LLM) → Entity Extraction → Relation Extraction
+  - Output saved to `ocr_cleaned/` directory + embedded in extraction JSON (`ocr_result.cleaned_text`)
+  - API serves cleaned text by default, includes `rawOcrText` when available
+  - Frontend toggle: "Show Raw OCR" / "Show Cleaned" on OCR tab
+  - Prompt: `farmer_factory/extract/prompts/zero_shot.py` → `build_cleanup_prompt()`
+  - Method: `LLMExtractionService.clean_ocr_text()` in `extract/llm.py`
 
 ### Strategic Priorities (from Civic Architecture Vision)
 1. **Domain Configuration Abstraction** — ✅ Complete
@@ -377,9 +408,5 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 
 <!-- This section is auto-generated by claude-mem. Edit content outside the tags. -->
 
-### Jan 27, 2026
-
-| ID | Time | T | Title | Read |
-|----|------|---|-------|------|
-| #1 | 10:32 PM | 🔄 | LLM Extraction Module Refactored with Zero-Shot Prompts | ~538 |
+*No recent activity*
 </claude-mem-context>
