@@ -5,10 +5,10 @@ const COOKIE_NAME = 'vault_session';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow login page, login API, and static assets
+  // Always allow: login page, all API routes (called internally by server components), static assets
   if (
     pathname === '/login' ||
-    pathname === '/api/auth/login' ||
+    pathname.startsWith('/api/') ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico'
   ) {
