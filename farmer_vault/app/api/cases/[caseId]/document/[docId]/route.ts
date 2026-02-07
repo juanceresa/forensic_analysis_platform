@@ -37,6 +37,64 @@ function normalizeOcrText(text: string): string {
     .trim();
 }
 
+interface OcrBlock {
+  text: string;
+  confidence: number;
+  bounding_box: number[]; // [x, y, width, height]
+  block_type: string;
+}
+
+/**
+ * Build structured OCR text from Vision API blocks.
+ * Sorts blocks by vertical position and filters noise,
+ * preserving the document's original paragraph structure.
+ */
+function buildTextFromBlocks(blocks: OcrBlock[]): string {
+  if (!blocks || blocks.length === 0) return '';
+
+  // Sort by Y position (top to bottom), then X (left to right)
+  const sorted = [...blocks].sort((a, b) => {
+    const ay = a.bounding_box[1];
+    const by = b.bounding_box[1];
+    if (Math.abs(ay - by) > 20) return ay - by; // different row
+    return a.bounding_box[0] - b.bounding_box[0]; // same row, left to right
+  });
+
+  // Filter OCR noise using tiered confidence thresholds.
+  // Short blocks need higher confidence; long blocks tolerate lower.
+  const meaningful = sorted.filter(b => {
+    const text = b.text.trim();
+    if (text.length === 0) return false;
+
+    const words = text.split(/\s+/).length;
+    const alphaChars = text.replace(/[^a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]/g, '').length;
+    const alphaRatio = alphaChars / text.length;
+
+    // Pure symbols/punctuation with no letters — always noise
+    if (alphaRatio === 0 && words <= 3) return false;
+
+    // Single word: high bar (catches "AI", "03", "☑", stray marks)
+    if (words === 1) return b.confidence >= 0.7 && alphaRatio > 0.3;
+
+    // 2-4 words: moderate bar (keeps dates like "May 26/66", filters "smade for moral")
+    if (words <= 4) return b.confidence >= 0.6;
+
+    // 5+ words: lower bar but still filters gibberish/bleed-through
+    return b.confidence >= 0.5;
+  });
+
+  if (meaningful.length === 0) return '';
+
+  // Normalize each block's text (fix hyphenation, collapse whitespace)
+  return meaningful
+    .map(b => b.text.trim()
+      .replace(/-\s*\n\s*/g, '')
+      .replace(/\s+/g, ' ')
+    )
+    .filter(t => t.length > 0)
+    .join('\n\n');
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ caseId: string; docId: string }> }
@@ -81,11 +139,26 @@ export async function GET(
     const extractionContent = await fs.readFile(extractionPath, 'utf-8');
     const extraction = JSON.parse(extractionContent);
 
-    let ocrText = '';
+    // Build raw OCR text from blocks or fallback sources
+    const blocks: OcrBlock[] = extraction.ocr_result?.blocks || [];
+    let rawOcrText = '';
+    if (blocks.length > 0) {
+      rawOcrText = buildTextFromBlocks(blocks);
+    } else {
+      try {
+        rawOcrText = normalizeOcrText(await fs.readFile(ocrPath, 'utf-8'));
+      } catch {
+        rawOcrText = normalizeOcrText(extraction.ocr_result?.text || '');
+      }
+    }
+
+    // Prefer LLM-cleaned text if available, otherwise use raw
+    const cleanedPath = path.join(caseDir, 'ocr_cleaned', `${extractionDocId}.txt`);
+    let ocrText = rawOcrText;
     try {
-      ocrText = normalizeOcrText(await fs.readFile(ocrPath, 'utf-8'));
+      ocrText = await fs.readFile(cleanedPath, 'utf-8');
     } catch {
-      ocrText = normalizeOcrText(extraction.ocr_result?.text || '');
+      // No cleaned text — use raw (already assigned above)
     }
 
     const intakeFiles = await fs.readdir(intakeDir);
@@ -119,6 +192,7 @@ export async function GET(
       confidence: extraction.confidence_scores?.ocr_confidence || 0,
       imagePath: `/api/cases/${caseId}/document/${encodeURIComponent(decodedDocId)}/image`,
       ocrText,
+      rawOcrText: ocrText !== rawOcrText ? rawOcrText : undefined,
       translatedText,
       entities: extraction.entities || [],
       detectedLanguage,
@@ -156,6 +230,7 @@ async function handleGroupedDocument(
   // Build per-page data from all extraction files
   const pages: {
     ocrText: string;
+    rawOcrText?: string;
     translatedText: string | null;
     imagePath: string;
     entities: any[];
@@ -188,11 +263,24 @@ async function handleGroupedDocument(
     }
 
     const partDocId = extFile.replace(/\.json$/i, '');
-    let ocrText = '';
+    const pageBlocks: OcrBlock[] = extraction.ocr_result?.blocks || [];
+    let rawOcrText = '';
+    if (pageBlocks.length > 0) {
+      rawOcrText = buildTextFromBlocks(pageBlocks);
+    } else {
+      try {
+        rawOcrText = normalizeOcrText(await fs.readFile(path.join(caseDir, 'ocr', `${partDocId}.txt`), 'utf-8'));
+      } catch {
+        rawOcrText = normalizeOcrText(extraction.ocr_result?.text || '');
+      }
+    }
+
+    // Prefer LLM-cleaned text if available
+    let ocrText = rawOcrText;
     try {
-      ocrText = normalizeOcrText(await fs.readFile(path.join(caseDir, 'ocr', `${partDocId}.txt`), 'utf-8'));
+      ocrText = await fs.readFile(path.join(caseDir, 'ocr_cleaned', `${partDocId}.txt`), 'utf-8');
     } catch {
-      ocrText = normalizeOcrText(extraction.ocr_result?.text || '');
+      // No cleaned text — use raw
     }
 
     let translatedText: string | null = null;
@@ -204,6 +292,7 @@ async function handleGroupedDocument(
 
     pages.push({
       ocrText,
+      rawOcrText: ocrText !== rawOcrText ? rawOcrText : undefined,
       translatedText,
       imagePath: `/api/cases/${caseId}/document/${encodeURIComponent(groupDocId)}/image?page=${i}`,
       entities: pageEntities,
@@ -219,6 +308,7 @@ async function handleGroupedDocument(
     confidence: maxConfidence,
     imagePath: `/api/cases/${caseId}/document/${encodeURIComponent(groupDocId)}/image?page=0`,
     ocrText: pages[0]?.ocrText || '',
+    rawOcrText: pages[0]?.rawOcrText,
     translatedText: pages[0]?.translatedText || null,
     entities: allEntities,
     detectedLanguage,

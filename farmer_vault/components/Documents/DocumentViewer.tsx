@@ -39,6 +39,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
   const [currentPage, setCurrentPage] = useState(0);
+  const [showRawOcr, setShowRawOcr] = useState(false);
   const isMobile = useIsMobile();
 
   const pages = document.pages;
@@ -47,9 +48,13 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
 
   // Current page data
   const currentOcrText = pages ? pages[currentPage]?.ocrText : document.ocrText;
+  const currentRawOcrText = pages ? pages[currentPage]?.rawOcrText : document.rawOcrText;
   const currentTranslatedText = pages ? pages[currentPage]?.translatedText : document.translatedText;
   const currentImagePath = pages ? pages[currentPage]?.imagePath : document.imagePath;
   const currentEntities = pages ? pages[currentPage]?.entities : document.entities;
+
+  const hasCleanedText = !!currentRawOcrText;
+  const displayOcrText = showRawOcr && hasCleanedText ? currentRawOcrText : currentOcrText;
 
   const languageDisplayName = document.detectedLanguage
     ? LANGUAGE_NAMES[document.detectedLanguage] || document.detectedLanguage.toUpperCase()
@@ -185,12 +190,28 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
         </TabsList>
 
         {/* OCR Panel */}
-        <TabsContent value="ocr" className="flex-1 min-h-0">
-          <ScrollArea className="h-full">
-            <div className="p-4 sm:p-6">
-              <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
-                {currentOcrText}
-              </pre>
+        <TabsContent value="ocr" className="flex-1 min-h-0 flex flex-col">
+          {hasCleanedText && (
+            <div className="flex items-center gap-2 px-4 sm:px-6 pt-3 pb-1">
+              <button
+                type="button"
+                onClick={() => setShowRawOcr(!showRawOcr)}
+                className="text-xs font-mono px-2 py-1 rounded border border-[var(--border)] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              >
+                {showRawOcr ? 'Show Cleaned' : 'Show Raw OCR'}
+              </button>
+              {showRawOcr && (
+                <span className="text-xs text-muted-foreground/60">Unprocessed OCR output</span>
+              )}
+            </div>
+          )}
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="p-4 sm:p-6 max-w-prose">
+              {(displayOcrText || '').split(/\n\n+/).map((paragraph, i) => (
+                <p key={i} className="mb-4 text-[15px] leading-7 text-foreground">
+                  {paragraph}
+                </p>
+              ))}
             </div>
           </ScrollArea>
         </TabsContent>
@@ -199,13 +220,15 @@ export function DocumentViewer({ document, caseId }: DocumentViewerProps) {
         {hasTranslation && (
           <TabsContent value="translated" className="flex-1 min-h-0">
             <ScrollArea className="h-full">
-              <div className="p-4 sm:p-6">
+              <div className="p-4 sm:p-6 max-w-prose">
                 {currentTranslatedText ? (
-                  <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
-                    {currentTranslatedText}
-                  </pre>
+                  (currentTranslatedText || '').split(/\n\n+/).map((paragraph, i) => (
+                    <p key={i} className="mb-4 text-[15px] leading-7 text-foreground">
+                      {paragraph}
+                    </p>
+                  ))
                 ) : (
-                  <p className="text-sm text-muted-foreground/60 font-mono">
+                  <p className="text-sm text-muted-foreground/60">
                     No translation available for this page.
                   </p>
                 )}

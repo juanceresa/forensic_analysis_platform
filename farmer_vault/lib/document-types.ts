@@ -13,6 +13,7 @@ export interface Document {
 
 export interface DocumentPage {
   ocrText: string;
+  rawOcrText?: string;
   translatedText?: string | null;
   imagePath: string;
   entities: BaseNode[];
@@ -20,6 +21,7 @@ export interface DocumentPage {
 
 export interface DocumentDetail extends Document {
   ocrText: string;
+  rawOcrText?: string;
   translatedText?: string | null;
   detectedLanguage?: string;
   entities: BaseNode[];
