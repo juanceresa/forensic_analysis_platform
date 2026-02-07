@@ -1,8 +1,56 @@
 """Pydantic models for case narrative generation output."""
 
 from datetime import datetime
+from enum import Enum
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
+
+
+# --- Document Analysis Models ---
+
+class RelevanceLevel(str, Enum):
+    CRITICAL = "CRITICAL"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class OcrQuality(str, Enum):
+    EXCELLENT = "EXCELLENT"  # >0.90
+    GOOD = "GOOD"            # 0.75-0.90
+    FAIR = "FAIR"            # 0.60-0.75
+    POOR = "POOR"            # <0.60
+
+
+class ClaimRelevance(BaseModel):
+    level: RelevanceLevel
+    reasoning: str
+
+
+class QualityNotes(BaseModel):
+    ocr_quality: OcrQuality
+    missing_information: list[str] = []
+    verification_needed: list[str] = []
+
+
+class GenerationMetadata(BaseModel):
+    generated_at: str  # ISO 8601 timestamp
+    model: str  # e.g., "claude-haiku-4-5-20251001"
+    prompt_version: str  # e.g., "1.0"
+
+
+class DocumentAnalysis(BaseModel):
+    document_type: str
+    executive_summary: str
+    claim_relevance: ClaimRelevance
+    key_facts: list[str] = []
+    cross_references: list[str] = []
+    quality_notes: QualityNotes
+    source_docs: list[str] = []
+    _metadata: GenerationMetadata
+
+
+# --- Case Narrative Models ---
 
 
 class EventHighlight(BaseModel):
