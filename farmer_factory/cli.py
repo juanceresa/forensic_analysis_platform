@@ -793,6 +793,43 @@ def list_domains():
             click.echo(f"  {domain_code}: (failed to load)")
 
 
+@cli.command("generate-descriptions")
+@click.argument("case_id")
+@click.option("--max-cost", default=0.50, help="Max generation cost in USD (default: 0.50)")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def generate_descriptions(case_id: str, max_cost: float, domain: str):
+    """Generate AI descriptions for each entity in the knowledge graph.
+
+    Uses Haiku for cheap, fast per-entity prose summaries. Writes descriptions
+    directly into graph_data.json. Skips entities that already have descriptions.
+
+    Example:
+        python cli.py generate-descriptions TEST-CERESA
+    """
+    setup_domain(domain)
+
+    graph_path = Path("cases") / case_id / "output" / "graph_data.json"
+    if not graph_path.exists():
+        raise click.ClickException(
+            f"graph_data.json not found at {graph_path}. Run 'process' first."
+        )
+
+    from farmer_factory.narrative.entity_descriptions import generate_entity_descriptions
+
+    click.echo(f"Generating entity descriptions (model=haiku, max_cost=${max_cost:.2f})...")
+
+    try:
+        result_path = generate_entity_descriptions(case_id, max_cost=max_cost)
+        click.echo(f"\n✅ Descriptions written to: {result_path}")
+    except Exception as e:
+        logger.exception(f"Description generation failed: {e}")
+        raise click.ClickException(str(e))
+
+
 @cli.command("generate-manifest")
 @click.argument("case_id")
 def generate_manifest(case_id: str):
