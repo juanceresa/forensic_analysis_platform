@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     output_dir: Path = Path("./output")
 
     # Translation
-    translation_enabled: bool = False  # Off by default for compliance/PII safety
-    translation_backend: str = "gcp"  # Google Cloud Translation
+    translation_enabled: bool = True
+    translation_backend: str = "gcp"
     translation_target_language: str = "en"
 
     # Model Configuration

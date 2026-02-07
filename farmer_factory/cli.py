@@ -305,7 +305,7 @@ def process(
         output_path = Path("cases") / case_id / "output" / "graph_data.json"
         click.echo(f"\nGraph saved to: {output_path}")
 
-        # Generate case narrative (final pipeline step)
+        # Generate case narrative
         try:
             from farmer_factory.narrative import CaseNarrativeGenerator
             from farmer_factory.structure.graph import KnowledgeGraph
@@ -318,6 +318,28 @@ def process(
         except Exception as e:
             logger.warning(f"Narrative generation failed (non-fatal): {e}")
             click.echo(f"\n⚠️  Narrative generation skipped: {e}", err=True)
+
+        # Generate per-entity descriptions
+        try:
+            from farmer_factory.narrative.entity_descriptions import generate_entity_descriptions
+
+            click.echo("\nGenerating entity descriptions (Haiku)...")
+            desc_path = generate_entity_descriptions(case_id)
+            click.echo(f"Entity descriptions saved to: {desc_path}")
+        except Exception as e:
+            logger.warning(f"Entity description generation failed (non-fatal): {e}")
+            click.echo(f"\n⚠️  Entity descriptions skipped: {e}", err=True)
+
+        # Generate per-document analyses (final pipeline step)
+        try:
+            from farmer_factory.narrative.document_analysis import generate_document_analyses
+
+            click.echo("\nGenerating document analyses (Haiku)...")
+            analyses_path = generate_document_analyses(case_id)
+            click.echo(f"Document analyses saved to: {analyses_path}")
+        except Exception as e:
+            logger.warning(f"Document analysis generation failed (non-fatal): {e}")
+            click.echo(f"\n⚠️  Document analyses skipped: {e}", err=True)
 
     except ProcessingError as e:
         logger.error(f"Processing failed: {e}")
@@ -827,6 +849,43 @@ def generate_descriptions(case_id: str, max_cost: float, domain: str):
         click.echo(f"\n✅ Descriptions written to: {result_path}")
     except Exception as e:
         logger.exception(f"Description generation failed: {e}")
+        raise click.ClickException(str(e))
+
+
+@cli.command("generate-analyses")
+@click.argument("case_id")
+@click.option("--max-cost", default=1.00, help="Max generation cost in USD (default: 1.00)")
+@click.option(
+    "--domain",
+    default="cuban_property",
+    help="Domain configuration to use (default: cuban_property)",
+)
+def generate_analyses(case_id: str, max_cost: float, domain: str):
+    """Generate per-document analysis for each document in the case.
+
+    Uses Haiku for cheap, structured interpretive summaries. Writes analyses
+    to output/document_analyses.json. Skips documents that already have analyses.
+
+    Example:
+        python cli.py generate-analyses TEST-CERESA
+    """
+    setup_domain(domain)
+
+    extractions_dir = Path("cases") / case_id / "extractions"
+    if not extractions_dir.exists():
+        raise click.ClickException(
+            f"Extractions not found at {extractions_dir}. Run 'process' first."
+        )
+
+    from farmer_factory.narrative.document_analysis import generate_document_analyses
+
+    click.echo(f"Generating document analyses (model=haiku, max_cost=${max_cost:.2f})...")
+
+    try:
+        result_path = generate_document_analyses(case_id, max_cost=max_cost)
+        click.echo(f"\n✅ Analyses written to: {result_path}")
+    except Exception as e:
+        logger.exception(f"Document analysis generation failed: {e}")
         raise click.ClickException(str(e))
 
 
