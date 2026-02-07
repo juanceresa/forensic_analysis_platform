@@ -30,7 +30,7 @@ from farmer_factory.structure import (
 from farmer_factory.intake import ManifestManager
 from farmer_factory.intake.document_groups import load_document_groups
 from farmer_factory.config.settings import settings
-from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, setup_logging
+from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, save_cleaned_text, setup_logging
 from .exceptions import ProcessingError
 
 logger = logging.getLogger(__name__)
@@ -214,6 +214,14 @@ def process_case(
                 save_ocr_text(extraction.ocr_result, ocr_text_path)
             except Exception as e:
                 logger.warning(f"Failed to save OCR text: {e}")
+
+            # Save cleaned OCR text if available
+            try:
+                if extraction.cleaned_text:
+                    cleaned_path = case_dir / 'ocr_cleaned' / f"{document_id}.txt"
+                    save_cleaned_text(extraction.cleaned_text, cleaned_path)
+            except Exception as e:
+                logger.warning(f"Failed to save cleaned OCR text: {e}")
 
             # Translate OCR text if enabled and non-English (local, offline)
             try:

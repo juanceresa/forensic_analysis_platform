@@ -29,7 +29,7 @@ The few-shot prompts are kept in `farmer_factory/extract/prompts/few_shot.py` fo
 ```
 farmer_factory/extract/prompts/
 ├── helpers.py      # Domain-aware helper functions
-├── zero_shot.py    # Zero-shot prompts (used by LLMExtractionService)
+├── zero_shot.py    # Zero-shot prompts (cleanup + extraction, used by LLMExtractionService)
 └── few_shot.py     # Few-shot prompts (kept for reference)
 ```
 
@@ -44,6 +44,12 @@ farmer_factory/extract/prompts/
 │   OCR Text ─────────────────────────────────────────────────────┐  │
 │       │                                                          │  │
 │       ▼                                                          │  │
+│   ┌──────────────┐                                               │  │
+│   │  OCR TEXT    │──▶ Fix broken words, remove artifacts,        │  │
+│   │  CLEANUP     │    restore paragraphs (preserves language)    │  │
+│   └──────────────┘                                               │  │
+│       │                                                          │  │
+│       ▼  (cleaned text used for all downstream steps)            │  │
 │   ┌──────────────┐                                               │  │
 │   │   ENTITY     │──▶ Persons, Properties, Organizations,        │  │
 │   │   EXTRACTION │    Locations, Dates                           │  │
@@ -82,8 +88,9 @@ farmer_factory/extract/prompts/
 
 | Prompt | Scope | When | Input Size | Model |
 |--------|-------|------|------------|-------|
-| **Entity Extraction** | Per document | Immediately after OCR | 1-10 pages | Haiku |
-| **Relation Extraction** | Per document | After entity extraction | Entities + OCR text | Haiku |
+| **OCR Text Cleanup** | Per document | Immediately after OCR | Raw OCR text | Haiku |
+| **Entity Extraction** | Per document | After OCR cleanup | Cleaned text | Haiku |
+| **Relation Extraction** | Per document | After entity extraction | Entities + cleaned text | Haiku |
 | **Document Summary** | Per document | After relations | Entities + relations + OCR | Haiku |
 | **Coreference Resolution** | Batch (all docs) | After all docs processed | All extracted entities | Sonnet |
 | **Gap Detection** | Graph-wide | After graph construction | Complete graph + metadata | Sonnet |
@@ -123,6 +130,44 @@ DOCUMENT CONTEXT:
 - Time period: primarily 1940s-1960s
 - Geographic focus: Cuba, with emphasis on Camagüey province
 ```
+
+---
+
+## Prompt 0: OCR Text Cleanup
+
+### Purpose
+Clean noisy OCR output from degraded historical documents before entity/relation extraction. This improves both human readability and downstream extraction quality.
+
+### Input
+- Raw OCR text (typically Spanish)
+- OCR confidence score
+- Detected language
+- Document ID
+
+### When
+Runs immediately after OCR extraction, before entity extraction. Uses Haiku (cheapest model). On failure, gracefully falls back to raw OCR text.
+
+### Cost
+~$0.0016 per document (~$0.03 for an 18-document case).
+
+### Prompt Template
+
+See `farmer_factory/extract/prompts/zero_shot.py` → `build_cleanup_prompt()`.
+
+The prompt instructs the LLM to:
+- Fix broken/hyphenated words across line breaks (e.g., "Far-\nmacia" → "Farmacia")
+- Remove OCR noise and artifacts (random characters, reversed bleed-through text, stray symbols)
+- Restore proper paragraph breaks following the document's logical sections
+- Preserve the original language exactly — no translation, no paraphrasing
+- Keep all names, dates, numbers, addresses, and legal terms verbatim
+- Mark genuinely unreadable sections as `[ilegible]`
+- Return only cleaned text (no JSON wrapper)
+
+### Output
+Plain text string — the cleaned document text. Saved to `cases/{CASE_ID}/ocr_cleaned/{doc_id}.txt` and embedded in extraction JSON at `ocr_result.cleaned_text`.
+
+### Frontend Integration
+The Vault serves cleaned text by default on the OCR tab. A "Show Raw OCR" toggle lets users compare with the unprocessed version.
 
 ---
 

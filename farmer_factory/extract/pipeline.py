@@ -21,6 +21,7 @@ class ExtractionResult:
     path: DocumentPath                      # Which path was used
     processing_metadata: Dict[str, Any]     # Processing metadata
     extraction_flags: List[str] = field(default_factory=list)  # Flags for incomplete/failed extractions
+    cleaned_text: Optional[str] = None      # LLM-cleaned OCR text
 
 
 class ExtractionPipeline:
@@ -89,14 +90,23 @@ class ExtractionPipeline:
         # Step 1: OCR extraction
         ocr_result = self.ocr_service.extract_text(processed_page.image)
 
-        # Step 2: LLM entity extraction from OCR text
-        llm_result = self.llm_service.extract_from_text(
+        # Step 2: Clean OCR text (LLM — cheap Haiku call)
+        detected_language = ocr_result.metadata.get('language', 'unknown')
+        cleaned_text = self.llm_service.clean_ocr_text(
             text=ocr_result.text,
+            ocr_confidence=ocr_result.confidence,
+            document_id=document_id,
+            detected_language=detected_language,
+        )
+
+        # Step 3: LLM entity extraction from cleaned text
+        llm_result = self.llm_service.extract_from_text(
+            text=cleaned_text,
             ocr_confidence=ocr_result.confidence,
             document_id=document_id
         )
 
-        # Step 3: Validate entities and relations
+        # Step 4: Validate entities and relations
         # (LLM already returns Pydantic models, but validator ensures consistency)
         entity_dicts = [e.model_dump(mode="json") for e in llm_result.entities]
         relation_dicts = [r.model_dump(mode="json") for r in llm_result.relations]
@@ -144,7 +154,8 @@ class ExtractionPipeline:
             confidence_scores=confidence_scores,
             path=DocumentPath.TYPED,
             processing_metadata=processing_metadata,
-            extraction_flags=extraction_flags
+            extraction_flags=extraction_flags,
+            cleaned_text=cleaned_text if cleaned_text != ocr_result.text else None,
         )
 
     def _extract_handwritten_path(

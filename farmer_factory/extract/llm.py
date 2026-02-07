@@ -12,6 +12,7 @@ from farmer_factory.extract.chunker import TextChunker
 from farmer_factory.extract.prompts import (
     build_entity_prompt_zero_shot,
     build_relation_prompt_zero_shot,
+    build_cleanup_prompt,
 )
 from farmer_factory.extract.parsers import (
     parse_entity_response,
@@ -249,6 +250,66 @@ class LLMExtractionService:
         )
 
         return entities, extraction.document_date
+
+    def clean_ocr_text(
+        self,
+        text: str,
+        ocr_confidence: float,
+        document_id: str,
+        detected_language: str = "unknown",
+    ) -> str:
+        """
+        Clean noisy OCR text using LLM (Haiku).
+
+        Fixes broken words, removes artifacts, restores paragraph structure.
+        On failure, returns original text (graceful degradation).
+
+        Args:
+            text: Raw OCR text
+            ocr_confidence: OCR confidence score
+            document_id: Document identifier
+            detected_language: ISO language code from OCR
+
+        Returns:
+            Cleaned text string, or original text on failure
+        """
+        if not text or not text.strip():
+            return text
+
+        if not self.api_key:
+            logger.debug(f"No API key — skipping OCR cleanup for {document_id}")
+            return text
+
+        try:
+            start_time = time.time()
+
+            prompt = build_cleanup_prompt(
+                text=text,
+                document_id=document_id,
+                ocr_quality=ocr_confidence,
+                detected_language=detected_language,
+            )
+
+            logger.info(f"Cleaning OCR text for {document_id} (Haiku)...")
+            cleaned = self.api_client.call_standard(
+                prompt=prompt,
+                max_retries=2,
+                retry_delay=1.0,
+                api_timeout=60,
+            )
+
+            processing_time = time.time() - start_time
+            logger.info(
+                f"OCR cleanup completed in {processing_time:.2f}s for {document_id} "
+                f"({len(text)} → {len(cleaned)} chars)"
+            )
+            return cleaned.strip()
+
+        except Exception as e:
+            logger.warning(
+                f"OCR cleanup failed for {document_id}, using raw text: {e}"
+            )
+            return text
 
     def extract_from_text(
         self, text: str, ocr_confidence: float, document_id: str

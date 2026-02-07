@@ -15,6 +15,7 @@ from .few_shot import (
 from .zero_shot import (
     build_entity_prompt_zero_shot,
     build_relation_prompt_zero_shot,
+    build_cleanup_prompt,
 )
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     # Zero-shot prompts (default - more effective and cost-efficient)
     "build_entity_prompt_zero_shot",
     "build_relation_prompt_zero_shot",
+    "build_cleanup_prompt",
     # Few-shot prompts (kept for reference, not used by default)
     "build_entity_prompt",
     "build_relation_prompt",

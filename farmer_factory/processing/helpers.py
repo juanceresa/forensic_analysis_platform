@@ -98,10 +98,16 @@ def save_extraction_json(extraction, output_path: Path) -> None:
                 return obj.isoformat()
             return super().default(obj)
 
+    # Serialize OCR result, embedding cleaned_text if available
+    ocr_data = _serialize_ocr_result(extraction.ocr_result) if extraction.ocr_result else None
+    cleaned_text = getattr(extraction, 'cleaned_text', None)
+    if ocr_data and cleaned_text:
+        ocr_data['cleaned_text'] = cleaned_text
+
     data = {
         'entities': [e.model_dump() for e in extraction.entities],
         'relations': [r.model_dump() for r in extraction.relations],
-        'ocr_result': _serialize_ocr_result(extraction.ocr_result) if extraction.ocr_result else None,
+        'ocr_result': ocr_data,
         'confidence_scores': extraction.confidence_scores,
         'path': extraction.path.value,
         'processing_metadata': extraction.processing_metadata,
@@ -132,6 +138,25 @@ def save_ocr_text(ocr_result, output_path: Path) -> None:
         f.write(ocr_result.text)
 
     logger.debug(f"Saved OCR text to {output_path}")
+
+
+def save_cleaned_text(text: str, output_path: Path) -> None:
+    """
+    Save LLM-cleaned OCR text to standalone .txt file.
+
+    Args:
+        text: Cleaned OCR text
+        output_path: Path to save .txt file
+    """
+    if not text:
+        logger.debug(f"No cleaned text to save for {output_path}")
+        return
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(text)
+
+    logger.debug(f"Saved cleaned OCR text to {output_path}")
 
 
 def setup_logging(log_file: Path) -> None:

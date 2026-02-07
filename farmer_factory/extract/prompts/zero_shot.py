@@ -19,6 +19,59 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 
+def build_cleanup_prompt(
+    text: str,
+    document_id: str,
+    ocr_quality: float = 0.0,
+    detected_language: str = "unknown",
+) -> str:
+    """
+    Build prompt for LLM-powered OCR text cleanup.
+
+    Instructs the LLM to fix OCR noise while preserving original content.
+
+    Args:
+        text: Raw OCR text to clean
+        document_id: Document identifier for context
+        ocr_quality: OCR confidence score
+        detected_language: ISO language code from OCR
+
+    Returns:
+        Formatted prompt string
+    """
+    quality_desc = ocr_quality_description(ocr_quality)
+    system_context = load_system_context()
+    context_section = f"\n{system_context}\n" if system_context else ""
+
+    lang_hint = ""
+    if detected_language and detected_language not in ("unknown", "und"):
+        lang_hint = f"\nDetected language: {detected_language}. Preserve the original language exactly."
+
+    prompt = f"""{context_section}You are an OCR text cleanup specialist for degraded historical documents.
+
+TASK: Clean the following OCR-extracted text from a historical document. The OCR confidence is {quality_desc} ({ocr_quality:.0%}).{lang_hint}
+
+RULES:
+- Fix broken/hyphenated words across line breaks (e.g., "Far-\\nmacia" → "Farmacia")
+- Remove OCR noise and artifacts: random characters, reversed bleed-through text, stray symbols
+- Restore proper paragraph breaks following the document's logical sections
+- Preserve the original language exactly — do NOT translate or paraphrase
+- Keep ALL names, dates, numbers, addresses, and legal terms verbatim
+- Mark genuinely unreadable sections as [ilegible]
+- Do NOT add any information not present in the original text
+- Do NOT wrap the output in JSON or any other format
+
+Return ONLY the cleaned text, nothing else.
+
+Document: {document_id} | OCR Quality: {quality_desc}
+
+RAW OCR TEXT:
+{text}
+
+CLEANED TEXT:"""
+    return prompt
+
+
 def build_entity_prompt_zero_shot(
     text: str,
     document_id: str,
