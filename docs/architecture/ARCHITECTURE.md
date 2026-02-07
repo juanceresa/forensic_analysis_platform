@@ -208,14 +208,15 @@ In MVP1:
 │                       POST-PROCESSING                               │
 │                                                                     │
 │   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐           │
-│   │ Error Correct│──▶│ Normalize    │──▶│ Entity       │           │
-│   │ (OCR cleanup)│   │ (dates, $)   │   │ Extraction   │           │
+│   │ LLM OCR     │──▶│ Entity       │──▶│ Relation     │           │
+│   │ Cleanup     │   │ Extraction   │   │ Extraction   │           │
+│   │ (Haiku)     │   │ (Haiku)      │   │ (Haiku)      │           │
 │   └──────────────┘   └──────────────┘   └──────────────┘           │
 │          │                                     │                    │
 │          ▼                                     ▼                    │
 │   ┌──────────────┐                      ┌──────────────┐           │
-│   │ Coreference  │                      │ Relation     │           │
-│   │ Resolution   │                      │ Extraction   │           │
+│   │ Coreference  │                      │ Schema       │           │
+│   │ Resolution   │                      │ Validation   │           │
 │   └──────────────┘                      └──────────────┘           │
 │                                                                     │
 │   • "Don Mario" = "M. Ceresa" = "Mario Ceresa"                     │
@@ -284,11 +285,12 @@ In MVP1:
 
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
-| Framework | Next.js 14 (App Router) | Static export, modern React |
-| Styling | Tailwind CSS | Rapid prototyping, dark mode support |
+| Framework | Next.js 16 (App Router) | Static export, modern React |
+| Styling | Tailwind CSS + shadcn/ui | Radix primitives, dark mode |
 | Graph Visualization | react-force-graph-2d | Force-directed physics-based layout |
 | State Management | None (static data) | Read-only, no client state needed |
-| Deployment (MVP1) | Local | No Vercel/Supabase until MVP2 |
+| Auth (interim) | Cookie-based password gate | Simple shared password for family sharing |
+| Deployment (MVP1) | Local + cloudflared tunnel | No Vercel/Supabase until MVP2 |
 
 ### Database (MVP2+)
 
@@ -516,41 +518,47 @@ farmer_factory/
 
 ```
 farmer_vault/
+├── middleware.ts               # Password auth gate (interim, pre-Clerk)
 ├── app/
 │   ├── layout.tsx             # Dark theme, monospace fonts
 │   ├── page.tsx               # Dashboard entry
 │   ├── globals.css            # Tailwind + custom styles
-│   └── case/
-│       └── [id]/
-│           ├── page.tsx       # Case overview
-│           ├── graph/
-│           │   └── page.tsx   # Full graph view
-│           └── documents/
-│               └── page.tsx   # Document list
+│   ├── login/page.tsx         # Password login page
+│   ├── api/
+│   │   ├── auth/login/route.ts # Password auth endpoint
+│   │   └── cases/[caseId]/   # Case data API routes
+│   │       ├── dashboard/     # Aggregated metrics
+│   │       ├── documents/     # Document list (grouped)
+│   │       ├── document/[docId]/ # Document detail + image
+│   │       ├── entities/      # Entities grouped by type
+│   │       ├── entity/[entityId]/ # Entity detail + descriptions
+│   │       ├── timeline/      # Timeline periods + narrative
+│   │       ├── graph/         # Full graph data
+│   │       ├── narrative/     # AI narrative generation
+│   │       └── dossier/       # PDF dossier download
+│   └── case/[caseId]/
+│       ├── page.tsx           # Dashboard
+│       ├── documents/         # Document browser
+│       ├── entities/          # Entity browser + key events
+│       ├── narrative/         # AI Analysis (scroll + sub-routes)
+│       └── graph/             # Redirect to /narrative/graph
 ├── components/
-│   ├── Dashboard/             # Dashboard-specific components
-│   │   └── Header.tsx         # Dashboard header with graph stats
-│   ├── Documents/             # Document browser components
-│   ├── Entities/              # Entity browser and detail components
-│   │   └── EntityDetail.tsx   # Full entity view (metadata, sources, connections)
-│   ├── Graph/                 # Knowledge graph components
-│   │   ├── KnowledgeGraph.tsx # Force-directed graph (react-force-graph-2d)
-│   │   ├── GraphView.tsx      # Graph page with integrated sidebar
-│   │   ├── EntitySidebar.tsx  # Slide-in entity detail panel
-│   │   ├── GraphSettingsPanel.tsx # Graph customization controls
-│   │   └── NodeBadge.tsx      # Entity type indicator
-│   ├── Narrative/             # Timeline/narrative components
-│   └── shared/                # Shared UI primitives
-│       ├── Card.tsx, Header.tsx, Sidebar.tsx
-│       ├── VerificationBadge.tsx
-│       └── ErrorBoundary.tsx, ErrorState.tsx, LoadingState.tsx
+│   ├── Dashboard/             # Dashboard header, dossier download
+│   ├── Documents/             # DocumentViewer (raw/cleaned toggle), DocumentList
+│   ├── Entities/              # EntityBrowser (+ events), EntityDetail (+ descriptions)
+│   ├── Graph/                 # KnowledgeGraph, GraphView (inline settings), EntitySidebar
+│   ├── Timeline/              # Scroll experience (Hero, ScrollTimeline, StickySpine, etc.)
+│   ├── Narrative/             # TimelinePeriod
+│   ├── ui/                    # shadcn/ui primitives
+│   └── shared/                # Sidebar, ErrorBoundary, VerificationBadge, etc.
 ├── lib/
 │   ├── types.ts               # TypeScript types matching JSON schema
-│   ├── verification.ts        # Tier display logic
-│   └── graph-config.ts        # Force graph settings
-├── public/
-│   └── data/
-│       └── graph_data.json    # Static export from Factory
+│   ├── document-groups.ts     # YAML loading, file-to-group mapping
+│   ├── document-types.ts      # Document type definitions
+│   ├── graph-settings.ts      # Graph display settings
+│   └── graph-utils.ts         # Graph data utilities
+├── hooks/
+│   └── useGraphSettings.ts    # Graph settings hook
 ├── tailwind.config.js
 ├── next.config.js
 └── package.json
@@ -621,11 +629,15 @@ cases/
 └── CASE-ID/
     ├── intake/                         # Original uploaded documents
     ├── preprocessed/                   # Preprocessed images for OCR
-    ├── ocr/                            # OCR text output
+    ├── ocr/                            # Raw OCR text output
+    ├── ocr_cleaned/                    # LLM-cleaned OCR text
     ├── ocr_translated/                 # Translated OCR text
-    ├── extractions/                    # LLM entity extractions
+    ├── extractions/                    # LLM entity extractions (includes cleaned_text)
+    ├── entity_groups/                  # Entity merge authority YAML files
     ├── output/
     │   ├── graph_data.json             # Knowledge graph
+    │   ├── case_narrative.json         # Period-based case narrative
+    │   ├── entity_descriptions.json    # Per-entity AI descriptions
     │   └── *_dossier.pdf               # Generated dossiers
     ├── metadata.json                   # Case metadata
     ├── manifest.json                   # Processing manifest

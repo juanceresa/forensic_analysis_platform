@@ -1,8 +1,8 @@
 # Farmer House Forensic Intelligence Platform — Implementation Roadmap
 
 > **Document Classification:** Internal Engineering Reference
-> **Version:** 1.10.0
-> **Last Updated:** 2026-01-30
+> **Version:** 1.11.0
+> **Last Updated:** 2026-02-07
 > **Status:** MVP1 Planning (with dependencies and acceptance criteria)
 
 ---
@@ -865,7 +865,7 @@ farmer_factory/
 │   └── prompts/              [✓] # NEW - Prompt builders package
 │       ├── __init__.py       [✓]
 │       ├── helpers.py        [✓] # Domain-aware helpers
-│       ├── zero_shot.py      [✓] # Zero-shot prompts (default)
+│       ├── zero_shot.py      [✓] # Zero-shot prompts + OCR cleanup prompt
 │       └── few_shot.py       [✓] # Few-shot prompts (reference only)
 ├── structure/
 │   ├── schema.py             [✓] # Complete (includes LocationNature, OrganizationNature enums)
@@ -878,11 +878,12 @@ farmer_factory/
 │   ├── merge_engine.py       [✓] # NEW - Graph surgery engine (apply_merges)
 │   ├── models/               [ ] # Trained dedupe models (*.pkl)
 │   └── ~~gap_detector.py~~   [x] # DEFERRED to analyst workflow
-├── narrative/                [✓] # Batch case narrative generation
+├── narrative/                [✓] # Batch case narrative + entity descriptions
 │   ├── __init__.py           [✓]
 │   ├── models.py             [✓] # CaseNarrative, NarrativePeriod, NarrativeMetadata, EventHighlight
 │   ├── prompts.py            [✓] # Period + summary prompt templates
-│   └── generator.py          [✓] # CaseNarrativeGenerator (batch processing)
+│   ├── generator.py          [✓] # CaseNarrativeGenerator (batch processing)
+│   └── entity_descriptions.py [✓] # Per-entity descriptions (Haiku, writes entity_descriptions.json)
 ├── export/
 │   ├── json_exporter.py      [ ]
 │   └── audit_log.py          [ ]
@@ -941,7 +942,7 @@ tests/
 ### Vault (Next.js)
 ```
 farmer_vault/
-├── middleware.ts             [ ] # Clerk auth middleware
+├── middleware.ts             [✓] # Password auth gate (interim, pre-Clerk)
 ├── app/
 │   ├── layout.tsx            [ ] # ClerkProvider wrapper
 │   ├── globals.css           [ ]
@@ -961,7 +962,7 @@ farmer_vault/
 │   │   ├── KnowledgeGraph.tsx    [✓]
 │   │   ├── GraphView.tsx         [✓]
 │   │   ├── EntitySidebar.tsx     [✓]
-│   │   ├── GraphSettingsPanel.tsx [✓]
+│   │   ├── GraphSettingsPanel.tsx [x] # REMOVED - inline in GraphView
 │   │   └── NodeBadge.tsx         [✓]
 │   ├── Narrative/
 │   │   └── TimelinePeriod.tsx    [✓]
@@ -1606,6 +1607,67 @@ farmer_vault/
 - **Server components where possible:** HeroSection and PlaceholderSection are server components; scroll-interactive components are client
 - **No shared layout:** Navigation handled entirely by sidebar sub-items, not a nested layout
 - **Enriched events:** Main page enriches events with narrative text from periods for bullet snapshots
+
+---
+
+## Phase 9F: LLM OCR Cleanup + Entity Descriptions + UI Polish
+
+### Status: ✅ COMPLETE (2026-02-07)
+
+### Overview
+Multi-feature release adding LLM-powered OCR text cleanup, per-entity AI descriptions, key events in entity browser, knowledge graph simplification, and password-based auth for deployment.
+
+### Tasks
+
+| Task | File | Status | Notes |
+|------|------|--------|-------|
+| 9F.1 | `extract/prompts/zero_shot.py` | ✅ | `build_cleanup_prompt()` for OCR text cleanup |
+| 9F.2 | `extract/llm.py` | ✅ | `clean_ocr_text()` method (Haiku, ~$0.0016/doc) |
+| 9F.3 | `extract/pipeline.py` | ✅ | Pipeline: OCR → Cleanup → Entity Extraction |
+| 9F.4 | `processing/helpers.py` | ✅ | `save_cleaned_text()` + embed in extraction JSON |
+| 9F.5 | `narrative/entity_descriptions.py` | ✅ | Per-entity descriptions (Haiku, separate JSON) |
+| 9F.6 | `cli.py` | ✅ | `generate-descriptions` CLI command |
+| 9F.7 | Document API | ✅ | Serve cleaned text + rawOcrText + OCR block filtering |
+| 9F.8 | Entity API | ✅ | Merge descriptions from entity_descriptions.json |
+| 9F.9 | DocumentViewer | ✅ | Raw/cleaned toggle, paragraph formatting |
+| 9F.10 | EntityBrowser | ✅ | Key Events section with CONFISCATED/SOLD/INHERITED |
+| 9F.11 | EntityDetail | ✅ | About section with real descriptions |
+| 9F.12 | Graph components | ✅ | Simplified (removed GraphSettingsPanel, -500 lines) |
+| 9F.13 | Auth gate | ✅ | Password middleware + login page for family sharing |
+| 9F.14 | Documentation | ✅ | CLAUDE.md, PROMPTS.md, READMEs updated |
+
+### Key Features
+
+**OCR Text Cleanup:**
+- LLM-powered cleanup step inserted between OCR and entity extraction
+- Fixes broken words, removes artifacts, restores paragraph structure
+- Preserves original language — no translation
+- Graceful degradation: falls back to raw OCR on failure
+- Output: `ocr_cleaned/` directory + embedded in extraction JSON
+
+**Entity Descriptions:**
+- Per-entity AI prose descriptions using Haiku (~$0.001/entity)
+- Saved to `entity_descriptions.json` (survives graph rebuilds)
+- Incremental: re-running skips already-described entities
+- CLI: `generate-descriptions CASE-ID`
+
+**Key Events in Entity Browser:**
+- Timeline events surfaced on entity index page
+- CONFISCATED/SOLD/INHERITED event cards with color coding
+- Filter toggle between entity types and events
+- Events searchable alongside entities
+
+**Graph Simplification:**
+- Removed separate GraphSettingsPanel
+- Inline controls in GraphView
+- EntitySidebar manages own collapse state
+- ~500 lines removed while preserving functionality
+
+**Password Auth Gate:**
+- Simple shared-password for family member access
+- Cookie-based sessions (30 days)
+- Disabled when VAULT_PASSWORD env var is empty
+- Login page with Civic Table branding
 
 ---
 

@@ -1,10 +1,10 @@
 # Extract Module
 
-> **Version:** 1.4.0
-> **Last Updated:** 2026-01-27
-> **Status:** Zero-shot extraction (domain-aware)
+> **Version:** 1.6.0
+> **Last Updated:** 2026-02-07
+> **Status:** Zero-shot extraction with LLM OCR cleanup
 
-Entity and relation extraction from OCR text using Claude API with domain-specific configuration.
+Entity and relation extraction from OCR text using Claude API with domain-specific configuration. Includes LLM-powered OCR text cleanup step before extraction.
 
 ---
 
@@ -12,6 +12,7 @@ Entity and relation extraction from OCR text using Claude API with domain-specif
 
 This module handles:
 - OCR text processing (Google Cloud Vision)
+- **LLM OCR text cleanup** (Haiku — fixes broken words, removes artifacts, preserves language)
 - Structured entity extraction (Claude API with zero-shot prompts)
 - Relation extraction with domain-configured extraction hints
 - Schema validation with Pydantic against domain-defined types
@@ -90,34 +91,37 @@ response = client.call_with_retry(
 
 ### 3. LLM Extraction Service (`llm.py`)
 
-Main interface for entity and relation extraction. Uses **zero-shot prompts** by default (more effective and ~50% cheaper than few-shot based on A/B testing).
+Main interface for OCR cleanup, entity extraction, and relation extraction. Uses **zero-shot prompts** by default (more effective and ~50% cheaper than few-shot based on A/B testing).
 
 ```python
 from farmer_factory.extract import LLMExtractionService
 
 service = LLMExtractionService(api_key="sk-...")
 
-# Extract entities from OCR text
-result = service.extract_from_text(
-    text="En el año 1958, Don Mario Ceresa...",
-    ocr_confidence=0.92,
-    document_id="doc_001"
+# Clean OCR text (Haiku — cheap, fast)
+cleaned = service.clean_ocr_text(
+    text="Far-\nmacia de la Calle...",
+    ocr_confidence=0.72,
+    document_id="doc_001",
+    detected_language="es"
 )
 
-# Extract relations between entities
-relations = service.extract_relations(
-    text="...",
-    entities=[person1, person2, property1],
+# Extract entities from cleaned text
+result = service.extract_from_text(
+    text=cleaned,
+    ocr_confidence=0.72,
     document_id="doc_001"
 )
 ```
 
 **Methods:**
+- `clean_ocr_text()` - Fix OCR noise, broken words, artifacts (Haiku, ~$0.0016/doc)
 - `extract_from_text()` - Extract entities with full structured data
 - Relation extraction runs after entity extraction and uses the document date
   for temporal fallbacks when needed
 - Invalid relation types are skipped without dropping valid relations
 - Extraction results are validated via `SchemaValidator` before returning
+- OCR cleanup gracefully falls back to raw text on failure
 
 ### 4. Response Parsers (`parsers.py`)
 
@@ -267,9 +271,28 @@ See `docs/guides/ADMIN_GUIDE.md` for setup instructions and model installation.
 
 ---
 
+## Pipeline Flow
+
+```
+OCR (Google Cloud Vision)
+    ↓
+OCR Text Cleanup (LLM — Haiku)
+    ↓  fixes broken words, removes artifacts, preserves language
+Entity Extraction (LLM — Haiku, zero-shot)
+    ↓
+Relation Extraction (LLM — Haiku, zero-shot + domain hints)
+    ↓
+Schema Validation (Pydantic)
+```
+
+Output saved to `ocr_cleaned/` directory + embedded in extraction JSON at `ocr_result.cleaned_text`.
+
+---
+
 ## Prompts
 
 All extraction prompts documented in `PROMPTS.md` in this directory:
+- **Prompt 0:** OCR Text Cleanup (preserves original language)
 - **Prompt 1:** Entity Extraction (Structured Format)
 - **Prompt 2:** Relation Extraction (now includes domain-specific hints)
 
@@ -292,6 +315,14 @@ python -m pytest tests/extract/test_llm.py::test_entity_extraction -v
 ---
 
 ## Version History
+
+**v1.6.0 (2026-02-07):**
+- Added LLM-powered OCR text cleanup step (`clean_ocr_text()` in `llm.py`)
+- New prompt: `build_cleanup_prompt()` in `prompts/zero_shot.py`
+- Pipeline: OCR → Cleanup → Entity Extraction → Relation Extraction
+- Output: `ocr_cleaned/{doc_id}.txt` + embedded in extraction JSON
+- Graceful degradation: falls back to raw OCR on failure
+- Cost: ~$0.0016/doc with Haiku
 
 **v1.5.1 (2026-01-28):**
 - Removed local Argos/CTranslate2 translation backend (poor quality on legal text)

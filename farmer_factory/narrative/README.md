@@ -1,148 +1,135 @@
-# Narrative Generation Module
+# Narrative Module
 
-User-driven contextual narrative generation for knowledge graph entities with forensic intelligence narratives, inline citations, and event highlighting.
+> **Version:** 2.0.0
+> **Last Updated:** 2026-02-07
+> **Status:** Batch generation (case narratives + entity descriptions)
 
-## Quick Start
+Batch narrative generation for forensic intelligence cases. Produces case-level timeline narratives and per-entity prose descriptions.
 
-```python
-from farmer_factory.narrative import NarrativeGenerator
-from farmer_factory.structure.graph import KnowledgeGraph
+---
 
-# Initialize
-generator = NarrativeGenerator(api_key="your_anthropic_key")
+## Module Structure
 
-# Load graph
-graph = KnowledgeGraph.load("cases/TEST-CERESA/output/graph_data.json")
-
-# Generate narrative
-result = generator.generate(
-    clicked_node_id="prop_villa_aurelia_001",
-    graph=graph,
-    session_id="user_session_123"
-)
-
-print(result.main_narrative)
-print(f"Cost: ${result.generation_cost:.4f}")
-print(f"Highlighted events: {len(result.highlighted_events)}")
+```
+narrative/
+├── models.py               # Pydantic: CaseNarrative, NarrativePeriod, EventHighlight
+├── prompts.py              # LLM prompt templates (period + summary)
+├── generator.py            # CaseNarrativeGenerator (batch, period-based)
+└── entity_descriptions.py  # Per-entity description generator (Haiku)
 ```
 
-## Architecture
+---
 
-### Single-Stage LLM Generation
-- One API call generates complete narrative with inline citations
-- 50% faster and cheaper than two-stage approach
-- Narrative voice with forensic rigor
+## 1. Case Narrative Generation (`generator.py`)
 
-### Story Centrality Scoring
-Properties score highest (optimal focal points for restitution):
-- PROPERTY: 10.0 base weight
-- CONFISCATED relations: +5.0 boost
-- SOLD/INHERITED: +3.0 boost
-- Document count: ×3.0 multiplier
+Batch per-case narrative generation. Produces `case_narrative.json` with period-based narratives organized by decade.
 
-### Model Selection
-- **Haiku** (cheap): complexity ≤ 50
-- **Sonnet** (deep): complexity > 50
-- Complexity = (entities × 2) + (relations × 1.5) + (documents × 3)
+### Usage
 
-### Session Cost Tracking
-- $1 hard limit per session (configurable)
-- Blocks generation when exceeded
-- Accumulates across all narratives in session
+```bash
+# Runs automatically during `process` pipeline
+python -m farmer_factory.cli process CASE-ID
 
-### Caching Strategy
-In-memory cache with graph-state invalidation:
-- Cache key: `session_id + entity_id + graph_hash`
-- Invalidates when any entity or relation data in the constellation changes
-- Graph hash ignores volatile timestamps (`created_at`, `updated_at`)
-- 1-hour TTL
-- Easy Redis migration via adapter pattern
-
-## Event Highlighting
-
-Special prominence for:
-- **CONFISCATED** - Expropriations (red highlight in UI)
-- **SOLD** - Property sales
-- **INHERITED** - Estate transfers
-
-Relation context in prompts now includes source document IDs and evidence text
-when available, to ground inline citations.
-
-```python
-for event in result.highlighted_events:
-    if event.event_type == "CONFISCATED":
-        print(f"🚨 {event.summary}")
-        print(f"   Date: {event.date}")
-        print(f"   Parties: {', '.join(event.parties_involved)}")
+# Or standalone
+python -m farmer_factory.cli generate-narrative CASE-ID
 ```
 
-## Weight Profile System
+### Architecture
 
-Tune centrality scoring for different use cases:
+- **Grouping:** Documents grouped by decade, sparse periods merged
+- **Model:** Sonnet for narrative quality, Haiku fallback on cost limit
+- **Cost control:** Configurable max cost ($2 default), model downgrade on failure
+- **Output:** `cases/{CASE_ID}/output/case_narrative.json`
 
-```python
-from farmer_factory.narrative import StoryScorer, WEIGHT_PROFILES
+### Output Schema
 
-# Use built-in profile
-scorer = StoryScorer(profile="cuban_restitution")
-
-# Custom weights
-custom_weights = {
-    "type_weights": {
-        EntityType.PROPERTY: 15.0,  # Boost properties more
-        EntityType.PERSON: 3.0
-    },
-    "relation_weights": {
-        RelationType.CONFISCATED: 10.0  # Emphasize expropriations
+```json
+{
+  "metadata": { "case_id": "...", "model": "...", "cost": 0.12 },
+  "case_summary": "Overall case narrative...",
+  "periods": [
+    {
+      "start_year": 1950, "end_year": 1959,
+      "title": "Acquisition Period",
+      "narrative": "During the 1950s...",
+      "events": [
+        { "year": 1958, "event_type": "SOLD", "summary": "...", "parties": [...] }
+      ]
     }
+  ]
 }
-scorer = StoryScorer(profile="custom", custom_weights=custom_weights)
 ```
 
-## Error Handling
+### Event Highlighting
 
-```python
-from farmer_factory.narrative.exceptions import SessionCostLimitExceeded
+Special prominence for key events:
+- **CONFISCATED** — Expropriations (red highlight in Vault UI)
+- **SOLD** — Property sales
+- **INHERITED** — Estate transfers
 
-try:
-    result = generator.generate(
-        clicked_node_id="entity_001",
-        graph=graph,
-        session_id="sess_123",
-        max_cost_per_session=1.0
-    )
-except SessionCostLimitExceeded as e:
-    print(f"Session limit exceeded: ${e.current_cost:.2f} > ${e.limit:.2f}")
+---
+
+## 2. Entity Description Generation (`entity_descriptions.py`)
+
+Per-entity AI-generated prose descriptions using Haiku for cost control.
+
+### Usage
+
+```bash
+python -m farmer_factory.cli generate-descriptions CASE-ID
 ```
+
+### Architecture
+
+- **Model:** Haiku (~$0.0016/entity, ~$0.03 for 18-entity case)
+- **Incremental:** Re-running skips entities already described
+- **Separate file:** Writes to `entity_descriptions.json` (survives graph rebuilds)
+- **Skips DOCUMENT entities:** Only describes PERSON, PROPERTY, ORGANIZATION, LOCATION
+
+### Output
+
+```json
+{
+  "person_mario_ceresa_001": "Mario Ceresa appears in multiple notarial documents...",
+  "property_villa_aurelia_001": "Villa Aurelia is a residential property located in..."
+}
+```
+
+### Design Decisions
+
+- **Separate file:** `entity_descriptions.json` lives alongside `graph_data.json` but is not embedded in it. This means descriptions survive `rebuild-graph` and `apply-merges` operations.
+- **Haiku model:** Cheap enough to regenerate freely (~$0.001/entity)
+- **Forensic voice:** Descriptions state only what documents show, never make legal conclusions
+
+---
+
+## Vault Integration
+
+### Case Narrative
+- Timeline API reads `case_narrative.json`, merges into period responses
+- Scroll-driven timeline experience renders periods with progressive reveal
+- Key events surfaced in entity browser index page
+
+### Entity Descriptions
+- Entity detail API merges descriptions from `entity_descriptions.json`
+- Displayed in "About" section with TIER_3_AI disclaimer badge
+- Falls back gracefully when descriptions file doesn't exist
+
+---
 
 ## Testing
 
 ```bash
-# Unit tests
+# Unit tests (safe — no API calls)
 pytest tests/narrative/ -v
 
-# Integration tests (requires API key)
-pytest tests/narrative/test_integration.py -v -m integration
-
-# Specific test
-pytest tests/narrative/test_scorer.py::test_confiscation_boosts_score -v
+# 27 tests covering models, prompts, generator
 ```
 
-## Cost Estimates
-
-Villa Aurelia example (4 entities, 3 relations, 1 doc):
-- Complexity: ~26 → Haiku
-- Tokens: ~1500 input, ~400 output
-- Cost: ~$0.0007 per generation
-- With cache: $0 on repeat
-
-Session with 20 narratives:
-- Mix of Haiku (80%) and Sonnet (20%)
-- Average: ~$0.014 total
-- Well under $1 limit
+---
 
 ## See Also
 
-- Design: `docs/plans/2026-01-25-narrative-generation-design.md`
-- Implementation: `docs/plans/2026-01-25-narrative-generation-implementation-v2.md`
-- Schema: `farmer_factory/structure/SCHEMA.md`
+- Redesign: `docs/plans/2026-01-28-case-narrative-generation-redesign.md`
+- Prompts: `farmer_factory/narrative/prompts.py`
+- Schema: `farmer_factory/narrative/models.py`
