@@ -133,8 +133,9 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 - **`farmer_factory/narrative/`**
   - `generator.py` - Batch case narrative generation (period-based, uses Sonnet)
   - `entity_descriptions.py` - Per-entity descriptions (uses Haiku, writes `entity_descriptions.json`)
+  - `document_analysis.py` - Per-document structured analysis (uses Haiku, writes `document_analyses.json`)
   - `prompts.py` - LLM prompts for narrative and summary generation
-  - `models.py` - Pydantic models for CaseNarrative, NarrativePeriod, etc.
+  - `models.py` - Pydantic models for CaseNarrative, NarrativePeriod, DocumentAnalysis, etc.
 
 - **`farmer_factory/structure/`**
   - `README.md` - Graph construction & deduplication
@@ -186,6 +187,7 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 - `graph_data.json` - Knowledge graph (entities, relations, metadata)
 - `case_narrative.json` - Period-based case narrative (Sonnet)
 - `entity_descriptions.json` - Per-entity prose descriptions (Haiku) — separate file, survives graph rebuilds
+- `document_analyses.json` - Per-document structured analysis (Haiku) — separate file, survives graph rebuilds
 
 ### Implementation Plans
 - **`docs/plans/`** - Dated design and implementation docs
@@ -285,9 +287,21 @@ python -m farmer_factory.cli list-entities CASE-ID [--type PERSON|PROPERTY|ORGAN
 ### Generate entity descriptions (cheap, uses Haiku)
 ```bash
 python -m farmer_factory.cli generate-descriptions CASE-ID
+# Now runs automatically at end of `process` pipeline (non-fatal on failure)
 # Writes output/entity_descriptions.json — separate from graph_data.json
 # Incremental: re-running skips entities that already have descriptions
 # Survives rebuild-graph and apply-merges
+# Standalone command still available for regeneration
+```
+
+### Generate document analyses (cheap, uses Haiku)
+```bash
+python -m farmer_factory.cli generate-analyses CASE-ID
+# Now runs automatically at end of `process` pipeline (non-fatal on failure)
+# Writes output/document_analyses.json — separate from graph_data.json
+# Incremental: re-running skips documents that already have analyses
+# Survives rebuild-graph and apply-merges
+# Standalone command still available for regeneration
 ```
 
 ### Generate forensic dossier PDF
@@ -371,7 +385,7 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - Fixes broken words, removes artifacts, restores paragraph structure
   - Preserves original language — no translation, no paraphrasing
   - Graceful degradation: falls back to raw OCR on failure
-  - New pipeline flow: OCR → Cleanup (LLM) → Entity Extraction → Relation Extraction
+  - Full pipeline flow: OCR → Cleanup (LLM) → Translation (GCP, on by default) → Entity Extraction → Relation Extraction → Graph Build → Case Narrative → Entity Descriptions → Document Analyses
   - Output saved to `ocr_cleaned/` directory + embedded in extraction JSON (`ocr_result.cleaned_text`)
   - API serves cleaned text by default, includes `rawOcrText` when available
   - Frontend toggle: "Show Raw OCR" / "Show Cleaned" on OCR tab
