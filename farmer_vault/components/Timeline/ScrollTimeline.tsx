@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import StickySpine from './StickySpine';
 import ScrollEventNode, { type ScrollEventData } from './ScrollEventNode';
 import ScrollGap, { type ScrollGapData } from './ScrollGap';
@@ -16,6 +16,9 @@ interface ScrollTimelineProps {
 }
 
 export default function ScrollTimeline({ events, gaps, caseId }: ScrollTimelineProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [activeYear, setActiveYear] = useState<number | null>(null);
+
   const items: TimelineItem[] = useMemo(() => {
     const all: TimelineItem[] = [
       ...events.map(e => ({ type: 'event' as const, data: e, sortYear: e.year })),
@@ -25,11 +28,29 @@ export default function ScrollTimeline({ events, gaps, caseId }: ScrollTimelineP
     return all;
   }, [events, gaps]);
 
-  const years = useMemo(() => {
-    const unique = [...new Set(events.map(e => e.year))];
-    unique.sort((a, b) => a - b);
-    return unique;
-  }, [events]);
+  // Track which year label is closest to viewport center
+  const handleScroll = useCallback(() => {
+    if (!contentRef.current) return;
+    const viewportCenter = window.innerHeight / 2;
+    const labels = contentRef.current.querySelectorAll<HTMLElement>('[data-spine-year]');
+    let closest: number | null = null;
+    let closestDist = Infinity;
+    labels.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const dist = Math.abs(rect.top + rect.height / 2 - viewportCenter);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = parseInt(el.getAttribute('data-spine-year')!, 10);
+      }
+    });
+    setActiveYear(closest);
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
   if (items.length === 0) {
     return (
@@ -39,30 +60,54 @@ export default function ScrollTimeline({ events, gaps, caseId }: ScrollTimelineP
     );
   }
 
+  // Build rendered items, inserting year markers at year boundaries
+  const rendered: React.ReactNode[] = [];
+  let lastYear: number | null = null;
+
+  for (const item of items) {
+    const year = item.type === 'event' ? item.data.year : item.data.startYear;
+    const isNewYear = year !== lastYear;
+    lastYear = year;
+
+    const node = item.type === 'gap'
+      ? <ScrollGap gap={item.data} />
+      : <ScrollEventNode event={item.data} caseId={caseId} />;
+
+    if (isNewYear) {
+      // Wrap the first item of each year so we can position a year label on the spine
+      rendered.push(
+        <div key={item.data.id} className="relative">
+          {/* Year label on the spine line — positioned near top of the event */}
+          <div
+            data-spine-year={year}
+            data-active={year === activeYear}
+            className="spine-year-marker absolute left-[1.52rem] -translate-x-1/2 top-4 font-mono text-[9px] tabular-nums text-slate-600 -rotate-90 origin-center whitespace-nowrap pointer-events-none select-none z-20"
+          >
+            {year}
+          </div>
+          {node}
+        </div>
+      );
+    } else {
+      rendered.push(
+        <div key={item.data.id}>{node}</div>
+      );
+    }
+  }
+
   return (
     <section className="relative">
-      {/* Sticky spine on left */}
+      {/* Sticky animated line overlay */}
       <div className="absolute left-0 top-0 bottom-0">
-        <StickySpine years={years} />
+        <StickySpine />
       </div>
 
       {/* Continuous vertical line behind events */}
       <div className="absolute left-[1.52rem] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-slate-700/40 to-transparent" />
 
-      {/* Event/Gap sequence */}
-      <div>
-        {items.map((item) => {
-          if (item.type === 'gap') {
-            return <ScrollGap key={item.data.id} gap={item.data} />;
-          }
-          return (
-            <ScrollEventNode
-              key={item.data.id}
-              event={item.data}
-              caseId={caseId}
-            />
-          );
-        })}
+      {/* Event/Gap sequence with inline year markers */}
+      <div ref={contentRef}>
+        {rendered}
       </div>
     </section>
   );
