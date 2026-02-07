@@ -1,23 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { KnowledgeGraph } from './KnowledgeGraph';
 import { EntitySidebar } from './EntitySidebar';
-import { GraphSettingsPanel } from './GraphSettingsPanel';
 import { useGraphSettings } from '@/hooks/useGraphSettings';
-import type { GraphData, BaseNode } from '@/lib/types';
+import type { GraphData, BaseNode, EntityType } from '@/lib/types';
+import { ENTITY_COLORS, ENTITY_LABELS } from '@/lib/graph-settings';
+import { RELATION_CATEGORIES } from '@/lib/relation-categories';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+const ENTITY_TYPES: EntityType[] = ['PERSON', 'PROPERTY', 'ORGANIZATION', 'LOCATION', 'DOCUMENT'];
 
 interface GraphViewProps {
   caseId: string;
 }
-
-const ENTITY_TYPE_COLORS: Record<string, { color: string; label: string }> = {
-  PERSON: { color: '#38bdf8', label: 'Person' },
-  PROPERTY: { color: '#a78bfa', label: 'Property' },
-  ORGANIZATION: { color: '#fb923c', label: 'Organization' },
-  LOCATION: { color: '#4ade80', label: 'Location' },
-  DOCUMENT: { color: '#f472b6', label: 'Document' },
-};
 
 export function GraphView({ caseId }: GraphViewProps) {
   const { settings, updateSetting, resetSettings, isLoaded } = useGraphSettings();
@@ -25,7 +23,6 @@ export function GraphView({ caseId }: GraphViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     async function fetchGraphData() {
@@ -40,24 +37,37 @@ export function GraphView({ caseId }: GraphViewProps) {
         setLoading(false);
       }
     }
-
     fetchGraphData();
   }, [caseId]);
 
-  const handleNodeClick = (node: BaseNode) => {
+  const handleNodeClick = useCallback((node: BaseNode) => {
     setSelectedNodeId(node.id);
-  };
+  }, []);
 
-  const handleBackgroundClick = () => {
+  const handleBackgroundClick = useCallback(() => {
     setSelectedNodeId(null);
-  };
+  }, []);
+
+  const toggleEntityType = useCallback((type: EntityType) => {
+    updateSetting('entityTypeFilters', {
+      ...settings.entityTypeFilters,
+      [type]: !settings.entityTypeFilters[type],
+    });
+  }, [settings.entityTypeFilters, updateSetting]);
+
+  const toggleRelationCategory = useCallback((category: string) => {
+    updateSetting('relationCategoryVisibility', {
+      ...settings.relationCategoryVisibility,
+      [category]: !settings.relationCategoryVisibility[category],
+    });
+  }, [settings.relationCategoryVisibility, updateSetting]);
 
   if (loading || !isLoaded) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-950">
+      <div className="h-full flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="animate-spin motion-reduce:animate-none rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4" />
-          <p className="text-slate-400 font-mono text-sm">Loading graph...</p>
+          <div className="animate-spin motion-reduce:animate-none rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground font-mono text-sm">Loading graph...</p>
         </div>
       </div>
     );
@@ -65,34 +75,120 @@ export function GraphView({ caseId }: GraphViewProps) {
 
   if (error || !graphData) {
     return (
-      <div className="h-full flex items-center justify-center bg-slate-950">
-        <div className="text-center p-8 bg-slate-900 border border-red-800/50 rounded">
-          <p className="text-red-400 font-mono text-sm">{error || 'Failed to load graph data'}</p>
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="text-center p-8 bg-card border border-destructive/30 rounded-lg">
+          <p className="text-destructive font-mono text-sm">{error || 'Failed to load graph data'}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950">
-      {/* Graph Header */}
-      <header className="shrink-0 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-mono">Knowledge Graph</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {graphData.nodes.length} entities &middot; {graphData.links.length} relationships
-          </p>
-        </div>
-        <div className="text-xs text-slate-500">
-          Click a node to view entity details
-        </div>
-      </header>
+    <TooltipProvider>
+      <div className="h-full flex flex-col bg-background">
+        {/* Toolbar */}
+        <div className="shrink-0 border-b border-border">
+          <div className="px-3 py-1.5 flex items-center gap-1 flex-wrap">
+            {/* Entity type filters */}
+            {ENTITY_TYPES.map((type) => {
+              const active = settings.entityTypeFilters[type];
+              return (
+                <Tooltip key={type}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={active ? 'secondary' : 'ghost'}
+                      size="xs"
+                      onClick={() => toggleEntityType(type)}
+                      className={active ? 'opacity-100' : 'opacity-40'}
+                    >
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: ENTITY_COLORS[type] }}
+                      />
+                      <span className="font-mono text-xs">{ENTITY_LABELS[type]}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{active ? 'Hide' : 'Show'} {ENTITY_LABELS[type].toLowerCase()} nodes</TooltipContent>
+                </Tooltip>
+              );
+            })}
 
-      {/* Graph + Sidebar */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Graph Canvas */}
-        <div className="flex-1 min-w-0 relative flex flex-col">
-          <div className="flex-1 relative overflow-hidden">
+            <Separator orientation="vertical" className="mx-1 h-5" />
+
+            {/* Relation category filters */}
+            {Object.entries(RELATION_CATEGORIES).map(([key, cat]) => {
+              const active = settings.relationCategoryVisibility[key];
+              return (
+                <Tooltip key={key}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={active ? 'secondary' : 'ghost'}
+                      size="xs"
+                      onClick={() => toggleRelationCategory(key)}
+                      className={active ? 'opacity-100' : 'opacity-40'}
+                    >
+                      <span
+                        className="inline-block w-4 h-0.5 rounded shrink-0"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                      <span className="font-mono text-xs">{cat.label}</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{active ? 'Hide' : 'Show'} {cat.label.toLowerCase()} links</TooltipContent>
+                </Tooltip>
+              );
+            })}
+
+            <Separator orientation="vertical" className="mx-1 h-5" />
+
+            {/* Toggle controls */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={settings.hideOrphans ? 'secondary' : 'ghost'}
+                  size="xs"
+                  onClick={() => updateSetting('hideOrphans', !settings.hideOrphans)}
+                >
+                  <OrphanIcon />
+                  <span className="font-mono text-xs">Orphans</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{settings.hideOrphans ? 'Show' : 'Hide'} unconnected nodes</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={settings.showArrows ? 'secondary' : 'ghost'}
+                  size="xs"
+                  onClick={() => updateSetting('showArrows', !settings.showArrows)}
+                >
+                  <ArrowIcon />
+                  <span className="font-mono text-xs">Arrows</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{settings.showArrows ? 'Hide' : 'Show'} directional arrows</TooltipContent>
+            </Tooltip>
+
+            <div className="ml-auto flex items-center gap-1">
+              <span className="text-xs text-muted-foreground font-mono mr-2">
+                {graphData.nodes.length} entities · {graphData.links.length} relations
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="xs" onClick={resetSettings}>
+                    <ResetIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Reset filters</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+
+        {/* Graph + Sidebar */}
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 min-w-0 relative">
             <KnowledgeGraph
               data={graphData}
               selectedNodeId={selectedNodeId}
@@ -100,39 +196,40 @@ export function GraphView({ caseId }: GraphViewProps) {
               onBackgroundClick={handleBackgroundClick}
               settings={settings}
             />
-
-            {/* Settings Panel (overlaid) */}
-            <GraphSettingsPanel
-              settings={settings}
-              onUpdateSetting={updateSetting}
-              onReset={resetSettings}
-            />
           </div>
 
-          {/* Legend Footer */}
-          <footer className="shrink-0 px-6 py-3 border-t border-slate-800 bg-slate-900/50">
-            <div className="flex items-center gap-6 justify-center">
-              {Object.entries(ENTITY_TYPE_COLORS).map(([type, config]) => (
-                <div key={type} className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: config.color }}
-                  />
-                  <span className="text-xs text-slate-400 font-mono">{config.label}</span>
-                </div>
-              ))}
-            </div>
-          </footer>
+          <EntitySidebar
+            selectedNodeId={selectedNodeId}
+            caseId={caseId}
+          />
         </div>
-
-        {/* Entity Sidebar */}
-        <EntitySidebar
-          selectedNodeId={selectedNodeId}
-          caseId={caseId}
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
-        />
       </div>
-    </div>
+    </TooltipProvider>
+  );
+}
+
+function OrphanIcon() {
+  return (
+    <svg className="size-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M8 1v2M8 13v2M1 8h2M13 8h2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg className="size-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 8h10M9 5l3 3-3 3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ResetIcon() {
+  return (
+    <svg className="size-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 8a6 6 0 1 1 1.5 4" strokeLinecap="round" />
+      <path d="M2 12V8h4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

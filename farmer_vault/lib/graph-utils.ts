@@ -1,18 +1,8 @@
 import type { BaseNode, EntityType } from './types';
-import type { EntityColorMap } from './graph-settings';
+import { ENTITY_COLORS } from './graph-settings';
 
-export function getNodeColor(
-  node: BaseNode,
-  overrides?: EntityColorMap
-): string {
-  const entityColors: Record<EntityType, string> = {
-    PERSON: '#7c3aed',       // Purple/Violet
-    LOCATION: '#0891b2',     // Cyan
-    PROPERTY: '#059669',     // Green
-    ORGANIZATION: '#dc2626', // Red
-    DOCUMENT: '#64748b',     // Slate/Gray
-  };
-  return overrides?.[node.entity_type] || entityColors[node.entity_type] || '#64748b';
+export function getNodeColor(node: BaseNode): string {
+  return ENTITY_COLORS[node.entity_type] || '#64748b';
 }
 
 export function getNodeSize(node: BaseNode): number {
