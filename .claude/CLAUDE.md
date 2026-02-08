@@ -116,6 +116,18 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 - `extract/llm.py` - Domain-aware prompts and extraction hints
 - `cli.py` - `--domain` flag on all commands (default: cuban_property)
 
+### Case-Level Focus Configuration
+- **`cases/{CASE-ID}/case.yaml`** - Per-case focus (optional, analyst-created)
+  - `CaseFocus` model in `intake/manifest.py` — `primary_subjects`, `primary_assets`, `focus_context`
+  - Loaded by `load_case_focus(case_dir)` → returns `None` if missing/malformed (graceful degradation)
+  - Threaded via explicit parameter passing (not global state) through:
+    - `extract/prompts/zero_shot.py` — entity + relation prompts (NOT cleanup)
+    - `extract/llm.py` → `extract/pipeline.py` → `processing/pipeline.py`
+    - `narrative/prompts.py` + `narrative/generator.py`
+    - `narrative/entity_descriptions.py` + `narrative/document_analysis.py`
+  - ~50-100 tokens per prompt, `focus_context` capped at 500 chars
+  - OCR cleanup deliberately excluded — cleanup is mechanical text normalization
+
 ### Operational Guides
 - **`docs/guides/`**
   - `ADMIN_GUIDE.md` - System administration
@@ -124,6 +136,7 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 ### Module Documentation
 - **`farmer_factory/intake/`**
   - `document_groups.py` - Multi-part document grouping (auto-detect + analyst review)
+  - `manifest.py` - `ManifestManager` + `CaseFocus` model + `load_case_focus()` (reads `case.yaml`)
 
 - **`farmer_factory/extract/`**
   - `README.md` - Module overview
@@ -239,6 +252,18 @@ python -m farmer_factory.cli detect-groups CASE-ID
 # Review generated document_groups.yaml, change status DRAFT → CONFIRMED
 ```
 
+### Configure case focus (optional, before processing)
+Create `cases/{CASE-ID}/case.yaml` to tell LLM prompts whose story matters:
+```yaml
+focus:
+  primary_subjects: ["Mario Ceresa", "Ceresa family"]
+  primary_assets: ["Farmacia Ceresa"]
+  focus_context: "Case centers on Ceresa family property restitution..."
+```
+Injected into entity extraction, relation extraction, narrative generation,
+entity descriptions, and document analyses. NOT injected into OCR cleanup
+(cleanup stays unbiased). Everything works without case.yaml — it's optional.
+
 ### Process documents
 ```bash
 python -m farmer_factory.cli process CASE-ID --domain cuban_property --force-typed
@@ -317,8 +342,8 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 
 **See:** `.claude/ROADMAP.md` for current implementation status.
 
-**Recent:** Phase 9F - LLM OCR Cleanup (✅ COMPLETE - 2026-02-07)
-**Status:** OCR text cleanup pipeline integrated
+**Recent:** Phase 9G - Case-Level Focus Configuration (✅ COMPLETE - 2026-02-07)
+**Status:** case.yaml focus config threaded through all LLM prompts (except cleanup)
 
 ### Completed Phases
 - Phase 6 - Narrative Generation (✅ 2026-01-25)
@@ -385,12 +410,22 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - Fixes broken words, removes artifacts, restores paragraph structure
   - Preserves original language — no translation, no paraphrasing
   - Graceful degradation: falls back to raw OCR on failure
-  - Full pipeline flow: OCR → Cleanup (LLM) → Translation (GCP, on by default) → Entity Extraction → Relation Extraction → Graph Build → Case Narrative → Entity Descriptions → Document Analyses
+  - Full pipeline flow: OCR → Cleanup (LLM) → Translation (GCP, on by default) → Entity Extraction* → Relation Extraction* → Graph Build → Case Narrative* → Entity Descriptions* → Document Analyses* (*=case focus injected if case.yaml exists)
   - Output saved to `ocr_cleaned/` directory + embedded in extraction JSON (`ocr_result.cleaned_text`)
   - API serves cleaned text by default, includes `rawOcrText` when available
   - Frontend toggle: "Show Raw OCR" / "Show Cleaned" on OCR tab
   - Prompt: `farmer_factory/extract/prompts/zero_shot.py` → `build_cleanup_prompt()`
   - Method: `LLMExtractionService.clean_ocr_text()` in `extract/llm.py`
+- Phase 9G - Case-Level Focus Configuration (✅ COMPLETE - 2026-02-07)
+  - `case.yaml` in each case directory with `focus:` block (primary_subjects, primary_assets, focus_context)
+  - `CaseFocus` Pydantic model in `intake/manifest.py` with validation (list cleaning, 500-char truncation)
+  - `load_case_focus(case_dir)` — fail-soft loader, returns None if missing/malformed
+  - Threaded via explicit parameter passing through entity extraction, relation extraction, narrative generation, entity descriptions, and document analyses
+  - OCR cleanup deliberately excluded — cleanup is mechanical text normalization
+  - ~50-100 tokens per prompt, negligible cost
+  - Graceful degradation: everything works without case.yaml
+  - TEST-CERESA case.yaml created (Mario Ceresa / Ceresa family / Farmacia Ceresa)
+  - 29 tests in `tests/intake/test_case_focus.py`
 
 ### Strategic Priorities (from Civic Architecture Vision)
 1. **Domain Configuration Abstraction** — ✅ Complete
