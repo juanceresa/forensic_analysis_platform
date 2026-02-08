@@ -168,6 +168,7 @@ TIER_3 AI output is interpretive by design — the tier label communicates trust
   - `DATA_DICTIONARY.md` - Field-level reference
   - `INTEGRATION.md` - Integration guide
   - `postprocessor.py` - Graph post-processing (transitive redundancy removal, location validation)
+  - `orphan_resolver.py` - Cross-document orphan relation resolver (matches unresolved relations against full graph)
 
 ### Test Infrastructure
 - **`tests/golden/`** - Golden standard evaluation dataset
@@ -308,6 +309,15 @@ python -m farmer_factory.cli apply-merges CASE-ID
 python -m farmer_factory.cli apply-merges CASE-ID --include-drafts  # preview
 ```
 
+### Resolve orphan relations (after apply-merges)
+```bash
+python -m farmer_factory.cli resolve-orphans CASE-ID
+python -m farmer_factory.cli resolve-orphans CASE-ID --dry-run  # preview
+# Scans extraction JSONs for relations dropped during per-document extraction
+# Matches orphan entity names against the full graph (exact, fuzzy, substring)
+# Run after apply-merges for best results — more canonical entities available
+```
+
 ### Merge two entities manually (analyst-driven)
 ```bash
 python -m farmer_factory.cli merge-entities CASE-ID ENTITY_A ENTITY_B
@@ -323,24 +333,14 @@ python -m farmer_factory.cli clean CASE-ID --confirm
 python -m farmer_factory.cli list-entities CASE-ID [--type PERSON|PROPERTY|ORGANIZATION|LOCATION|DOCUMENT]
 ```
 
-### Generate entity descriptions (cheap, uses Haiku)
+### Generate AI analysis (run AFTER graph cleanup, not during process)
 ```bash
-python -m farmer_factory.cli generate-descriptions CASE-ID
-# Now runs automatically at end of `process` pipeline (non-fatal on failure)
-# Writes output/entity_descriptions.json — separate from graph_data.json
-# Incremental: re-running skips entities that already have descriptions
-# Survives rebuild-graph and apply-merges
-# Standalone command still available for regeneration
-```
-
-### Generate document analyses (cheap, uses Haiku)
-```bash
-python -m farmer_factory.cli generate-analyses CASE-ID
-# Now runs automatically at end of `process` pipeline (non-fatal on failure)
-# Writes output/document_analyses.json — separate from graph_data.json
-# Incremental: re-running skips documents that already have analyses
-# Survives rebuild-graph and apply-merges
-# Standalone command still available for regeneration
+python -m farmer_factory.cli analyze CASE-ID
+# Runs all three in sequence: descriptions → analyses → narrative
+# NOT part of `process` pipeline — run after entity merges are reviewed
+# Cheap (Haiku for descriptions/analyses, Sonnet for narrative)
+# Incremental: re-running skips already-generated items
+# Individual commands also available: generate-descriptions, generate-analyses, generate-narrative
 ```
 
 ### Generate forensic dossier PDF
@@ -424,7 +424,8 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - Fixes broken words, removes artifacts, restores paragraph structure
   - Preserves original language — no translation, no paraphrasing
   - Graceful degradation: falls back to raw OCR on failure
-  - Full pipeline flow: OCR → Cleanup (LLM) → Translation (GCP, on by default) → Entity Extraction* → Relation Extraction* → Graph Build → Case Narrative* → Entity Descriptions* → Document Analyses* (*=case focus injected if case.yaml exists)
+  - Pipeline flow: OCR → Cleanup (LLM) → Translation (GCP) → Entity Extraction* → Relation Extraction* → Graph Build (*=case focus injected)
+  - AI analysis (narratives, descriptions, document analyses) runs separately AFTER graph cleanup — not in pipeline
   - Output saved to `ocr_cleaned/` directory + embedded in extraction JSON (`ocr_result.cleaned_text`)
   - API serves cleaned text by default, includes `rawOcrText` when available
   - Frontend toggle: "Show Raw OCR" / "Show Cleaned" on OCR tab

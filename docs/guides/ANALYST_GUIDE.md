@@ -137,7 +137,23 @@ standalone:
 
 ---
 
-### Step 4: Process Documents
+### Step 4: Configure Case Focus (Optional)
+
+Create `cases/CASE-ID/case.yaml` to tell AI analysis whose story to emphasize:
+
+```yaml
+focus:
+  primary_subjects: ["Mario Ceresa", "Ceresa family"]
+  primary_assets: ["Villa Aurelia"]
+  focus_context: "The Ceresa family is tracing their heritage back to Cuba..."
+```
+
+This shapes narratives, entity descriptions, and document analyses (NOT extraction).
+Skip this step if no specific family focus is needed.
+
+---
+
+### Step 5: Process Documents
 
 Once groupings are confirmed (or if no groupings needed):
 
@@ -151,9 +167,39 @@ python3 -m farmer_factory.cli process CASE-ID --force-typed --domain cuban_prope
 - All entities from grouped files reference the same document ID
 - Graph is built with proper provenance
 
+**What does NOT happen (by design):**
+- No narrative generation
+- No entity descriptions
+- No document analyses
+
+These are generated *after* you review and clean the graph (see below).
+
 **After processing:**
-- Review graph in Vault
-- Begin verification workflow (next section)
+- Review entity_groups/*.yaml — confirm or reject merge suggestions
+- Apply merges to clean the graph
+- Then generate AI analysis on the clean graph
+
+---
+
+### Step 6: Generate AI Analysis (After Graph Cleanup)
+
+Once entity merges are reviewed and applied:
+
+```bash
+python3 -m farmer_factory.cli analyze CASE-ID
+```
+
+This runs all three steps in sequence (descriptions → analyses → narrative).
+Individual commands also available: `generate-descriptions`, `generate-analyses`, `generate-narrative`.
+
+**Why this is separate from processing:**
+The `process` command builds a raw graph with potential duplicate entities.
+Running AI analysis on an unreviewed graph wastes credits on output you'll
+throw away. Generate analysis after the graph is clean.
+
+**After AI analysis:**
+- Review graph and narratives in Vault
+- Begin entity verification workflow (next section)
 
 ---
 

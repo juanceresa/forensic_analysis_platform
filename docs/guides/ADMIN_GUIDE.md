@@ -202,19 +202,33 @@ Full `process` re-runs OCR and LLM extraction (~$5-10 per case). If you've only 
 **End-to-end workflow for a new case:**
 
 ```
+PHASE 1 — Extraction (API cost, run once)
 1. Create case        →  create-case --id CASE-XXX --name "..." --family "..."
 2. Add PDFs           →  cp documents/*.pdf cases/CASE-XXX/intake/
-3. Detect groups      →  detect-groups CASE-XXX
-4. Review groups      →  Edit document_groups.yaml: DRAFT → CONFIRMED
-5. Process            →  process CASE-XXX --force-typed
-6. Train dedupe       →  train-deduplication CASE-XXX --entity-type PERSON (etc.)
-7. Rebuild graph      →  rebuild-graph CASE-XXX
-8. Review merges      →  Edit entity_groups/*.yaml: DRAFT → CONFIRMED
-9. Apply merges       →  apply-merges CASE-XXX
-10. Generate dossier  →  generate-dossier CASE-XXX --property-id X --family-member-id Y
+3. Configure focus    →  Create cases/CASE-XXX/case.yaml (optional, see below)
+4. Detect groups      →  detect-groups CASE-XXX
+5. Review groups      →  Edit document_groups.yaml: DRAFT → CONFIRMED
+6. Process            →  process CASE-XXX --force-typed
+
+PHASE 2 — Graph cleanup (no API cost, iterate freely)
+7. Train dedupe       →  train-deduplication CASE-XXX --entity-type PERSON (etc.)
+8. Rebuild graph      →  rebuild-graph CASE-XXX
+9. Review merges      →  Edit entity_groups/*.yaml: DRAFT → CONFIRMED
+10. Apply merges      →  apply-merges CASE-XXX
+
+PHASE 3 — AI analysis (cheap, run on clean graph)
+11. All-in-one        →  analyze CASE-XXX
+
+PHASE 4 — Deliverables
+14. Generate dossier  →  generate-dossier CASE-XXX --property-id X --family-member-id Y
 ```
 
-**Iterative refinement loop (steps 6-9):**
+**Why AI analysis is separate from processing:**
+The `process` command builds a raw graph that needs analyst review (entity merges,
+deduplication). Running narratives/descriptions on an unreviewed graph produces
+output you'll throw away. Generate AI analysis after the graph is clean (Phase 3).
+
+**Iterative refinement loop (steps 7-10):**
 After initial processing, you may iterate on dedupe quality:
 - Retrain models with more labeled pairs
 - Rebuild graph to apply new models
@@ -222,6 +236,7 @@ After initial processing, you may iterate on dedupe quality:
 - Apply merges
 
 This loop costs nothing (no API calls) and can be repeated as many times as needed.
+Re-run Phase 3 after each refinement cycle for updated AI analysis.
 
 ---
 
@@ -625,55 +640,32 @@ print(translate_text('Hola, esto es una prueba.', source_language='es'))
 ## Quick Reference Commands
 
 ```bash
-# Case creation
+# ── Phase 1: Extraction ──────────────────────────────────────────────
 python -m farmer_factory.cli create-case --id CASE-XXX --name "Name" --family "Family" --domain cuban_property
-
-# Detect document groups
 python -m farmer_factory.cli detect-groups CASE-XXX
+python -m farmer_factory.cli process CASE-XXX --force-typed
 
-# Process case
-python -m farmer_factory.cli process CASE-XXX
-
-# Process with options
-python -m farmer_factory.cli process CASE-XXX --verbose --force-typed
-
-# Validate output
-python -m farmer_factory.cli validate CASE-XXX
-
-# Retry failed relations
-python -m farmer_factory.cli retry-relations CASE-XXX --verbose
-
-# List cases
-python -m farmer_factory.cli list-cases
-
-# List entities in a case
-python -m farmer_factory.cli list-entities CASE-XXX --type PERSON
-
-# List available domains
-python -m farmer_factory.cli list-domains
-
-# Generate dossier PDF
-python -m farmer_factory.cli generate-dossier CASE-XXX --property-id "ID" --family-member-id "ID"
-
-# Apply entity merges (after analyst reviews entity_groups/*.yaml)
-python -m farmer_factory.cli apply-merges CASE-XXX
-python -m farmer_factory.cli apply-merges CASE-XXX --include-drafts  # Preview with drafts
-
-# Merge entities manually (analyst-driven, writes CONFIRMED + applies immediately)
-# First ID becomes canonical; all others merge into it
-python -m farmer_factory.cli merge-entities CASE-XXX person_abc person_xyz
-python -m farmer_factory.cli merge-entities CASE-XXX person_abc person_xyz person_def  # 3-way merge
-
-# Rebuild graph from existing extractions (no OCR/LLM, uses current dedupe models)
-python -m farmer_factory.cli rebuild-graph CASE-XXX
-
-# Train entity deduplication models
+# ── Phase 2: Graph cleanup (no API cost) ─────────────────────────────
 python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type PERSON
 python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type LOCATION
 python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type PROPERTY
 python -m farmer_factory.cli train-deduplication CASE-XXX --entity-type ORGANIZATION
+python -m farmer_factory.cli rebuild-graph CASE-XXX
+python -m farmer_factory.cli apply-merges CASE-XXX
 
-# Clean case outputs
+# ── Phase 3: AI analysis (cheap, run on clean graph) ─────────────────
+python -m farmer_factory.cli analyze CASE-XXX
+# Or individually: generate-descriptions, generate-analyses, generate-narrative
+
+# ── Phase 4: Deliverables ────────────────────────────────────────────
+python -m farmer_factory.cli generate-dossier CASE-XXX --property-id "ID" --family-member-id "ID"
+
+# ── Utilities ─────────────────────────────────────────────────────────
+python -m farmer_factory.cli list-cases
+python -m farmer_factory.cli list-entities CASE-XXX --type PERSON
+python -m farmer_factory.cli list-domains
+python -m farmer_factory.cli validate CASE-XXX
+python -m farmer_factory.cli merge-entities CASE-XXX person_abc person_xyz
 python -m farmer_factory.cli clean CASE-XXX --confirm
 ```
 
