@@ -54,6 +54,14 @@ class DocumentGroup(BaseModel):
     date: Optional[str] = Field(None, description="Document date if known")
     files: List[str] = Field(..., description="List of filenames in order")
 
+    @field_validator("date", mode="before")
+    @classmethod
+    def coerce_date_to_str(cls, v: object) -> str | None:
+        """YAML parses bare dates (e.g. 1946-04-01) into datetime.date objects."""
+        if v is None:
+            return v
+        return str(v)
+
     @field_validator("files")
     @classmethod
     def validate_files(cls, v: List[str]) -> List[str]:
@@ -142,7 +150,11 @@ def detect_groups(filenames: List[str]) -> Tuple[Dict[str, List[str]], List[str]
             groups[base_name] = [f[0] for f in sorted_files]
 
     # Files not in any group (either didn't match patterns or were alone)
-    standalone = [f for f in filenames if f not in matched_files or f not in _get_grouped_files(groups)]
+    standalone = [
+        f
+        for f in filenames
+        if f not in matched_files or f not in _get_grouped_files(groups)
+    ]
 
     # Also add files that matched a pattern but were alone (not a real group)
     for base_name, files_with_seq in potential_groups.items():
@@ -246,8 +258,12 @@ def _build_yaml_with_comments(config: DocumentGroupsConfig) -> str:
         lines.append("groups:")
         for group in config.groups:
             lines.append(f"  - id: {group.id}")
-            lines.append(f"    name: \"{group.name or group.id}\"  # Edit this to be descriptive")
-            lines.append("    # document_type:  # Optional: notarial_deed, registry_certificate, etc.")
+            lines.append(
+                f'    name: "{group.name or group.id}"  # Edit this to be descriptive'
+            )
+            lines.append(
+                "    # document_type:  # Optional: notarial_deed, registry_certificate, etc."
+            )
             lines.append("    # date:  # Optional: YYYY-MM-DD")
             lines.append("    files:")
             for f in group.files:
@@ -258,7 +274,9 @@ def _build_yaml_with_comments(config: DocumentGroupsConfig) -> str:
         lines.append("")
 
     if config.standalone:
-        lines.append("# Files not part of any group (processed as individual documents)")
+        lines.append(
+            "# Files not part of any group (processed as individual documents)"
+        )
         lines.append("standalone:")
         for f in config.standalone:
             lines.append(f"  - {f}")
@@ -322,9 +340,7 @@ def validate_groups_against_files(
     for group in config.groups:
         for filename in group.files:
             if filename not in actual_set:
-                errors.append(
-                    f"Group '{group.id}' references missing file: {filename}"
-                )
+                errors.append(f"Group '{group.id}' references missing file: {filename}")
 
     # Check that all standalone files exist
     for filename in config.standalone:
@@ -335,8 +351,6 @@ def validate_groups_against_files(
     accounted_files = config.get_all_grouped_files() | set(config.standalone)
     unaccounted = actual_set - accounted_files
     if unaccounted:
-        errors.append(
-            f"Files not in groups or standalone list: {sorted(unaccounted)}"
-        )
+        errors.append(f"Files not in groups or standalone list: {sorted(unaccounted)}")
 
     return errors
