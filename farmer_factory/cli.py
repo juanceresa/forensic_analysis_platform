@@ -167,11 +167,11 @@ def detect_groups(case_id: str, force: bool):
         existing = load_document_groups(case_dir)
         if existing and existing.is_confirmed():
             raise click.ClickException(
-                f"document_groups.yaml already exists and is CONFIRMED.\n"
-                f"Use --force to overwrite (this will reset to DRAFT)."
+                "document_groups.yaml already exists and is CONFIRMED.\n"
+                "Use --force to overwrite (this will reset to DRAFT)."
             )
         elif existing:
-            click.echo(f"⚠️  Existing DRAFT file will be overwritten.")
+            click.echo("⚠️  Existing DRAFT file will be overwritten.")
 
     # Get PDF files
     pdf_files = sorted([f.name for f in intake_dir.glob("*.pdf")])
@@ -305,45 +305,14 @@ def process(
         output_path = Path("cases") / case_id / "output" / "graph_data.json"
         click.echo(f"\nGraph saved to: {output_path}")
 
-        # Load case focus for narrative/description/analysis generation
-        from farmer_factory.intake.manifest import load_case_focus
-        case_focus = load_case_focus(case_dir)
-
-        # Generate case narrative
-        try:
-            from farmer_factory.narrative import CaseNarrativeGenerator
-            from farmer_factory.structure.graph import KnowledgeGraph
-
-            graph = KnowledgeGraph.load(output_path)
-            generator = CaseNarrativeGenerator(case_focus=case_focus)
-            output_dir = Path("cases") / case_id / "output"
-            narrative_path = generator.generate_and_save(case_id, graph, output_dir)
-            click.echo(f"Narrative saved to: {narrative_path}")
-        except Exception as e:
-            logger.warning(f"Narrative generation failed (non-fatal): {e}")
-            click.echo(f"\n⚠️  Narrative generation skipped: {e}", err=True)
-
-        # Generate per-entity descriptions
-        try:
-            from farmer_factory.narrative.entity_descriptions import generate_entity_descriptions
-
-            click.echo("\nGenerating entity descriptions (Haiku)...")
-            desc_path = generate_entity_descriptions(case_id, case_focus=case_focus)
-            click.echo(f"Entity descriptions saved to: {desc_path}")
-        except Exception as e:
-            logger.warning(f"Entity description generation failed (non-fatal): {e}")
-            click.echo(f"\n⚠️  Entity descriptions skipped: {e}", err=True)
-
-        # Generate per-document analyses (final pipeline step)
-        try:
-            from farmer_factory.narrative.document_analysis import generate_document_analyses
-
-            click.echo("\nGenerating document analyses (Haiku)...")
-            analyses_path = generate_document_analyses(case_id, case_focus=case_focus)
-            click.echo(f"Document analyses saved to: {analyses_path}")
-        except Exception as e:
-            logger.warning(f"Document analysis generation failed (non-fatal): {e}")
-            click.echo(f"\n⚠️  Document analyses skipped: {e}", err=True)
+        click.echo("\n✅ Processing complete. Next steps:")
+        click.echo(
+            "  1. Review entity_groups/*.yaml — confirm or reject merge suggestions"
+        )
+        click.echo("  2. apply-merges to clean the graph")
+        click.echo(
+            "  3. generate-descriptions, generate-analyses, generate-narrative on the clean graph"
+        )
 
     except ProcessingError as e:
         logger.error(f"Processing failed: {e}")
@@ -364,8 +333,15 @@ def process(
 
 @cli.command("generate-narrative")
 @click.argument("case_id")
-@click.option("--max-cost", default=2.0, help="Max generation cost in USD (default: 2.0)")
-@click.option("--model", default="sonnet", type=click.Choice(["haiku", "sonnet"]), help="Primary model")
+@click.option(
+    "--max-cost", default=2.0, help="Max generation cost in USD (default: 2.0)"
+)
+@click.option(
+    "--model",
+    default="sonnet",
+    type=click.Choice(["haiku", "sonnet"]),
+    help="Primary model",
+)
 @click.option(
     "--domain",
     default="cuban_property",
@@ -392,7 +368,9 @@ def generate_narrative(case_id: str, max_cost: float, model: str, domain: str):
     graph = KnowledgeGraph.load(graph_path)
 
     click.echo(f"Generating narrative (model={model}, max_cost=${max_cost:.2f})...")
-    generator = CaseNarrativeGenerator(max_cost=max_cost, primary_model=model, case_focus=case_focus)
+    generator = CaseNarrativeGenerator(
+        max_cost=max_cost, primary_model=model, case_focus=case_focus
+    )
     output_dir = Path("cases") / case_id / "output"
     narrative_path = generator.generate_and_save(case_id, graph, output_dir)
 
@@ -519,7 +497,9 @@ def retry_relations(case_id: str, verbose: bool):
     default="cuban_property",
     help="Domain configuration to use (default: cuban_property)",
 )
-def train_deduplication(case_id: str, entity_type: str, num_examples: int, from_groups: bool, domain: str):
+def train_deduplication(
+    case_id: str, entity_type: str, num_examples: int, from_groups: bool, domain: str
+):
     """
     Train entity deduplication models using labeled examples.
 
@@ -536,9 +516,15 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int, from_
     from farmer_factory.domains import domain_registry
 
     try:
-        from farmer_factory.structure.dedupe.train import train_dedupe_model, train_dedupe_model_from_groups
+        from farmer_factory.structure.dedupe.train import (
+            train_dedupe_model,
+            train_dedupe_model_from_groups,
+        )
     except ModuleNotFoundError:
-        from structure.train_dedupe import train_dedupe_model, train_dedupe_model_from_groups
+        from structure.train_dedupe import (
+            train_dedupe_model,
+            train_dedupe_model_from_groups,
+        )
 
     case_dir = Path("cases") / case_id
     extractions_dir = case_dir / "extractions"
@@ -602,17 +588,19 @@ def train_deduplication(case_id: str, entity_type: str, num_examples: int, from_
 def clean(case_id: str, confirm: bool):
     """Clean case outputs for fresh processing.
 
-    Removes all processed outputs while keeping source PDFs intact:
+    Removes all processed outputs while keeping source PDFs and analyst work intact:
     - extractions/ (AI-extracted entities)
     - ocr/ (OCR text files)
     - ocr_cleaned/ (LLM-cleaned OCR text)
     - ocr_translated/ (translated text)
     - preprocessed/ (processed images)
     - output/ (graph_data.json, narratives, descriptions)
-    - entity_groups/ (merge authority YAML files)
-    - document_groups.yaml (document grouping config)
 
-    Your intake/ PDFs are never deleted.
+    Preserved (analyst work):
+    - intake/ (source PDFs)
+    - entity_groups/ (analyst-reviewed merge authority YAML)
+    - document_groups.yaml (analyst-reviewed document grouping)
+    - case.yaml (case focus configuration)
     """
     case_dir = Path("cases") / case_id
 
@@ -632,10 +620,11 @@ def clean(case_id: str, confirm: bool):
     click.echo("  - ocr_translated/")
     click.echo("  - preprocessed/")
     click.echo("  - output/")
+    click.echo("\nWill keep (analyst work):")
+    click.echo(f"  - intake/ ({len(list(intake_dir.glob('*.pdf')))} PDFs)")
     click.echo("  - entity_groups/")
     click.echo("  - document_groups.yaml")
-    click.echo("\nWill keep:")
-    click.echo(f"  - intake/ ({len(list(intake_dir.glob('*.pdf')))} PDFs)")
+    click.echo("  - case.yaml")
 
     if not confirm:
         click.echo("\nThis cannot be undone.")
@@ -646,23 +635,19 @@ def clean(case_id: str, confirm: bool):
     import shutil
 
     # Clean directories (recreate empty)
-    dirs_to_clean = ["extractions", "ocr", "ocr_cleaned", "ocr_translated", "preprocessed", "output"]
+    dirs_to_clean = [
+        "extractions",
+        "ocr",
+        "ocr_cleaned",
+        "ocr_translated",
+        "preprocessed",
+        "output",
+    ]
     for dir_name in dirs_to_clean:
         dir_path = case_dir / dir_name
         if dir_path.exists():
             shutil.rmtree(dir_path)
         dir_path.mkdir(parents=True, exist_ok=True)
-
-    # Clean directories (remove entirely, pipeline recreates as needed)
-    for dir_name in ["entity_groups"]:
-        dir_path = case_dir / dir_name
-        if dir_path.exists():
-            shutil.rmtree(dir_path)
-
-    # Clean standalone files
-    doc_groups = case_dir / "document_groups.yaml"
-    if doc_groups.exists():
-        doc_groups.unlink()
 
     click.echo(f"\n✓ Case {case_id} cleaned successfully")
     click.echo("\nReady for fresh processing:")
@@ -690,7 +675,7 @@ def list_cases():
         if metadata_file.exists():
             import json
 
-            with open(metadata_file, encoding='utf-8') as f:
+            with open(metadata_file, encoding="utf-8") as f:
                 metadata = json.load(f)
             click.echo(
                 f"  {metadata['id']}: {metadata['name']} ({metadata.get('status', 'UNKNOWN')})"
@@ -844,7 +829,9 @@ def list_domains():
 
 @cli.command("generate-descriptions")
 @click.argument("case_id")
-@click.option("--max-cost", default=0.50, help="Max generation cost in USD (default: 0.50)")
+@click.option(
+    "--max-cost", default=0.50, help="Max generation cost in USD (default: 0.50)"
+)
 @click.option(
     "--domain",
     default="cuban_property",
@@ -868,15 +855,21 @@ def generate_descriptions(case_id: str, max_cost: float, domain: str):
         )
 
     from farmer_factory.intake.manifest import load_case_focus
-    from farmer_factory.narrative.entity_descriptions import generate_entity_descriptions
+    from farmer_factory.narrative.entity_descriptions import (
+        generate_entity_descriptions,
+    )
 
     case_dir = Path("cases") / case_id
     case_focus = load_case_focus(case_dir)
 
-    click.echo(f"Generating entity descriptions (model=haiku, max_cost=${max_cost:.2f})...")
+    click.echo(
+        f"Generating entity descriptions (model=haiku, max_cost=${max_cost:.2f})..."
+    )
 
     try:
-        result_path = generate_entity_descriptions(case_id, max_cost=max_cost, case_focus=case_focus)
+        result_path = generate_entity_descriptions(
+            case_id, max_cost=max_cost, case_focus=case_focus
+        )
         click.echo(f"\n✅ Descriptions written to: {result_path}")
     except Exception as e:
         logger.exception(f"Description generation failed: {e}")
@@ -885,7 +878,9 @@ def generate_descriptions(case_id: str, max_cost: float, domain: str):
 
 @cli.command("generate-analyses")
 @click.argument("case_id")
-@click.option("--max-cost", default=1.00, help="Max generation cost in USD (default: 1.00)")
+@click.option(
+    "--max-cost", default=1.00, help="Max generation cost in USD (default: 1.00)"
+)
 @click.option(
     "--domain",
     default="cuban_property",
@@ -914,14 +909,108 @@ def generate_analyses(case_id: str, max_cost: float, domain: str):
     case_dir = Path("cases") / case_id
     case_focus = load_case_focus(case_dir)
 
-    click.echo(f"Generating document analyses (model=haiku, max_cost=${max_cost:.2f})...")
+    click.echo(
+        f"Generating document analyses (model=haiku, max_cost=${max_cost:.2f})..."
+    )
 
     try:
-        result_path = generate_document_analyses(case_id, max_cost=max_cost, case_focus=case_focus)
+        result_path = generate_document_analyses(
+            case_id, max_cost=max_cost, case_focus=case_focus
+        )
         click.echo(f"\n✅ Analyses written to: {result_path}")
     except Exception as e:
         logger.exception(f"Document analysis generation failed: {e}")
         raise click.ClickException(str(e))
+
+
+@cli.command("analyze")
+@click.argument("case_id")
+@click.option(
+    "--max-cost", default=2.00, help="Cost ceiling in USD for all analysis combined"
+)
+@click.option("--domain", default="cuban_property", help="Domain configuration to use")
+def analyze(case_id: str, max_cost: float, domain: str):
+    """Run all AI analysis on a clean graph (Phase 3).
+
+    Generates entity descriptions, document analyses, and case narrative
+    in sequence. Run this AFTER entity merges are reviewed and applied.
+
+    Example:
+        python cli.py analyze TEST-CERESA
+    """
+    setup_domain(domain)
+
+    case_dir = Path("cases") / case_id
+    if not case_dir.exists():
+        raise click.ClickException(f"Case not found: {case_id}")
+
+    output_path = case_dir / "output" / "graph_data.json"
+    if not output_path.exists():
+        raise click.ClickException(
+            f"No graph found at {output_path}. Run 'process' first."
+        )
+
+    from farmer_factory.intake.manifest import load_case_focus
+
+    case_focus = load_case_focus(case_dir)
+    if case_focus:
+        click.echo(
+            f"Case focus loaded: {len(case_focus.primary_subjects)} subjects, {len(case_focus.primary_assets)} assets"
+        )
+
+    # Split cost budget: descriptions and analyses are cheap (Haiku), narrative is pricier (Sonnet)
+    desc_budget = max_cost * 0.25
+    analysis_budget = max_cost * 0.25
+    narrative_budget = max_cost * 0.50
+
+    # 1. Entity descriptions
+    try:
+        from farmer_factory.narrative.entity_descriptions import (
+            generate_entity_descriptions,
+        )
+
+        click.echo(f"\n── Entity descriptions (Haiku, max ${desc_budget:.2f}) ──")
+        desc_path = generate_entity_descriptions(
+            case_id, max_cost=desc_budget, case_focus=case_focus
+        )
+        click.echo(f"✅ {desc_path}")
+    except Exception as e:
+        logger.warning(f"Entity descriptions failed: {e}")
+        click.echo(f"⚠️  Descriptions skipped: {e}", err=True)
+
+    # 2. Document analyses
+    try:
+        from farmer_factory.narrative.document_analysis import (
+            generate_document_analyses,
+        )
+
+        click.echo(f"\n── Document analyses (Haiku, max ${analysis_budget:.2f}) ──")
+        analyses_path = generate_document_analyses(
+            case_id, max_cost=analysis_budget, case_focus=case_focus
+        )
+        click.echo(f"✅ {analyses_path}")
+    except Exception as e:
+        logger.warning(f"Document analyses failed: {e}")
+        click.echo(f"⚠️  Analyses skipped: {e}", err=True)
+
+    # 3. Case narrative
+    try:
+        from farmer_factory.narrative import CaseNarrativeGenerator
+        from farmer_factory.structure.graph import KnowledgeGraph
+
+        click.echo(f"\n── Case narrative (Sonnet, max ${narrative_budget:.2f}) ──")
+        graph = KnowledgeGraph.load(output_path)
+        generator = CaseNarrativeGenerator(
+            max_cost=narrative_budget, case_focus=case_focus
+        )
+        output_dir = case_dir / "output"
+        narrative_path = generator.generate_and_save(case_id, graph, output_dir)
+        click.echo(f"✅ {narrative_path}")
+    except Exception as e:
+        logger.warning(f"Narrative generation failed: {e}")
+        click.echo(f"⚠️  Narrative skipped: {e}", err=True)
+
+    click.echo("\n✅ Analysis complete.")
 
 
 @cli.command("generate-manifest")
@@ -944,7 +1033,7 @@ def generate_manifest(case_id: str):
 
     ocr_dir = case_dir / "ocr"
     if not ocr_dir.exists():
-        raise click.ClickException(f"No OCR directory found. Run 'process' first.")
+        raise click.ClickException("No OCR directory found. Run 'process' first.")
 
     # Discover documents from OCR files
     ocr_files = sorted(ocr_dir.glob("*.txt"))
@@ -1013,9 +1102,11 @@ def rebuild_graph(case_id: str, skip_validation: bool, domain: str):
             case_id=case_id,
             skip_validation=skip_validation,
         )
-        click.echo(f"\n✅ Graph rebuilt successfully!")
+        click.echo("\n✅ Graph rebuilt successfully!")
         click.echo(f"   Documents: {stats['documents_processed']}")
-        click.echo(f"   Entities:  {stats['entities_extracted']} extracted, {stats['entities_merged']} merged")
+        click.echo(
+            f"   Entities:  {stats['entities_extracted']} extracted, {stats['entities_merged']} merged"
+        )
         click.echo(f"   Relations: {stats['relations_added']}")
     except Exception as e:
         logger.exception(f"rebuild-graph failed: {e}")
@@ -1057,9 +1148,7 @@ def apply_merges(case_id: str, include_drafts: bool, domain: str):
     if not case_dir.exists():
         raise click.ClickException(f"Case not found: {case_id}")
     if not graph_path.exists():
-        raise click.ClickException(
-            f"graph_data.json not found. Run 'process' first."
-        )
+        raise click.ClickException("graph_data.json not found. Run 'process' first.")
 
     if include_drafts:
         click.echo("⚠️  Including DRAFT merges (preview mode)")
@@ -1071,6 +1160,45 @@ def apply_merges(case_id: str, include_drafts: bool, domain: str):
         click.echo(f"\n✅ Merges applied. Graph updated: {result_path}")
     except Exception as e:
         logger.exception(f"apply-merges failed: {e}")
+        raise click.ClickException(str(e))
+
+
+@cli.command("resolve-orphans")
+@click.argument("case_id")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Report what would be resolved without modifying graph",
+)
+def resolve_orphans(case_id: str, dry_run: bool):
+    """Resolve orphan relations against the full entity set.
+
+    Scans extraction JSONs for relations that couldn't be matched
+    during per-document processing, and tries to match them against
+    the full graph (where entities from all documents are available).
+
+    Run this AFTER apply-merges for best results.
+    """
+    from farmer_factory.structure.orphan_resolver import resolve_orphans as _resolve
+
+    graph_path = Path("cases") / case_id / "output" / "graph_data.json"
+    if not graph_path.exists():
+        raise click.ClickException(
+            f"graph_data.json not found at {graph_path}. Run 'process' first."
+        )
+
+    if dry_run:
+        click.echo("DRY RUN — no changes will be made\n")
+
+    try:
+        result = _resolve(case_id, dry_run=dry_run)
+        click.echo(f"\nOrphan relations: {result['total_orphans']}")
+        click.echo(f"Resolved:         {result['resolved']}")
+        click.echo(f"Still unmatched:  {result['still_unmatched']}")
+        if result["resolved"] and not dry_run:
+            click.echo(f"\n✅ Added {result['resolved']} relations to graph")
+    except Exception as e:
+        logger.exception(f"resolve-orphans failed: {e}")
         raise click.ClickException(str(e))
 
 
@@ -1107,9 +1235,7 @@ def merge_entities(case_id: str, entity_ids: tuple, domain: str):
     if not case_dir.exists():
         raise click.ClickException(f"Case not found: {case_id}")
     if not graph_path.exists():
-        raise click.ClickException(
-            f"graph_data.json not found. Run 'process' first."
-        )
+        raise click.ClickException("graph_data.json not found. Run 'process' first.")
 
     # Load graph to get entity names and types
     with open(graph_path) as f:
@@ -1138,7 +1264,9 @@ def merge_entities(case_id: str, entity_ids: tuple, domain: str):
     try:
         for member_id in entity_ids[1:]:
             node_b = node_map[member_id]
-            click.echo(f"Merging: {node_b.get('name', member_id)} → {node_a.get('name', canonical_id)}")
+            click.echo(
+                f"Merging: {node_b.get('name', member_id)} → {node_a.get('name', canonical_id)}"
+            )
             add_analyst_merge(
                 case_dir=case_dir,
                 entity_type=entity_type,
@@ -1220,7 +1348,13 @@ def review_groups(case_id: str, entity_type: str, domain: str):
             _display_group(group)
 
             while True:
-                action = input("\n  [c]onfirm  [r]emove members  [s]et canonical  [d]elete group  [n]ext  [q]uit\n  > ").strip().lower()
+                action = (
+                    input(
+                        "\n  [c]onfirm  [r]emove members  [s]et canonical  [d]elete group  [n]ext  [q]uit\n  > "
+                    )
+                    .strip()
+                    .lower()
+                )
 
                 if action == "c":
                     group.status = "CONFIRMED"
@@ -1231,9 +1365,13 @@ def review_groups(case_id: str, entity_type: str, domain: str):
 
                 elif action == "r":
                     if len(group.members) <= 2:
-                        click.echo("  Group needs at least 2 members. Use [d]elete to remove the group.")
+                        click.echo(
+                            "  Group needs at least 2 members. Use [d]elete to remove the group."
+                        )
                         continue
-                    selection = input("  Remove which members? (e.g. 3 or 1,3): ").strip()
+                    selection = input(
+                        "  Remove which members? (e.g. 3 or 1,3): "
+                    ).strip()
                     try:
                         indices = [int(x.strip()) for x in selection.split(",")]
                     except ValueError:
@@ -1244,22 +1382,30 @@ def review_groups(case_id: str, entity_type: str, domain: str):
                         click.echo(f"  Numbers must be 1-{len(group.members)}.")
                         continue
                     if 1 in indices:
-                        click.echo("  Cannot remove member 1 (canonical). Use [s]et canonical first.")
+                        click.echo(
+                            "  Cannot remove member 1 (canonical). Use [s]et canonical first."
+                        )
                         continue
                     remaining_count = len(group.members) - len(indices)
                     if remaining_count < 2:
-                        click.echo("  Would leave fewer than 2 members. Use [d]elete instead.")
+                        click.echo(
+                            "  Would leave fewer than 2 members. Use [d]elete instead."
+                        )
                         continue
                     # Remove members (highest index first to preserve ordering)
                     for i in sorted(indices, reverse=True):
                         removed = group.members.pop(i - 1)
-                        entity_file.unmerged.append(UnmergedEntity(id=removed.id, name=removed.name))
+                        entity_file.unmerged.append(
+                            UnmergedEntity(id=removed.id, name=removed.name)
+                        )
                         click.echo(f"  Removed {removed.name} -> unmerged")
                     save_entity_group_file(case_dir, etype, entity_file)
                     _display_group(group)
 
                 elif action == "s":
-                    selection = input(f"  Set canonical to which member? (1-{len(group.members)}): ").strip()
+                    selection = input(
+                        f"  Set canonical to which member? (1-{len(group.members)}): "
+                    ).strip()
                     try:
                         new_idx = int(selection)
                     except ValueError:
@@ -1280,7 +1426,9 @@ def review_groups(case_id: str, entity_type: str, domain: str):
                 elif action == "d":
                     # Move all members to unmerged, remove group
                     for member in group.members:
-                        entity_file.unmerged.append(UnmergedEntity(id=member.id, name=member.name))
+                        entity_file.unmerged.append(
+                            UnmergedEntity(id=member.id, name=member.name)
+                        )
                     entity_file.groups.remove(group)
                     save_entity_group_file(case_dir, etype, entity_file)
                     click.echo("  Group deleted, members moved to unmerged.")
@@ -1300,7 +1448,9 @@ def review_groups(case_id: str, entity_type: str, domain: str):
 
     # Summary
     total = stats["confirmed"] + stats["skipped"] + stats["deleted"]
-    click.echo(f"\nSummary: {stats['confirmed']} confirmed, {stats['skipped']} skipped, {stats['deleted']} deleted")
+    click.echo(
+        f"\nSummary: {stats['confirmed']} confirmed, {stats['skipped']} skipped, {stats['deleted']} deleted"
+    )
     if stats["confirmed"] > 0:
         click.echo(f"Run 'apply-merges {case_id}' to update the graph.")
 
@@ -1310,7 +1460,9 @@ def _display_group(group) -> None:
     click.echo(f"  Canonical: {group.canonical_name}")
     for i, member in enumerate(group.members, 1):
         conf_pct = f"{member.confidence:.0%}" if member.confidence is not None else "?"
-        click.echo(f"  [{i}] {member.name:<40s} (conf: {conf_pct}, source: {member.source})")
+        click.echo(
+            f"  [{i}] {member.name:<40s} (conf: {conf_pct}, source: {member.source})"
+        )
 
 
 if __name__ == "__main__":
