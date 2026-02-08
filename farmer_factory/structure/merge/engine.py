@@ -64,27 +64,38 @@ def apply_merges(
 
     # Build merge map: member_id → canonical_id
     merge_map = get_confirmed_merges(case_dir, include_drafts=include_drafts)
+    # Keep full map for cross-type relation rewriting (before validation strips
+    # IDs already merged in previous runs)
+    full_merge_map = dict(merge_map)
 
     merged_node_ids: Set[str] = set()
 
     if merge_map:
-        logger.info(f"Applying {len(merge_map)} entity merges (include_drafts={include_drafts})")
+        logger.info(
+            f"Applying {len(merge_map)} entity merges (include_drafts={include_drafts})"
+        )
 
         # Build node lookup
         node_by_id: Dict[str, Dict[str, Any]] = {n["id"]: n for n in nodes}
 
-        # Validate merge references
+        # Validate merge references against current graph
         missing = {mid for mid in merge_map if mid not in node_by_id}
         if missing:
-            logger.warning(f"Merge references {len(missing)} entity IDs not in graph, skipping: {missing}")
+            logger.warning(
+                f"Merge references {len(missing)} entity IDs not in graph, skipping: {missing}"
+            )
             merge_map = {k: v for k, v in merge_map.items() if k not in missing}
 
-        missing_canonicals = {cid for cid in merge_map.values() if cid not in node_by_id}
+        missing_canonicals = {
+            cid for cid in merge_map.values() if cid not in node_by_id
+        }
         if missing_canonicals:
             logger.warning(
                 f"Canonical IDs not in graph, skipping their merges: {missing_canonicals}"
             )
-            merge_map = {k: v for k, v in merge_map.items() if v not in missing_canonicals}
+            merge_map = {
+                k: v for k, v in merge_map.items() if v not in missing_canonicals
+            }
 
         # Merge entity nodes
         for member_id, canonical_id in merge_map.items():
@@ -103,7 +114,22 @@ def apply_merges(
         logger.info("No entity merges to apply")
 
     # Apply cross-type relation corrections (always, even without entity merges)
-    links = _apply_cross_type_relations(case_dir, links, include_drafts)
+    # Use full_merge_map so IDs already merged in previous runs still get rewritten
+    current_node_ids = {n["id"] for n in nodes}
+    links = _apply_cross_type_relations(
+        case_dir, links, include_drafts, full_merge_map, current_node_ids
+    )
+
+    # Remove any links with dangling endpoints (from previous buggy runs)
+    before_count = len(links)
+    links = [
+        l
+        for l in links
+        if l["source"] in current_node_ids and l["target"] in current_node_ids
+    ]
+    dropped = before_count - len(links)
+    if dropped:
+        logger.info(f"Removed {dropped} links with dangling entity references")
 
     # Recompute metadata to reflect merged state
     metadata = _recompute_metadata(metadata, nodes, links)
@@ -135,7 +161,10 @@ def _load_graph(path: Path) -> Optional[Dict[str, Any]]:
 def _check_staleness(case_dir: Path, current_hash: str) -> None:
     """Warn if any merge file has a stale extractions_hash."""
     for entity_type, entity_file in get_all_entity_groups(case_dir):
-        if entity_file.extractions_hash and entity_file.extractions_hash != current_hash:
+        if (
+            entity_file.extractions_hash
+            and entity_file.extractions_hash != current_hash
+        ):
             logger.warning(
                 f"{entity_type} merge file has stale extractions_hash "
                 f"(file={entity_file.extractions_hash}, current={current_hash}). "
@@ -143,9 +172,7 @@ def _check_staleness(case_dir: Path, current_hash: str) -> None:
             )
 
 
-def _merge_node_fields(
-    canonical: Dict[str, Any], member: Dict[str, Any]
-) -> None:
+def _merge_node_fields(canonical: Dict[str, Any], member: Dict[str, Any]) -> None:
     """Merge member node fields into canonical node.
 
     Canonical fields take precedence. Missing fields are filled from member.
@@ -153,14 +180,10 @@ def _merge_node_fields(
     """
     # Combine extracted_from
     canonical_sources = set(
-        s.strip()
-        for s in canonical.get("extracted_from", "").split(",")
-        if s.strip()
+        s.strip() for s in canonical.get("extracted_from", "").split(",") if s.strip()
     )
     member_sources = set(
-        s.strip()
-        for s in member.get("extracted_from", "").split(",")
-        if s.strip()
+        s.strip() for s in member.get("extracted_from", "").split(",") if s.strip()
     )
     combined = canonical_sources | member_sources
     if combined:
@@ -229,6 +252,8 @@ def _apply_cross_type_relations(
     case_dir: Path,
     links: List[Dict[str, Any]],
     include_drafts: bool,
+    merge_map: Dict[str, str],
+    node_ids: Set[str],
 ) -> List[Dict[str, Any]]:
     """Add/update relations from cross_type_relations.yaml."""
     cross_file = read_cross_type_relations(case_dir)
@@ -239,21 +264,41 @@ def _apply_cross_type_relations(
         if rel.status == "DRAFT" and not include_drafts:
             continue
 
-        # Check if this relation already exists
+        # Rewrite entity IDs through merge map (member → canonical).
+        # If the rewritten ID doesn't exist in the graph (canonical was itself
+        # merged by dedupe in a previous run), fall back to the original ID.
+        source = merge_map.get(rel.source_id, rel.source_id)
+        if source not in node_ids:
+            source = rel.source_id
+        target = merge_map.get(rel.target_id, rel.target_id)
+        if target not in node_ids:
+            target = rel.target_id
+
+        # Skip if either endpoint still doesn't exist
+        if source not in node_ids or target not in node_ids:
+            logger.warning(
+                f"Dropping cross-type relation (dangling ID): "
+                f"{rel.source_name} --[{rel.relation_type}]--> {rel.target_name}"
+            )
+            continue
+
+        # Check if this relation already exists (with rewritten IDs)
         exists = any(
-            l["source"] == rel.source_id
-            and l["target"] == rel.target_id
+            l["source"] == source
+            and l["target"] == target
             and l.get("relation_type") == rel.relation_type
             for l in links
         )
         if not exists:
-            links.append({
-                "source": rel.source_id,
-                "target": rel.target_id,
-                "relation_type": rel.relation_type,
-                "date": rel.date,
-                "source_authority": rel.source,
-            })
+            links.append(
+                {
+                    "source": source,
+                    "target": target,
+                    "relation_type": rel.relation_type,
+                    "date": rel.date,
+                    "source_authority": rel.source,
+                }
+            )
 
     return links
 

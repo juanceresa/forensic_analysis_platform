@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -79,9 +78,7 @@ def _parse_observations(obs_text: str) -> list:
         if len(parts) >= 2 and parts[1].upper() in ("HIGH", "MEDIUM", "LOW"):
             severity = parts[1].upper()
         if obs:
-            observations.append(
-                ForensicObservation(observation=obs, severity=severity)
-            )
+            observations.append(ForensicObservation(observation=obs, severity=severity))
     return observations
 
 
@@ -146,8 +143,12 @@ class CaseNarrativeGenerator:
         # Step 3: Generate per-period narratives
         narrative_periods: List[NarrativePeriod] = []
         for period_key, period_docs in sorted(period_groups.items()):
-            period_entities = self._entities_for_documents(period_docs, all_entities, graph)
-            period_relations = self._relations_for_period(period_entities, all_relations)
+            period_entities = self._entities_for_documents(
+                period_docs, all_entities, graph
+            )
+            period_relations = self._relations_for_period(
+                period_entities, all_relations
+            )
 
             start_year, end_year = self._parse_period_key(period_key)
             label = _get_period_label(start_year, end_year)
@@ -633,6 +634,10 @@ class CaseNarrativeGenerator:
         if len(sections) >= 2:
             # Section 0: title
             candidate_title = sections[0].strip()
+            # Strip XML-style tags the LLM sometimes wraps around titles
+            import re
+
+            candidate_title = re.sub(r"</?title>", "", candidate_title).strip()
             if candidate_title and len(candidate_title) < 100:
                 title = candidate_title
 
@@ -667,10 +672,10 @@ class CaseNarrativeGenerator:
         try:
             from farmer_factory.domains import domain_registry
 
-            domain = domain_registry.get_active_domain()
+            domain = domain_registry.active
             if domain is None:
                 return ""
-            context_path = domain.prompts_dir / "system_context.txt"
+            context_path = Path(domain.prompts_dir) / "system_context.txt"
             if context_path.exists():
                 text = context_path.read_text(encoding="utf-8")
                 if len(text) > 3000:
