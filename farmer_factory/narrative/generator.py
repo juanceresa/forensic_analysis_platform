@@ -1,11 +1,13 @@
 """Batch case narrative generator — produces case_narrative.json during processing."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from farmer_factory.config.settings import settings
 from farmer_factory.extract.api_client import ClaudeAPIClient
@@ -19,6 +21,9 @@ from farmer_factory.narrative.models import (
 )
 from farmer_factory.narrative.prompts import build_period_prompt, build_summary_prompt
 from farmer_factory.structure.graph import KnowledgeGraph
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +102,7 @@ class CaseNarrativeGenerator:
         max_cost: float = 2.0,
         primary_model: str = "sonnet",
         domain_context: str = "",
+        case_focus: CaseFocus | None = None,
     ):
         self.api_client = ClaudeAPIClient(api_key=api_key)
         self.max_cost = max_cost
@@ -104,6 +110,7 @@ class CaseNarrativeGenerator:
         self.fallback_model = "haiku"
         self.total_cost = 0.0
         self.domain_context = domain_context
+        self.case_focus = case_focus
 
     def generate(self, case_id: str, graph: KnowledgeGraph) -> CaseNarrative:
         """Generate the full case narrative.
@@ -393,6 +400,7 @@ class CaseNarrativeGenerator:
             entities=entities,
             relations=relations,
             domain_context=self.domain_context,
+            case_focus=self.case_focus,
         )
 
         # Thin-period logic: scale thinking budget by document count
@@ -487,6 +495,7 @@ class CaseNarrativeGenerator:
             total_documents=len(documents),
             total_entities=len(all_entities),
             period_summaries=period_summaries,
+            case_focus=self.case_focus,
         )
 
         summary_text, cost = self._call_llm(prompt)

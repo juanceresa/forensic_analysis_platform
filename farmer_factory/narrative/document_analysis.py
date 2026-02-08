@@ -1,12 +1,14 @@
 """Generate per-document analysis using Haiku for structured interpretive summaries."""
 
+from __future__ import annotations
+
 import json
 import logging
 import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from farmer_factory.config.settings import settings
 from farmer_factory.extract.api_client import ClaudeAPIClient
@@ -15,6 +17,9 @@ from farmer_factory.narrative.models import (
     GenerationMetadata,
     OcrQuality,
 )
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +159,11 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
         raise
 
 
-def generate_document_analyses(case_id: str, max_cost: float = 1.00) -> Path:
+def generate_document_analyses(
+    case_id: str,
+    max_cost: float = 1.00,
+    case_focus: CaseFocus | None = None,
+) -> Path:
     """Generate structured analysis for each document in a case.
 
     Reads extraction JSONs and OCR text, generates interpretive analysis via Haiku,
@@ -163,6 +172,7 @@ def generate_document_analyses(case_id: str, max_cost: float = 1.00) -> Path:
     Args:
         case_id: Case identifier
         max_cost: Cost ceiling in USD (default $1.00)
+        case_focus: Optional case-level focus configuration
 
     Returns:
         Path to document_analyses.json
@@ -212,7 +222,13 @@ def generate_document_analyses(case_id: str, max_cost: float = 1.00) -> Path:
             logger.warning(f"No OCR text for {doc_key}, skipping")
             continue
 
-        prompt = DOCUMENT_ANALYSIS_PROMPT.format(
+        focus_section = ""
+        if case_focus is not None:
+            focus_text = case_focus.to_prompt_section()
+            if focus_text:
+                focus_section = f"\n{focus_text}\n"
+
+        prompt = f"{focus_section}{DOCUMENT_ANALYSIS_PROMPT}".format(
             document_text=doc_text[:12000],  # Cap text to keep prompt reasonable
             entities_section=entities_section,
             relations_section=relations_section,

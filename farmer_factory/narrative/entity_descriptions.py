@@ -1,12 +1,17 @@
 """Generate per-entity descriptions using Haiku for cheap, fast prose summaries."""
 
+from __future__ import annotations
+
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from farmer_factory.config.settings import settings
 from farmer_factory.extract.api_client import ClaudeAPIClient
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +71,11 @@ def _build_connections_section(
     return "\n".join(connections[:15]) if connections else "No connections found"
 
 
-def generate_entity_descriptions(case_id: str, max_cost: float = 0.50) -> Path:
+def generate_entity_descriptions(
+    case_id: str,
+    max_cost: float = 0.50,
+    case_focus: CaseFocus | None = None,
+) -> Path:
     """Generate descriptions for all non-DOCUMENT entities, saved to entity_descriptions.json.
 
     Reads graph_data.json for entity metadata and connections, generates prose
@@ -76,6 +85,7 @@ def generate_entity_descriptions(case_id: str, max_cost: float = 0.50) -> Path:
     Args:
         case_id: Case identifier
         max_cost: Cost ceiling in USD (default $0.50 — generous for Haiku)
+        case_focus: Optional case-level focus configuration
 
     Returns:
         Path to entity_descriptions.json
@@ -129,7 +139,13 @@ def generate_entity_descriptions(case_id: str, max_cost: float = 0.50) -> Path:
         source_docs = entity.get("extracted_from", "")
         source_doc_count = len([s for s in source_docs.split(",") if s.strip()]) if source_docs else 0
 
-        prompt = ENTITY_DESCRIPTION_PROMPT.format(
+        focus_section = ""
+        if case_focus is not None:
+            focus_text = case_focus.to_prompt_section()
+            if focus_text:
+                focus_section = f"\n{focus_text}\n"
+
+        prompt = f"{focus_section}{ENTITY_DESCRIPTION_PROMPT}".format(
             name=name,
             entity_type=entity_type,
             metadata_section=metadata_section,

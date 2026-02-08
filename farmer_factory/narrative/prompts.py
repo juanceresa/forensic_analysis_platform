@@ -1,6 +1,11 @@
 """LLM prompts for batch case narrative generation."""
 
-from typing import Dict, List, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Dict, List, Any
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 
 PERIOD_NARRATIVE_TEMPLATE = """You are a forensic analyst writing a historical narrative for property restitution research.
@@ -93,6 +98,7 @@ def build_period_prompt(
     entities: List[Dict[str, Any]],
     relations: List[Dict[str, Any]],
     domain_context: str = "",
+    case_focus: CaseFocus | None = None,
 ) -> str:
     """Build prompt for a single period's narrative generation."""
     docs_lines = []
@@ -148,6 +154,12 @@ def build_period_prompt(
             truncated += "\n[truncated]"
         domain_section = f"\n**Domain Knowledge:**\n{truncated}\n"
 
+    # Case focus section
+    if case_focus is not None:
+        focus_text = case_focus.to_prompt_section()
+        if focus_text:
+            domain_section += f"\n{focus_text}\n"
+
     return PERIOD_NARRATIVE_TEMPLATE.format(
         period_label=period_label,
         period_range=period_range,
@@ -165,12 +177,19 @@ def build_summary_prompt(
     total_documents: int,
     total_entities: int,
     period_summaries: List[Dict[str, str]],
+    case_focus: CaseFocus | None = None,
 ) -> str:
     """Build prompt for the overall case summary."""
     summaries_lines = []
     for ps in period_summaries:
         summaries_lines.append(f"**{ps['label']} ({ps['range']}):**\n{ps['narrative']}\n")
     summaries_str = "\n".join(summaries_lines)
+
+    # Inject focus section into period summaries context
+    if case_focus is not None:
+        focus_text = case_focus.to_prompt_section()
+        if focus_text:
+            summaries_str = f"{focus_text}\n\n{summaries_str}"
 
     return CASE_SUMMARY_TEMPLATE.format(
         case_id=case_id,
