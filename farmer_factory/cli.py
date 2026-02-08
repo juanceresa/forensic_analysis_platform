@@ -305,13 +305,17 @@ def process(
         output_path = Path("cases") / case_id / "output" / "graph_data.json"
         click.echo(f"\nGraph saved to: {output_path}")
 
+        # Load case focus for narrative/description/analysis generation
+        from farmer_factory.intake.manifest import load_case_focus
+        case_focus = load_case_focus(case_dir)
+
         # Generate case narrative
         try:
             from farmer_factory.narrative import CaseNarrativeGenerator
             from farmer_factory.structure.graph import KnowledgeGraph
 
             graph = KnowledgeGraph.load(output_path)
-            generator = CaseNarrativeGenerator()
+            generator = CaseNarrativeGenerator(case_focus=case_focus)
             output_dir = Path("cases") / case_id / "output"
             narrative_path = generator.generate_and_save(case_id, graph, output_dir)
             click.echo(f"Narrative saved to: {narrative_path}")
@@ -324,7 +328,7 @@ def process(
             from farmer_factory.narrative.entity_descriptions import generate_entity_descriptions
 
             click.echo("\nGenerating entity descriptions (Haiku)...")
-            desc_path = generate_entity_descriptions(case_id)
+            desc_path = generate_entity_descriptions(case_id, case_focus=case_focus)
             click.echo(f"Entity descriptions saved to: {desc_path}")
         except Exception as e:
             logger.warning(f"Entity description generation failed (non-fatal): {e}")
@@ -335,7 +339,7 @@ def process(
             from farmer_factory.narrative.document_analysis import generate_document_analyses
 
             click.echo("\nGenerating document analyses (Haiku)...")
-            analyses_path = generate_document_analyses(case_id)
+            analyses_path = generate_document_analyses(case_id, case_focus=case_focus)
             click.echo(f"Document analyses saved to: {analyses_path}")
         except Exception as e:
             logger.warning(f"Document analysis generation failed (non-fatal): {e}")
@@ -377,14 +381,18 @@ def generate_narrative(case_id: str, max_cost: float, model: str, domain: str):
             f"graph_data.json not found at {graph_path}. Run 'process' first."
         )
 
+    from farmer_factory.intake.manifest import load_case_focus
     from farmer_factory.narrative import CaseNarrativeGenerator
     from farmer_factory.structure.graph import KnowledgeGraph
+
+    case_dir = Path("cases") / case_id
+    case_focus = load_case_focus(case_dir)
 
     click.echo(f"Loading graph from {graph_path}...")
     graph = KnowledgeGraph.load(graph_path)
 
     click.echo(f"Generating narrative (model={model}, max_cost=${max_cost:.2f})...")
-    generator = CaseNarrativeGenerator(max_cost=max_cost, primary_model=model)
+    generator = CaseNarrativeGenerator(max_cost=max_cost, primary_model=model, case_focus=case_focus)
     output_dir = Path("cases") / case_id / "output"
     narrative_path = generator.generate_and_save(case_id, graph, output_dir)
 
@@ -597,8 +605,12 @@ def clean(case_id: str, confirm: bool):
     Removes all processed outputs while keeping source PDFs intact:
     - extractions/ (AI-extracted entities)
     - ocr/ (OCR text files)
+    - ocr_cleaned/ (LLM-cleaned OCR text)
+    - ocr_translated/ (translated text)
     - preprocessed/ (processed images)
-    - output/ (graph_data.json)
+    - output/ (graph_data.json, narratives, descriptions)
+    - entity_groups/ (merge authority YAML files)
+    - document_groups.yaml (document grouping config)
 
     Your intake/ PDFs are never deleted.
     """
@@ -616,8 +628,12 @@ def clean(case_id: str, confirm: bool):
     click.echo("\nWill remove:")
     click.echo("  - extractions/")
     click.echo("  - ocr/")
+    click.echo("  - ocr_cleaned/")
+    click.echo("  - ocr_translated/")
     click.echo("  - preprocessed/")
     click.echo("  - output/")
+    click.echo("  - entity_groups/")
+    click.echo("  - document_groups.yaml")
     click.echo("\nWill keep:")
     click.echo(f"  - intake/ ({len(list(intake_dir.glob('*.pdf')))} PDFs)")
 
@@ -627,19 +643,30 @@ def clean(case_id: str, confirm: bool):
             click.echo("Aborted.")
             return
 
-    # Clean directories
-    dirs_to_clean = ["extractions", "ocr", "preprocessed", "output"]
+    import shutil
+
+    # Clean directories (recreate empty)
+    dirs_to_clean = ["extractions", "ocr", "ocr_cleaned", "ocr_translated", "preprocessed", "output"]
     for dir_name in dirs_to_clean:
         dir_path = case_dir / dir_name
         if dir_path.exists():
-            import shutil
-
             shutil.rmtree(dir_path)
         dir_path.mkdir(parents=True, exist_ok=True)
 
+    # Clean directories (remove entirely, pipeline recreates as needed)
+    for dir_name in ["entity_groups"]:
+        dir_path = case_dir / dir_name
+        if dir_path.exists():
+            shutil.rmtree(dir_path)
+
+    # Clean standalone files
+    doc_groups = case_dir / "document_groups.yaml"
+    if doc_groups.exists():
+        doc_groups.unlink()
+
     click.echo(f"\n✓ Case {case_id} cleaned successfully")
     click.echo("\nReady for fresh processing:")
-    click.echo(f"  python cli.py process {case_id}")
+    click.echo(f"  python -m farmer_factory.cli process {case_id}")
 
 
 @cli.command()
@@ -840,12 +867,16 @@ def generate_descriptions(case_id: str, max_cost: float, domain: str):
             f"graph_data.json not found at {graph_path}. Run 'process' first."
         )
 
+    from farmer_factory.intake.manifest import load_case_focus
     from farmer_factory.narrative.entity_descriptions import generate_entity_descriptions
+
+    case_dir = Path("cases") / case_id
+    case_focus = load_case_focus(case_dir)
 
     click.echo(f"Generating entity descriptions (model=haiku, max_cost=${max_cost:.2f})...")
 
     try:
-        result_path = generate_entity_descriptions(case_id, max_cost=max_cost)
+        result_path = generate_entity_descriptions(case_id, max_cost=max_cost, case_focus=case_focus)
         click.echo(f"\n✅ Descriptions written to: {result_path}")
     except Exception as e:
         logger.exception(f"Description generation failed: {e}")
@@ -877,12 +908,16 @@ def generate_analyses(case_id: str, max_cost: float, domain: str):
             f"Extractions not found at {extractions_dir}. Run 'process' first."
         )
 
+    from farmer_factory.intake.manifest import load_case_focus
     from farmer_factory.narrative.document_analysis import generate_document_analyses
+
+    case_dir = Path("cases") / case_id
+    case_focus = load_case_focus(case_dir)
 
     click.echo(f"Generating document analyses (model=haiku, max_cost=${max_cost:.2f})...")
 
     try:
-        result_path = generate_document_analyses(case_id, max_cost=max_cost)
+        result_path = generate_document_analyses(case_id, max_cost=max_cost, case_focus=case_focus)
         click.echo(f"\n✅ Analyses written to: {result_path}")
     except Exception as e:
         logger.exception(f"Document analysis generation failed: {e}")
