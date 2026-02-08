@@ -5,7 +5,7 @@ Handles PDF loading and initial document processing.
 
 from .pdf_loader import DocumentGrouper, PDFLoader, PDFLoadError
 from .provenance import ProvenanceTracker
-from .manifest import ManifestManager
+from .manifest import ManifestManager, CaseFocus, load_case_focus
 
 __all__ = [
     "DocumentGrouper",
@@ -13,4 +13,6 @@ __all__ = [
     "PDFLoadError",
     "ProvenanceTracker",
     "ManifestManager",
+    "CaseFocus",
+    "load_case_focus",
 ]
