@@ -1,7 +1,9 @@
 """LLM extraction service for entity extraction from OCR text using Claude API."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Dict, Any, Optional
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
 from difflib import SequenceMatcher
 import logging
 import time
@@ -20,6 +22,9 @@ from farmer_factory.extract.parsers import (
     transform_to_final_entities,
     transform_to_final_relations,
 )
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 # Chunk threshold from Chilean KG paper (arXiv:2408.11975)
 CHUNK_THRESHOLD = 5000  # Characters - process as chunks if longer
@@ -148,6 +153,7 @@ class LLMExtractionService:
         document_id: str,
         ocr_confidence: float,
         document_date: Optional[str],
+        case_focus: CaseFocus | None = None,
     ) -> List[Relation]:
         """
         Extract relations from OCR text using Claude API.
@@ -158,6 +164,7 @@ class LLMExtractionService:
             document_id: Document identifier
             ocr_confidence: OCR confidence for logging
             document_date: Document date for temporal fallback
+            case_focus: Optional case-level focus configuration
 
         Returns:
             List of Relation objects (empty if extraction fails)
@@ -169,7 +176,8 @@ class LLMExtractionService:
 
             # Build zero-shot prompt (more effective and cost-efficient)
             prompt = build_relation_prompt_zero_shot(
-                text=text, entities=entities, document_id=document_id
+                text=text, entities=entities, document_id=document_id,
+                case_focus=case_focus,
             )
 
             # Call Claude API with retry logic
@@ -213,10 +221,20 @@ class LLMExtractionService:
     # _transform_to_final_entities has been moved to farmer_factory.extract.parsers
 
     def _extract_entities(
-        self, text: str, ocr_confidence: float, document_id: str
+        self,
+        text: str,
+        ocr_confidence: float,
+        document_id: str,
+        case_focus: CaseFocus | None = None,
     ) -> tuple[List[BaseEntity], Optional[str]]:
         """
         Extract entities from OCR text (first pass).
+
+        Args:
+            text: OCR-extracted text
+            ocr_confidence: OCR confidence score
+            document_id: Document identifier
+            case_focus: Optional case-level focus configuration
 
         Returns:
             Tuple of (entities list, document_date)
@@ -227,7 +245,8 @@ class LLMExtractionService:
 
         # Build zero-shot prompt (more effective and cost-efficient)
         prompt = build_entity_prompt_zero_shot(
-            text=text, document_id=document_id, ocr_quality=ocr_confidence
+            text=text, document_id=document_id, ocr_quality=ocr_confidence,
+            case_focus=case_focus,
         )
 
         # Call Claude API
@@ -312,7 +331,11 @@ class LLMExtractionService:
             return text
 
     def extract_from_text(
-        self, text: str, ocr_confidence: float, document_id: str
+        self,
+        text: str,
+        ocr_confidence: float,
+        document_id: str,
+        case_focus: CaseFocus | None = None,
     ) -> LLMExtractionResult:
         """
         Extract entities and relations from OCR text using Claude API.
@@ -328,6 +351,7 @@ class LLMExtractionService:
             text: OCR-extracted text from document
             ocr_confidence: Confidence score from OCR (0.0-1.0)
             document_id: Document identifier for entity tracking
+            case_focus: Optional case-level focus configuration
 
         Returns:
             LLMExtractionResult with extracted entities and relations
@@ -349,13 +373,14 @@ class LLMExtractionService:
                 text=text,
                 ocr_confidence=ocr_confidence,
                 document_id=document_id,
+                case_focus=case_focus,
             )
 
         # Try real Claude API extraction
         try:
             # STEP 1: Extract entities (first pass)
             entities, document_date = self._extract_entities(
-                text, ocr_confidence, document_id
+                text, ocr_confidence, document_id, case_focus=case_focus
             )
 
             # STEP 2: Extract relations (second pass - only if we have 2+ entities)
@@ -370,6 +395,7 @@ class LLMExtractionService:
                     document_id=document_id,
                     ocr_confidence=ocr_confidence,
                     document_date=document_date,
+                    case_focus=case_focus,
                 )
             else:
                 logger.info(
@@ -442,6 +468,7 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
         text: str,
         ocr_confidence: float,
         document_id: str,
+        case_focus: CaseFocus | None = None,
     ) -> LLMExtractionResult:
         """
         Extract from long document using chunked processing.
@@ -479,6 +506,7 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
                     text=chunk.text,
                     ocr_confidence=ocr_confidence,
                     document_id=chunk_doc_id,
+                    case_focus=case_focus,
                 )
                 all_entities.extend(entities)
                 # Use first non-None document date found
@@ -508,6 +536,7 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
                 document_id=document_id,
                 ocr_confidence=ocr_confidence,
                 document_date=document_date,
+                case_focus=case_focus,
             )
 
         # Calculate weighted confidence by chunk length

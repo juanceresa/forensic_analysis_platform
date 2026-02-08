@@ -4,9 +4,11 @@ Based on Chilean KG paper methodology (arXiv:2408.11975).
 Uses JSON schema specification without example values.
 """
 
+from __future__ import annotations
+
 import json
 import logging
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from farmer_factory.structure.schema import BaseEntity
 from farmer_factory.domains import domain_registry
@@ -15,6 +17,9 @@ from .helpers import (
     get_relation_extraction_hints,
     ocr_quality_description,
 )
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +82,7 @@ def build_entity_prompt_zero_shot(
     document_id: str,
     document_type: str = "unknown",
     ocr_quality: float = 0.0,
+    case_focus: CaseFocus | None = None,
 ) -> str:
     """
     Build zero-shot entity extraction prompt (no examples).
@@ -89,6 +95,7 @@ def build_entity_prompt_zero_shot(
         document_id: Document identifier
         document_type: Type of document
         ocr_quality: OCR confidence score
+        case_focus: Optional case-level focus configuration
 
     Returns:
         Formatted prompt string
@@ -97,7 +104,13 @@ def build_entity_prompt_zero_shot(
     system_context = load_system_context()
     context_section = f"\n{system_context}\n" if system_context else ""
 
-    prompt = f"""{context_section}Extract entities from this historical Cuban property document. Return JSON only.
+    focus_section = ""
+    if case_focus is not None:
+        focus_text = case_focus.to_prompt_section()
+        if focus_text:
+            focus_section = f"\n{focus_text}\n"
+
+    prompt = f"""{context_section}{focus_section}Extract entities from this historical Cuban property document. Return JSON only.
 
 ENTITY TYPES AND REQUIRED FIELDS:
 
@@ -131,6 +144,7 @@ def build_relation_prompt_zero_shot(
     entities: List[BaseEntity],
     document_id: str,
     document_type: str = "unknown",
+    case_focus: CaseFocus | None = None,
 ) -> str:
     """
     Build zero-shot relation extraction prompt (no examples).
@@ -140,6 +154,7 @@ def build_relation_prompt_zero_shot(
         entities: Previously extracted entities
         document_id: Document identifier
         document_type: Type of document
+        case_focus: Optional case-level focus configuration
 
     Returns:
         Formatted prompt string
@@ -153,6 +168,12 @@ def build_relation_prompt_zero_shot(
     system_context = load_system_context()
     context_section = f"\n{system_context}\n" if system_context else ""
 
+    focus_section = ""
+    if case_focus is not None:
+        focus_text = case_focus.to_prompt_section()
+        if focus_text:
+            focus_section = f"\n{focus_text}\n"
+
     # Build relation types from domain config
     relation_hints = get_relation_extraction_hints()
     if domain_registry.is_active and relation_hints:
@@ -160,7 +181,7 @@ def build_relation_prompt_zero_shot(
     else:
         rel_types = "OWNS, SOLD, BOUGHT, INHERITED, CONFISCATED, WITNESSED, NOTARIZED, REGISTERED_IN, LOCATED_IN, EMPLOYED_BY, RELATED_TO"
 
-    prompt = f"""{context_section}Extract relationships between entities from this document. Return JSON only.
+    prompt = f"""{context_section}{focus_section}Extract relationships between entities from this document. Return JSON only.
 
 RELATION TYPES: {rel_types}
 

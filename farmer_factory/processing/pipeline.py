@@ -28,6 +28,7 @@ from farmer_factory.structure import (
     GraphExporter
 )
 from farmer_factory.intake import ManifestManager
+from farmer_factory.intake.manifest import load_case_focus
 from farmer_factory.intake.document_groups import load_document_groups
 from farmer_factory.config.settings import settings
 from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, save_cleaned_text, setup_logging
@@ -86,6 +87,15 @@ def process_case(
 
     setup_logging(case_dir / 'processing.log')
     logger.info(f"Starting processing for case: {case_id}")
+
+    # Load case-level focus configuration (optional)
+    case_focus = load_case_focus(case_dir)
+    if case_focus:
+        logger.info(
+            "Case focus loaded: %d subjects, %d assets",
+            len(case_focus.primary_subjects),
+            len(case_focus.primary_assets),
+        )
 
     # Initialize manifest tracker
     manifest = ManifestManager(case_id)
@@ -197,7 +207,9 @@ def process_case(
                     preprocessed.path = DocumentPath.TYPED
                     logger.debug(f"Forcing TYPED path for {document_id}")
 
-                extraction = extract_pipeline.extract_page(preprocessed, document_id=document_id)
+                extraction = extract_pipeline.extract_page(
+                    preprocessed, document_id=document_id, case_focus=case_focus
+                )
             except Exception as e:
                 raise ProcessingError(f"Failed extraction {page_path.stem}: {e}")
 

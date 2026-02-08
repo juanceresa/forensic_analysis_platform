@@ -1,7 +1,9 @@
 """Extraction pipeline orchestrating OCR, Vision, and LLM services."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
 
 from farmer_factory.prepare import DocumentPath, ProcessedPage
 from farmer_factory.structure.schema import BaseEntity, Relation
@@ -9,6 +11,9 @@ from farmer_factory.extract.ocr import OCRService, OCRResult
 from farmer_factory.extract.vision import VisionExtractionService
 from farmer_factory.extract.llm import LLMExtractionService
 from farmer_factory.extract.validator import SchemaValidator
+
+if TYPE_CHECKING:
+    from farmer_factory.intake.manifest import CaseFocus
 
 
 @dataclass
@@ -51,7 +56,8 @@ class ExtractionPipeline:
     def extract_page(
         self,
         processed_page: ProcessedPage,
-        document_id: str
+        document_id: str,
+        case_focus: CaseFocus | None = None,
     ) -> ExtractionResult:
         """
         Extract entities from preprocessed page.
@@ -61,12 +67,13 @@ class ExtractionPipeline:
         Args:
             processed_page: Preprocessed page from prepare module
             document_id: Document identifier for entity tracking
+            case_focus: Optional case-level focus configuration
 
         Returns:
             ExtractionResult with entities, relations, and confidence scores
         """
         if processed_page.path == DocumentPath.TYPED:
-            return self._extract_typed_path(processed_page, document_id)
+            return self._extract_typed_path(processed_page, document_id, case_focus=case_focus)
         elif processed_page.path == DocumentPath.HANDWRITTEN:
             return self._extract_handwritten_path(processed_page, document_id)
         else:
@@ -75,7 +82,8 @@ class ExtractionPipeline:
     def _extract_typed_path(
         self,
         processed_page: ProcessedPage,
-        document_id: str
+        document_id: str,
+        case_focus: CaseFocus | None = None,
     ) -> ExtractionResult:
         """
         Extract from TYPED document: OCR → LLM → Validate.
@@ -83,6 +91,7 @@ class ExtractionPipeline:
         Args:
             processed_page: Preprocessed binary image
             document_id: Document identifier
+            case_focus: Optional case-level focus configuration
 
         Returns:
             ExtractionResult with OCR + LLM extraction
@@ -91,6 +100,7 @@ class ExtractionPipeline:
         ocr_result = self.ocr_service.extract_text(processed_page.image)
 
         # Step 2: Clean OCR text (LLM — cheap Haiku call)
+        # NOTE: case_focus deliberately NOT passed here — cleanup is mechanical
         detected_language = ocr_result.metadata.get('language', 'unknown')
         cleaned_text = self.llm_service.clean_ocr_text(
             text=ocr_result.text,
@@ -103,7 +113,8 @@ class ExtractionPipeline:
         llm_result = self.llm_service.extract_from_text(
             text=cleaned_text,
             ocr_confidence=ocr_result.confidence,
-            document_id=document_id
+            document_id=document_id,
+            case_focus=case_focus,
         )
 
         # Step 4: Validate entities and relations
