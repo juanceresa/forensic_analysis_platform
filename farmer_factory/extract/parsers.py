@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from typing import List, Optional, Tuple, Callable
+from typing import List, Optional, Callable
 
 from farmer_factory.extract.models import (
     PersonExtraction,
@@ -62,7 +62,7 @@ def parse_entity_response(response_text: str) -> StructuredEntityExtractionResul
             registry_refs=[],
             document_date=None,
             document_date_confidence=None,
-            extraction_notes=f"JSON parse failed: {str(e)}"
+            extraction_notes=f"JSON parse failed: {str(e)}",
         )
 
     except Exception as e:
@@ -74,7 +74,7 @@ def parse_entity_response(response_text: str) -> StructuredEntityExtractionResul
             registry_refs=[],
             document_date=None,
             document_date_confidence=None,
-            extraction_notes=f"Schema validation failed: {str(e)}"
+            extraction_notes=f"Schema validation failed: {str(e)}",
         )
 
 
@@ -97,15 +97,13 @@ def parse_relation_response(response_text: str) -> RelationExtractionResult:
         logger.error(f"Failed to parse JSON from Claude relation response: {str(e)}")
         logger.debug(f"Response text: {response_text[:500]}...")
         return RelationExtractionResult(
-            relations=[],
-            extraction_notes=f"JSON parse failed: {str(e)}"
+            relations=[], extraction_notes=f"JSON parse failed: {str(e)}"
         )
 
     except Exception as e:
         logger.error(f"Failed to validate relation extraction result: {str(e)}")
         return RelationExtractionResult(
-            relations=[],
-            extraction_notes=f"Schema validation failed: {str(e)}"
+            relations=[], extraction_notes=f"Schema validation failed: {str(e)}"
         )
 
 
@@ -243,6 +241,7 @@ def transform_to_final_relations(
     document_id: str,
     document_date: Optional[str],
     match_entity_func: Callable[[str, List[BaseEntity]], Optional[str]],
+    unmatched_out: Optional[list] = None,
 ) -> List[Relation]:
     """
     Transform intermediate relations to final schema.
@@ -253,6 +252,9 @@ def transform_to_final_relations(
         document_id: Document identifier
         document_date: Document date for temporal fallback
         match_entity_func: Function to match entity names to IDs
+        unmatched_out: Optional list to collect unmatched (orphan) relations.
+            If provided, relations with unresolved entity names are appended
+            as dicts instead of being silently dropped.
 
     Returns:
         List of final Relation objects
@@ -275,9 +277,22 @@ def transform_to_final_relations(
 
         if not source_id or not target_id:
             logger.warning(
-                f"Skipping relation {rel.relation_type} - "
-                f"unmatched entities: {rel.source_entity} -> {rel.target_entity}"
+                f"Unmatched relation {rel.relation_type}: "
+                f"{rel.source_entity} -> {rel.target_entity}"
             )
+            if unmatched_out is not None:
+                unmatched_out.append(
+                    {
+                        "relation_type": rel.relation_type,
+                        "source_entity": rel.source_entity,
+                        "target_entity": rel.target_entity,
+                        "source_matched": source_id is not None,
+                        "target_matched": target_id is not None,
+                        "confidence": rel.confidence,
+                        "evidence": rel.evidence,
+                        "document_id": document_id,
+                    }
+                )
             continue
 
         temporal_info = apply_temporal_logic(rel, document_date)
@@ -298,7 +313,9 @@ def transform_to_final_relations(
         final_notes = rel.notes or ""
         if needs_review:
             if rel.confidence < 0.70:
-                final_notes += f" Low confidence ({rel.confidence:.2f}) - requires analyst review."
+                final_notes += (
+                    f" Low confidence ({rel.confidence:.2f}) - requires analyst review."
+                )
             if (
                 relation_type.value in temporal_relations
                 and temporal_info.date_precision == "unknown"
@@ -357,9 +374,7 @@ def apply_temporal_logic(
                 notes="Date inferred from document date",
             )
         else:
-            logger.warning(
-                f"No temporal data for {relation.relation_type} relation"
-            )
+            logger.warning(f"No temporal data for {relation.relation_type} relation")
             return TemporalInfo(
                 date_precision="unknown",
                 notes="Missing temporal data for event relation",

@@ -123,6 +123,7 @@ ORGANIZATION: name, org_type, location, address, confidence, context
 LOCATION: name, location_type, parent_location, country, confidence, context
 
 RULES:
+- Extract ALL entity types present in the document, not just PERSON. Property documents typically contain PROPERTY and LOCATION entities — do not omit them.
 - Extract only explicit information from text
 - Preserve Spanish names exactly
 - Use null for missing fields, [] for empty lists

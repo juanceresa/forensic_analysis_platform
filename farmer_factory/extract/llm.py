@@ -176,7 +176,9 @@ class LLMExtractionService:
 
             # Build zero-shot prompt (more effective and cost-efficient)
             prompt = build_relation_prompt_zero_shot(
-                text=text, entities=entities, document_id=document_id,
+                text=text,
+                entities=entities,
+                document_id=document_id,
                 case_focus=case_focus,
             )
 
@@ -195,27 +197,34 @@ class LLMExtractionService:
             extraction = parse_relation_response(response_text)
 
             # Transform to final relations using parsers module
+            unmatched: list[dict] = []
             relations = transform_to_final_relations(
                 extraction=extraction,
                 entities=entities,
                 document_id=document_id,
                 document_date=document_date,
                 match_entity_func=self._match_entity,
+                unmatched_out=unmatched,
             )
 
             processing_time = time.time() - start_time
             logger.info(
                 f"Relation extraction completed in {processing_time:.2f}s - "
                 f"extracted {len(relations)} relations"
+                + (
+                    f", {len(unmatched)} unmatched (saved as orphans)"
+                    if unmatched
+                    else ""
+                )
             )
 
-            return relations
+            return relations, unmatched
 
         except Exception as e:
             logger.error(f"Relation extraction failed for {document_id}: {str(e)}")
             logger.debug(f"Error details: {type(e).__name__}: {str(e)}")
-            # Return empty list - document will be flagged as incomplete
-            return []
+            # Return empty lists - document will be flagged as incomplete
+            return [], []
 
     # _parse_extraction_response has been moved to farmer_factory.extract.parsers
     # _transform_to_final_entities has been moved to farmer_factory.extract.parsers
@@ -245,7 +254,9 @@ class LLMExtractionService:
 
         # Build zero-shot prompt (more effective and cost-efficient)
         prompt = build_entity_prompt_zero_shot(
-            text=text, document_id=document_id, ocr_quality=ocr_confidence,
+            text=text,
+            document_id=document_id,
+            ocr_quality=ocr_confidence,
             case_focus=case_focus,
         )
 
@@ -325,9 +336,7 @@ class LLMExtractionService:
             return cleaned.strip()
 
         except Exception as e:
-            logger.warning(
-                f"OCR cleanup failed for {document_id}, using raw text: {e}"
-            )
+            logger.warning(f"OCR cleanup failed for {document_id}, using raw text: {e}")
             return text
 
     def extract_from_text(
@@ -385,11 +394,12 @@ class LLMExtractionService:
 
             # STEP 2: Extract relations (second pass - only if we have 2+ entities)
             relations = []
+            unmatched_relations: list[dict] = []
             if len(entities) >= 2:
                 logger.info(
                     f"Extracting relations from {document_id} ({len(entities)} entities found)..."
                 )
-                relations = self._extract_relations(
+                relations, unmatched_relations = self._extract_relations(
                     text=text,
                     entities=entities,
                     document_id=document_id,
@@ -448,6 +458,8 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
                 ),
                 "document_date": document_date,
                 "text_length": len(text),
+                "unmatched_relation_count": len(unmatched_relations),
+                "unmatched_relations": unmatched_relations,
             }
 
             return LLMExtractionResult(
@@ -529,8 +541,9 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
 
         # Phase 3: Extract relations using full text + merged entities
         relations: List[Relation] = []
+        unmatched_relations: list[dict] = []
         if len(merged_entities) >= 2:
-            relations = self._extract_relations(
+            relations, unmatched_relations = self._extract_relations(
                 text=text,  # Use full text for relation context
                 entities=merged_entities,
                 document_id=document_id,
@@ -542,10 +555,9 @@ All entities and relations tagged as TIER_3_AI (unverified AI extraction).
         # Calculate weighted confidence by chunk length
         if chunk_confidences:
             total_len = sum(length for _, length in chunk_confidences)
-            avg_confidence = (
-                sum(conf * length for conf, length in chunk_confidences)
-                / max(total_len, 1)
-            )
+            avg_confidence = sum(
+                conf * length for conf, length in chunk_confidences
+            ) / max(total_len, 1)
         else:
             avg_confidence = ocr_confidence
 
@@ -576,6 +588,8 @@ All entities tagged as TIER_3_AI (unverified AI extraction).
             "entities_after_merge": len(merged_entities),
             "chunk_confidences": [conf for conf, _ in chunk_confidences],
             "failed_chunks": sum(1 for conf, _ in chunk_confidences if conf == 0.0),
+            "unmatched_relation_count": len(unmatched_relations),
+            "unmatched_relations": unmatched_relations,
         }
 
         return LLMExtractionResult(
@@ -625,7 +639,10 @@ All entities tagged as TIER_3_AI (unverified AI extraction).
                 # Merge roles if present
                 if hasattr(existing, "roles") and hasattr(entity, "roles"):
                     existing.roles = list(
-                        set(getattr(existing, "roles", []) + getattr(entity, "roles", []))
+                        set(
+                            getattr(existing, "roles", [])
+                            + getattr(entity, "roles", [])
+                        )
                     )
                 # Merge alternate_names if present
                 if hasattr(existing, "alternate_names") and hasattr(
@@ -652,7 +669,9 @@ All entities tagged as TIER_3_AI (unverified AI extraction).
                         )
                         setattr(existing, field_name, merged_list)
                     else:
-                        if (existing_value in (None, "", [])) and incoming_value not in (None, "", []):
+                        if (
+                            existing_value in (None, "", [])
+                        ) and incoming_value not in (None, "", []):
                             setattr(existing, field_name, incoming_value)
                 # Keep highest confidence verification
                 if entity.verification.confidence > existing.verification.confidence:
