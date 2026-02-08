@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
-MAX_FOCUS_CONTEXT_LENGTH = 500
+MAX_FOCUS_CONTEXT_LENGTH = 1500
 
 
 class CaseFocus(BaseModel):

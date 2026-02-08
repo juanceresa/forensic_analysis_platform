@@ -8,15 +8,16 @@ if TYPE_CHECKING:
     from farmer_factory.intake.manifest import CaseFocus
 
 
-PERIOD_NARRATIVE_TEMPLATE = """You are a forensic analyst writing a historical narrative for property restitution research.
+PERIOD_NARRATIVE_TEMPLATE = """You are a research analyst writing a historical narrative for property restitution research.
 
-**CRITICAL CONSTRAINTS:**
+**GUIDELINES:**
 1. Write in past tense with engaging narrative voice (not a mechanical data dump)
 2. Present events in chronological order within this period
-3. NEVER make legal conclusions or assess ownership validity
-4. NEVER infer beyond what the documents explicitly state
+3. You MAY interpret, speculate on likely explanations, and connect dots across documents
+4. You MAY explain what the evidence suggests even when it doesn't explicitly confirm
 5. Highlight expropriations, sales, and inheritances prominently
-6. Ground every claim in the documents provided — do not fabricate
+6. Ground interpretation in the documents — do not fabricate, but do go beyond literal statements
+7. NEVER make legal conclusions or assess ownership validity
 
 **Time Period:** {period_label} ({period_range})
 
@@ -66,14 +67,15 @@ OBSERVATIONS:
 <observation> | <severity>"""
 
 
-CASE_SUMMARY_TEMPLATE = """You are a forensic analyst writing an executive summary for a property restitution case.
+CASE_SUMMARY_TEMPLATE = """You are a research analyst writing an executive summary for a property restitution case.
 
-**CRITICAL CONSTRAINTS:**
+**GUIDELINES:**
 1. Write in past tense with engaging narrative voice
 2. Summarize the full arc of the family's documentary record
-3. NEVER make legal conclusions or assess ownership validity
-4. NEVER infer beyond what the documents state
-5. This is AI-generated research analysis, not a legal document
+3. You MAY interpret the evidence — explain what the documents likely mean for the family's story
+4. You MAY note gaps, patterns, and what the record suggests but doesn't confirm
+5. NEVER make legal conclusions or assess ownership validity
+6. This is AI-generated research analysis, not a legal document
 
 **Case:** {case_id}
 **Date Range:** {date_range}

@@ -23,15 +23,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "1.0"
+PROMPT_VERSION = "1.1"
 
-DOCUMENT_ANALYSIS_PROMPT = """You are a forensic research analyst examining a historical document related to property restitution. Produce a structured analysis of this document.
+DOCUMENT_ANALYSIS_PROMPT = """You are a research analyst examining a historical document related to property restitution. Produce a structured analysis of this document.
 
-**CRITICAL CONSTRAINTS:**
-1. State ONLY what the document shows — never infer ownership validity or legal conclusions
-2. NEVER say "this proves" or "this establishes legal right" — say "this document states" or "this records"
-3. Be specific: use names, dates, and references from the document
-4. This is AI-generated research context, not a verified legal analysis
+**GUIDELINES:**
+1. Be specific: use names, dates, and references from the document
+2. You MAY interpret significance — explain what the document likely means in context, not just what it literally says
+3. You MAY note what's unusual, missing, or suggestive — connect dots across the evidence
+4. Relevance scoring should be relative to the specific case and family, not abstract
+5. NEVER make legal conclusions about ownership validity or case strength
+6. This is AI-generated research context, not a verified legal analysis
 
 **DOCUMENT TEXT:**
 {document_text}
@@ -47,10 +49,10 @@ DOCUMENT_ANALYSIS_PROMPT = """You are a forensic research analyst examining a hi
 Respond with ONLY valid JSON matching this exact schema (no markdown, no explanation):
 {{
   "document_type": "<type of document, e.g. Escritura de Compraventa, Poder General, Certificación>",
-  "executive_summary": "<2-4 sentence plain-English summary of what this document records>",
+  "executive_summary": "<2-4 sentence summary of what this document records and what it likely means for the case>",
   "claim_relevance": {{
     "level": "<CRITICAL|HIGH|MEDIUM|LOW>",
-    "reasoning": "<1-2 sentences explaining relevance to property restitution claims>"
+    "reasoning": "<1-2 sentences explaining relevance to this specific family's case — why does this document matter to them?>"
   }},
   "key_facts": [
     "<specific factual statement from the document>"

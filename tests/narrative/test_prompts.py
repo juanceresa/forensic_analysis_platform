@@ -32,7 +32,7 @@ def test_period_prompt_contains_constraints():
     assert "Escritura 1952" in prompt
     assert "Mario Ceresa" in prompt
     assert "NEVER make legal conclusions" in prompt
-    assert "NEVER infer beyond" in prompt
+    assert "do not fabricate" in prompt
 
 
 def test_period_prompt_highlights_confiscation():

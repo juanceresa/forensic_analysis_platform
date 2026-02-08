@@ -41,25 +41,37 @@ The system has TWO ZONES that must remain separate:
 
 **See:** `docs/architecture/ARCHITECTURE.md` for complete system design.
 
-### 2. Legal Posture
+### 2. Legal Posture (Two-Tier System)
 
-We produce **Forensic Facts**, never **Legal Strategy**.
+The platform operates on a **two-tier system** for AI-generated content:
 
-**ALLOWED:**
-- "Document X states Y owned Z in 1958"
-- "OCR confidence is 72%"
-- "Three documents corroborate this claim"
+**Tier 1 — Dossier (legal-grade):**
+- Forensic facts ONLY. "Document X states Y owned Z in 1958."
+- No interpretation, no speculation, no conclusions.
+- Extraction prompts (entity/relation) stay factual — they extract what's IN documents.
+- This tier produces artifacts that could theoretically support a legal claim.
 
-**FORBIDDEN:**
+**Tier 2 — AI Analysis (research-grade):**
+- Narratives, entity descriptions, document analyses.
+- For families and researchers, never for court.
+- MAY interpret, connect dots, speculate on likely explanations, note what's missing.
+- Relevance scoring is case-relative (importance to the specific family's story).
+- All output labeled TIER_3_AI — the disclaimer IS the guardrail.
+
+**FORBIDDEN (both tiers):**
 - "This proves ownership"
-- "You have a strong case"
-- "This is legally valid"
+- "You have a strong/valid legal case"
+- Anything that sounds like legal advice
+
+**The line:** Interpretation and informed speculation = allowed in Tier 2. Legal conclusions = never.
 
 **See:** `docs/architecture/POSTURING.md` for organizational strategy.
 
 ### 3. The Verification Tiers
 
 Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI → TIER_1_CERTIFIED).
+
+TIER_3 AI output is interpretive by design — the tier label communicates trustworthiness, not the content tone. Analyst promotion to TIER_2 is a review/edit workflow, not a rubber stamp on conservative AI output.
 
 **See:** `farmer_factory/structure/SCHEMA.md` for complete verification schema.
 
@@ -223,7 +235,9 @@ Every data point MUST have a `verification` field with 4-tier system (TIER_3_AI 
 - Use prompts EXACTLY as specified in `farmer_factory/extract/PROMPTS.md`
 - Parse responses into Pydantic models
 - Handle malformed responses gracefully
-- Never let LLM make legal conclusions
+- **Extraction prompts** (entity/relation): factual only — extract what's in documents
+- **AI analysis prompts** (narrative/descriptions/document analysis): may interpret, speculate, connect dots
+- Never let any LLM make legal conclusions (ownership validity, case strength)
 
 ### Frontend
 - Dark theme (Slate-900 background)
@@ -257,8 +271,8 @@ Create `cases/{CASE-ID}/case.yaml` to tell LLM prompts whose story matters:
 ```yaml
 focus:
   primary_subjects: ["Mario Ceresa", "Ceresa family"]
-  primary_assets: ["Farmacia Ceresa"]
-  focus_context: "Case centers on Ceresa family property restitution..."
+  primary_assets: ["Villa Aurelia"]
+  focus_context: "The Ceresa family is tracing their heritage back to Cuba..."
 ```
 Injected into entity extraction, relation extraction, narrative generation,
 entity descriptions, and document analyses. NOT injected into OCR cleanup
@@ -418,13 +432,13 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
   - Method: `LLMExtractionService.clean_ocr_text()` in `extract/llm.py`
 - Phase 9G - Case-Level Focus Configuration (✅ COMPLETE - 2026-02-07)
   - `case.yaml` in each case directory with `focus:` block (primary_subjects, primary_assets, focus_context)
-  - `CaseFocus` Pydantic model in `intake/manifest.py` with validation (list cleaning, 500-char truncation)
+  - `CaseFocus` Pydantic model in `intake/manifest.py` with validation (list cleaning, 1500-char truncation)
   - `load_case_focus(case_dir)` — fail-soft loader, returns None if missing/malformed
   - Threaded via explicit parameter passing through entity extraction, relation extraction, narrative generation, entity descriptions, and document analyses
   - OCR cleanup deliberately excluded — cleanup is mechanical text normalization
-  - ~50-100 tokens per prompt, negligible cost
   - Graceful degradation: everything works without case.yaml
-  - TEST-CERESA case.yaml created (Mario Ceresa / Ceresa family / Farmacia Ceresa)
+  - TEST-CERESA case.yaml created (Mario Ceresa / Ceresa family / Villa Aurelia)
+  - Two-tier prompt posture: extraction stays factual; AI analysis (narratives, descriptions, document analyses) allows interpretation
   - 29 tests in `tests/intake/test_case_focus.py`
 
 ### Strategic Priorities (from Civic Architecture Vision)
@@ -441,11 +455,12 @@ python -m farmer_factory.cli generate-dossier CASE-ID --property-id X --family-m
 
 ## What NOT to Do
 
-1. **Never** make legal conclusions in prompts or output
-2. **Never** allow Zone B to modify data
-3. **Never** display TIER_3_AI data without disclaimer
-4. **Never** skip the verification field on any node/link
-5. **Never** expose raw AI inference to clients without context
+1. **Never** make legal conclusions (ownership validity, case strength) in any prompt or output
+2. **Never** restrict AI analysis prompts to "only what documents state" — interpretation is allowed (see Two-Tier System)
+3. **Never** allow Zone B to modify data
+4. **Never** display TIER_3_AI data without disclaimer
+5. **Never** skip the verification field on any node/link
+6. **Never** expose raw AI inference to clients without context
 6. **Never** run tests that call the Anthropic API (`tests/extract/test_integration.py`, `tests/golden/`) without asking first — these use streaming API calls and burn through credits quickly. Safe to run: all other test files (they use mock extraction)
 
 ---

@@ -15,14 +15,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ENTITY_DESCRIPTION_PROMPT = """You are a forensic research analyst writing a brief profile for a person, property, organization, or location found in historical documents related to property restitution.
+ENTITY_DESCRIPTION_PROMPT = """You are a research analyst writing a brief profile for a person, property, organization, or location found in historical documents related to property restitution.
 
-**CRITICAL CONSTRAINTS:**
-1. State ONLY what the documents show — never infer or speculate
-2. NEVER make legal conclusions about ownership, validity, or case strength
-3. Write in past tense, 2-3 sentences maximum
-4. Be specific: use names, dates, and document references when available
-5. This is AI-generated research context, not a verified record
+**GUIDELINES:**
+1. Write in past tense, 2-4 sentences
+2. Be specific: use names, dates, and document references when available
+3. You MAY interpret and connect dots — explain likely roles, relationships, and significance
+4. You MAY note what's missing or what the evidence suggests but doesn't confirm
+5. Ground interpretation in the documents, but don't limit yourself to literal statements
+6. NEVER make legal conclusions about ownership validity or case strength
+7. This is AI-generated research context, not a verified record
 
 **Entity:**
 - Name: {name}
@@ -34,7 +36,7 @@ ENTITY_DESCRIPTION_PROMPT = """You are a forensic research analyst writing a bri
 
 **Source Documents:** {source_doc_count} document(s)
 
-Write a 2-3 sentence description of this entity based solely on what the documents reveal. Focus on who/what they are, their role in the documentary record, and key relationships. Be concise and factual."""
+Write a 2-4 sentence description of this entity. Explain who/what they are, their likely role in the story these documents tell, and their key relationships. Go beyond listing facts — interpret their significance. If the evidence suggests something but doesn't confirm it, say so."""
 
 
 def _build_metadata_section(entity: dict[str, Any]) -> str:

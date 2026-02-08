@@ -140,7 +140,7 @@ def test_parse_valid_response(mock_settings):
     assert result["claim_relevance"]["level"] == "CRITICAL"
     assert result["source_docs"] == ["doc_page_0"]
     assert "_metadata" in result
-    assert result["_metadata"]["prompt_version"] == "1.0"
+    assert result["_metadata"]["prompt_version"] == "1.1"
 
 
 @patch("farmer_factory.narrative.document_analysis.settings")

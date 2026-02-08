@@ -49,7 +49,7 @@ class TestCaseFocusModel:
         assert focus.primary_assets == ["Farmacia", "Casa"]
 
     def test_focus_context_truncation(self, caplog):
-        long_context = "x" * 600
+        long_context = "x" * 2000
         with caplog.at_level(logging.WARNING):
             focus = CaseFocus(focus_context=long_context)
         assert len(focus.focus_context) <= MAX_FOCUS_CONTEXT_LENGTH
@@ -259,8 +259,8 @@ class TestRealCaseYaml:
         assert focus is not None
         assert "Mario Ceresa" in focus.primary_subjects
         assert "Ceresa family" in focus.primary_subjects
-        assert "Farmacia Ceresa" in focus.primary_assets
+        assert "Villa Aurelia" in focus.primary_assets
         assert len(focus.focus_context) > 0
         section = focus.to_prompt_section()
         assert "Mario Ceresa" in section
-        assert "Farmacia Ceresa" in section
+        assert "Villa Aurelia" in section
