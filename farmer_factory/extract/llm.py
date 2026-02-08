@@ -85,6 +85,11 @@ class LLMExtractionService:
         # Normalize entity name for better matching
         entity_name_normalized = entity_name.lower().strip()
 
+        # Step 0: Direct ID match (LLM sometimes returns ID instead of name)
+        for entity in entities:
+            if entity.id == entity_name:
+                return entity.id
+
         # Step 1: Exact match on name (case-insensitive)
         for entity in entities:
             if hasattr(entity, "name") and entity.name:

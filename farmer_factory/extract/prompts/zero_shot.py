@@ -187,9 +187,10 @@ def build_relation_prompt_zero_shot(
 RELATION TYPES: {rel_types}
 
 RELATION SCHEMA:
-relation_type (string), source_entity (name), target_entity (name), confidence (0-1), temporal ({{start_date, end_date, ongoing, date_precision}}), evidence (quote), notes
+relation_type (string), source_entity (entity name as string), target_entity (entity name as string), confidence (0-1), temporal ({{start_date, end_date, ongoing, date_precision}}), evidence (quote), notes
 
 RULES:
+- Use the entity NAME (not ID) for source_entity and target_entity
 - Only extract explicit relationships from text
 - temporal.date_precision: "exact", "month", "year", "decade", "unknown"
 - If no relations found, return empty array
