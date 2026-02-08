@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -25,6 +25,9 @@ const monoFont = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Civic Table - Forensic Intelligence Platform",
   description: "Document analysis and entity intelligence for property restitution cases",
+};
+
+export const viewport: Viewport = {
   themeColor: "#020617", // slate-950
 };
 
