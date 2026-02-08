@@ -638,6 +638,9 @@ class CaseNarrativeGenerator:
             import re
 
             candidate_title = re.sub(r"</?title>", "", candidate_title).strip()
+            # Strip markdown formatting: # headers, **bold**, *italic*
+            candidate_title = re.sub(r"^#+\s*", "", candidate_title)
+            candidate_title = re.sub(r"\*+([^*]+)\*+", r"\1", candidate_title).strip()
             if candidate_title and len(candidate_title) < 100:
                 title = candidate_title
 

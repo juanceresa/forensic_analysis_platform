@@ -25,6 +25,7 @@ class ClaudeAPIClient:
         if self._client is None:
             try:
                 import anthropic
+
                 self._client = anthropic.Anthropic(api_key=self.api_key)
             except ImportError:
                 raise ImportError(
@@ -39,7 +40,7 @@ class ClaudeAPIClient:
         model: str = None,
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        api_timeout: int = 120
+        api_timeout: int = 120,
     ) -> str:
         """
         Call Claude API with exponential backoff retry logic.
@@ -67,14 +68,16 @@ class ClaudeAPIClient:
 
         for attempt in range(max_retries):
             try:
-                logger.info(f"Calling Claude API (attempt {attempt + 1}/{max_retries}, model: {model})")
+                logger.info(
+                    f"Calling Claude API (attempt {attempt + 1}/{max_retries}, model: {model})"
+                )
 
                 response = client.messages.create(
                     model=model,
                     max_tokens=4096,
                     temperature=0.1,
                     messages=[{"role": "user", "content": prompt}],
-                    timeout=api_timeout
+                    timeout=api_timeout,
                 )
 
                 # Extract text from response
@@ -85,15 +88,17 @@ class ClaudeAPIClient:
 
             except Exception as e:
                 error_type = type(e).__name__
-                logger.warning(f"Claude API error (attempt {attempt + 1}): {error_type}: {str(e)}")
+                logger.warning(
+                    f"Claude API error (attempt {attempt + 1}): {error_type}: {str(e)}"
+                )
 
                 # Check if we should retry
-                is_last_attempt = (attempt == max_retries - 1)
+                is_last_attempt = attempt == max_retries - 1
 
                 # Rate limit errors - exponential backoff
                 if "rate_limit" in str(e).lower() or "RateLimitError" in error_type:
                     if not is_last_attempt:
-                        delay = retry_delay * (2 ** attempt)
+                        delay = retry_delay * (2**attempt)
                         logger.info(f"Rate limited, waiting {delay}s before retry...")
                         time.sleep(delay)
                         continue
@@ -106,8 +111,24 @@ class ClaudeAPIClient:
                         time.sleep(retry_delay)
                         continue
 
+                # Empty/malformed response - Haiku can't handle this document,
+                # upgrade to Sonnet which handles complex documents better
+                if "empty response" in str(e).lower() or (
+                    isinstance(e, ValueError) and "empty" in str(e).lower()
+                ):
+                    if not is_last_attempt and model != retry_model:
+                        logger.warning(
+                            f"Empty response from {model}, upgrading to {retry_model} for retry..."
+                        )
+                        model = retry_model
+                        time.sleep(retry_delay)
+                        continue
+
                 # Connection/server errors - simple retry
-                if any(keyword in str(e).lower() for keyword in ["connection", "server", "503", "502", "500"]):
+                if any(
+                    keyword in str(e).lower()
+                    for keyword in ["connection", "server", "503", "502", "500"]
+                ):
                     if not is_last_attempt:
                         time.sleep(retry_delay)
                         continue
@@ -231,9 +252,7 @@ class ClaudeAPIClient:
                     thinking_tokens = max(0, int(output_tokens - visible_tokens))
 
                 # Compute cost
-                cost = self._compute_cost(
-                    current_model, input_tokens, output_tokens
-                )
+                cost = self._compute_cost(current_model, input_tokens, output_tokens)
 
                 usage_dict = {
                     "input_tokens": input_tokens,
@@ -248,20 +267,17 @@ class ClaudeAPIClient:
             except Exception as e:
                 error_type = type(e).__name__
                 logger.warning(
-                    f"Thinking call error (attempt {attempt + 1}): "
-                    f"{error_type}: {e}"
+                    f"Thinking call error (attempt {attempt + 1}): {error_type}: {e}"
                 )
                 if attempt < max_retries - 1:
-                    time.sleep(retry_delay * (2 ** attempt))
+                    time.sleep(retry_delay * (2**attempt))
                     continue
                 raise
 
         raise Exception("Claude API thinking retries exhausted")
 
     @staticmethod
-    def _compute_cost(
-        model: str, input_tokens: int, output_tokens: int
-    ) -> float:
+    def _compute_cost(model: str, input_tokens: int, output_tokens: int) -> float:
         """Compute cost from actual token counts."""
         # Pricing per token (2026 estimates)
         if "opus" in model:
