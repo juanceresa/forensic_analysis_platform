@@ -1,0 +1,27 @@
+{
+  "Demo Deed_page_0": {
+    "document_type": "Synthetic Registry Filing",
+    "executive_summary": "A synthetic filing records Raul Diaz as owner of Central Plot 12 and references registry and location evidence.",
+    "claim_relevance": {
+      "level": "HIGH",
+      "reasoning": "The document directly links claimant identity, property identifier, and registry context."
+    },
+    "key_facts": [
+      "Raul Diaz is associated with ownership of Central Plot 12.",
+      "The filing references the National Land Registry.",
+      "Habana Centro is recorded as the location reference."
+    ],
+    "cross_references": [
+      "Correlates with graph relation OWNS(person_raul_diaz -> property_central_plot_12)."
+    ],
+    "quality_notes": {
+      "ocr_quality": "GOOD",
+      "missing_information": [
+        "No secondary corroborating document in the demo set."
+      ],
+      "verification_needed": [
+        "Independent source confirmation for ownership transfer history."
+      ]
+    }
+  }
+}

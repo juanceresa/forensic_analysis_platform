@@ -52,6 +52,10 @@ output/
 *.jpg
 *.jpeg
 
+# Public synthetic demo artifacts (intentionally committed)
+!examples/demo_case/template/DEMO-SYNTHETIC/output/
+!examples/demo_case/template/DEMO-SYNTHETIC/output/*.json
+
 # Jupyter
 .ipynb_checkpoints/
 

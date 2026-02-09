@@ -1,0 +1,116 @@
+{
+  "metadata": {
+    "case_id": "DEMO-SYNTHETIC",
+    "created_at": "2026-02-09T00:00:00Z",
+    "updated_at": "2026-02-09T00:00:00Z",
+    "factory_version": "public-demo",
+    "entity_count": 5,
+    "relation_count": 3,
+    "document_count": 1,
+    "verification_distribution": {
+      "TIER_3_AI": 5
+    },
+    "entity_type_summary": {
+      "PERSON": 1,
+      "PROPERTY": 1,
+      "ORGANIZATION": 1,
+      "LOCATION": 1,
+      "DOCUMENT": 1
+    },
+    "date_range": {
+      "earliest_document": "1962-04-03",
+      "latest_document": "1962-04-03",
+      "earliest_event": "1962-04-03",
+      "latest_event": "1962-04-03"
+    }
+  },
+  "nodes": [
+    {
+      "id": "person_raul_diaz",
+      "entity_type": "PERSON",
+      "name": "Raul Diaz",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.88
+      },
+      "extracted_from": "Demo Deed_page_0"
+    },
+    {
+      "id": "property_central_plot_12",
+      "entity_type": "PROPERTY",
+      "name": "Central Plot 12",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.9
+      },
+      "extracted_from": "Demo Deed_page_0"
+    },
+    {
+      "id": "org_national_land_registry",
+      "entity_type": "ORGANIZATION",
+      "name": "National Land Registry",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.84
+      },
+      "extracted_from": "Demo Deed_page_0"
+    },
+    {
+      "id": "location_habana_centro",
+      "entity_type": "LOCATION",
+      "name": "Habana Centro",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.82
+      },
+      "extracted_from": "Demo Deed_page_0"
+    },
+    {
+      "id": "document_demo_deed",
+      "entity_type": "DOCUMENT",
+      "name": "Demo Deed",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 1.0
+      },
+      "extracted_from": "Demo Deed_page_0"
+    }
+  ],
+  "links": [
+    {
+      "source": "person_raul_diaz",
+      "target": "property_central_plot_12",
+      "relation_type": "OWNS",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.86
+      },
+      "date": "1962-04-03",
+      "document_id": "Demo Deed_page_0",
+      "evidence": "Raul Diaz is listed as the registered owner of Central Plot 12."
+    },
+    {
+      "source": "property_central_plot_12",
+      "target": "org_national_land_registry",
+      "relation_type": "REGISTERED_WITH",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.83
+      },
+      "date": "1962-04-03",
+      "document_id": "Demo Deed_page_0",
+      "evidence": "Registry stamp confirms filing under National Land Registry."
+    },
+    {
+      "source": "property_central_plot_12",
+      "target": "location_habana_centro",
+      "relation_type": "LOCATED_IN",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.8
+      },
+      "document_id": "Demo Deed_page_0",
+      "evidence": "Location reference: Habana Centro."
+    }
+  ]
+}

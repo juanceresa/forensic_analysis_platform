@@ -1,0 +1,63 @@
+{
+  "processing_metadata": {
+    "llm_metadata": {
+      "document_date": "1962-04-03"
+    }
+  },
+  "confidence_scores": {
+    "ocr_confidence": 0.93
+  },
+  "entities": [
+    {
+      "id": "person_raul_diaz",
+      "entity_type": "PERSON",
+      "name": "Raul Diaz",
+      "role": "Claimant",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.88
+      }
+    },
+    {
+      "id": "property_central_plot_12",
+      "entity_type": "PROPERTY",
+      "name": "Central Plot 12",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.9
+      }
+    },
+    {
+      "id": "org_national_land_registry",
+      "entity_type": "ORGANIZATION",
+      "name": "National Land Registry",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.84
+      }
+    },
+    {
+      "id": "location_habana_centro",
+      "entity_type": "LOCATION",
+      "name": "Habana Centro",
+      "verification": {
+        "tier": "TIER_3_AI",
+        "confidence": 0.82
+      }
+    }
+  ],
+  "relations": [
+    {
+      "source": "person_raul_diaz",
+      "target": "property_central_plot_12",
+      "relation_type": "OWNS",
+      "evidence": "Raul Diaz is listed as the registered owner of Central Plot 12."
+    },
+    {
+      "source": "property_central_plot_12",
+      "target": "org_national_land_registry",
+      "relation_type": "REGISTERED_WITH",
+      "evidence": "Registry stamp confirms filing under National Land Registry."
+    }
+  ]
+}

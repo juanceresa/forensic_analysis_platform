@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "case_id": "DEMO-SYNTHETIC",
+    "generated_at": "2026-02-09T00:00:00Z",
+    "model": "demo"
+  },
+  "case_summary": "Synthetic demonstration case showing ownership, registry linkage, and location evidence.",
+  "periods": [
+    {
+      "period_id": "1960-1969",
+      "label": "1960-1969",
+      "title": "Registry Filing Window",
+      "narrative": "In April 1962, Raul Diaz appears in the record as owner of Central Plot 12. The filing references the National Land Registry and situates the asset in Habana Centro.",
+      "document_ids": [
+        "Demo Deed_page_0"
+      ],
+      "entity_ids": [
+        "person_raul_diaz",
+        "property_central_plot_12",
+        "org_national_land_registry",
+        "location_habana_centro"
+      ],
+      "inline_entities": [
+        {
+          "name": "Raul Diaz",
+          "entity_id": "person_raul_diaz",
+          "entity_type": "PERSON"
+        },
+        {
+          "name": "Central Plot 12",
+          "entity_id": "property_central_plot_12",
+          "entity_type": "PROPERTY"
+        }
+      ],
+      "forensic_observations": [
+        {
+          "observation": "Single-document evidence only; corroboration pending.",
+          "severity": "MEDIUM"
+        }
+      ],
+      "highlighted_events": [
+        {
+          "event_type": "FILED",
+          "summary": "Ownership filing for Central Plot 12 entered the record.",
+          "date": "1962-04-03",
+          "parties_involved": [
+            "Raul Diaz",
+            "National Land Registry"
+          ]
+        }
+      ],
+      "evidence": [
+        "Demo Deed_page_0"
+      ]
+    }
+  ]
+}
