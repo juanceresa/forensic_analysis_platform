@@ -109,7 +109,6 @@ docs/architecture/             Domain, frontend, security, and system docs
 - security model: `docs/architecture/SECURITY.md`
 - frontend domain model: `docs/architecture/FRONTEND.md`
 - domain configuration: `docs/architecture/DOMAIN_CONFIGURATION.md`
-- project posture: `docs/architecture/POSTURING.md`
 
 ## Security Notes
 

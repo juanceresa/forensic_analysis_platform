@@ -11,7 +11,7 @@
 
 This document defines the domain configuration system that enables Civic Table to serve multiple documentary recovery domains (genealogy, academic research, investigative journalism, parallel restitution) from a shared technical core.
 
-**Strategic Context:** See `docs/strategy/CIVIC_ARCHITECTURE_VISION.md`
+**Strategic Context:** Maintained in local strategy docs under `.claude/local_docs/strategy/`.
 
 **Key Insight:** 70% of the platform is domain-agnostic. Only entity types, relation types, extraction prompts, and success criteria are domain-specific.
 

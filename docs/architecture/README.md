@@ -12,7 +12,6 @@ High-level design references for Civic Table.
 ## Product + UX Context
 
 - `FRONTEND.md`: UI/UX architecture and component model
-- `POSTURING.md`: product posture, audience, and boundary conditions
 
 ## Related Technical Docs
 

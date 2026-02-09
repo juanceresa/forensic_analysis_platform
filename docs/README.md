@@ -13,17 +13,12 @@ Public documentation for Civic Table.
 - `architecture/SECURITY.md`: security model and operational controls
 - `architecture/DOMAIN_CONFIGURATION.md`: domain-driven extraction configuration
 - `architecture/FRONTEND.md`: frontend architecture and UI model
-- `architecture/POSTURING.md`: platform positioning and constraints
 - `architecture/TESTING.md`: testing strategy and coverage model
 
 ## Operator Guides
 
 - `guides/ADMIN_GUIDE.md`: operating the platform and case lifecycle
 - `guides/ANALYST_GUIDE.md`: review, verification, and escalation workflow
-
-## Strategy / Vision
-
-- `strategy/CIVIC_ARCHITECTURE_VISION.md`: long-range civic/mission framing
 
 ## Test Reporting
 
