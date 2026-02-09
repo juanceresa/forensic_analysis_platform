@@ -62,6 +62,5 @@ if [[ "$failures" -eq 0 ]]; then
 fi
 
 echo "FAIL: $failures checks failed."
-echo "Run history sanitize if needed:"
-echo "  bash scripts/sanitize_history_for_public_release.sh --yes-i-know-this-rewrites-history"
+echo "Review failed checks and decide whether to keep history as-is or sanitize manually."
 exit 1

@@ -53,13 +53,6 @@ Before publishing this repository (or new history) run:
 bash scripts/check_public_readiness.sh
 ```
 
-If the history check fails because legacy private paths were committed in older
-commits, rewrite history first:
-
-```bash
-bash scripts/sanitize_history_for_public_release.sh --yes-i-know-this-rewrites-history
-```
-
 ## Fast Local Demo
 
 From repository root:
