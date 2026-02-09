@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isAuthenticated } from '@/lib/auth';
 
-const COOKIE_NAME = 'vault_session';
-
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow: login page, all API routes (called internally by server components), static assets
+  // Always allow auth routes and static assets.
   if (
     pathname === '/login' ||
-    pathname.startsWith('/api/') ||
+    pathname === '/api/auth/login' ||
+    pathname === '/api/auth/logout' ||
     pathname.startsWith('/_next/') ||
     pathname === '/favicon.ico'
   ) {
@@ -21,15 +21,19 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check session cookie
-  const session = request.cookies.get(COOKIE_NAME);
-  if (session?.value === password) {
+  const authed = await isAuthenticated(request);
+  if (authed) {
     return NextResponse.next();
+  }
+
+  // API endpoints should return JSON 401 instead of redirecting.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   // Redirect to login, preserving the original URL
   const loginUrl = new URL('/login', request.url);
-  loginUrl.searchParams.set('next', pathname);
+  loginUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
   return NextResponse.redirect(loginUrl);
 }
 

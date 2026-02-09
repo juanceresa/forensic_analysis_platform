@@ -5,16 +5,14 @@ import {
   VerificationChart,
   WorkflowTable,
 } from '@/components/Dashboard';
+import { fetchServerApi } from '@/lib/server-api';
 
 interface DashboardPageProps {
   params: Promise<{ caseId: string }>;
 }
 
 async function getDashboardData(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/cases/${caseId}/dashboard`, {
-    cache: 'no-store',
-  });
+  const res = await fetchServerApi(`/api/cases/${caseId}/dashboard`);
 
   if (!res.ok) {
     throw new Error('Failed to fetch dashboard data');

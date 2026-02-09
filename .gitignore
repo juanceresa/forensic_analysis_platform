@@ -43,9 +43,6 @@ Thumbs.db
 *.log
 logs/
 
-# Output
-output/
-!output/.gitkeep
 /cases/
 *.pdf
 *.png

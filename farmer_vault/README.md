@@ -1,6 +1,6 @@
-# Farmer Vault - The Vault Frontend
+# Farmer Vault
 
-Next.js 16 forensic intelligence interface for Civic Table platform.
+Next.js interface for exploring Civic Table case outputs.
 
 ## Quick Start
 
@@ -9,115 +9,57 @@ npm install
 npm run dev
 ```
 
-Navigate to http://localhost:3000 (redirects to TEST-CERESA case).
+Open `http://localhost:3000`.
 
-## Architecture
+If local case data exists, Vault redirects to an available case (prefers `DEMO-SYNTHETIC`).
 
-The Vault implements a **document-first navigation architecture** with multiple complementary views for case data:
+## What Vault Does
 
-```
-/case/[caseId]/              → Dashboard (case overview)
-/case/[caseId]/documents     → Document Browser
-/case/[caseId]/entities      → Entity Browser (grouped by type)
-/case/[caseId]/narrative     → Timeline View (grouped by decade)
-/case/[caseId]/graph         → Knowledge Graph (interactive)
-/case/[caseId]/entity/[id]   → Entity Detail
-/case/[caseId]/document/[id] → Document Viewer
-```
+- renders document, entity, narrative, and graph views
+- reads case artifacts from local `../cases/<CASE_ID>/`
+- exposes case APIs under `/api/cases/[caseId]/...`
+- supports grouped documents via `document_groups.yaml`
 
-## API Routes
+## Key Routes
 
-| Endpoint | Description |
-|----------|-------------|
-| `/api/cases/[caseId]/dashboard` | Aggregated metrics, verification distribution, workflow status |
-| `/api/cases/[caseId]/entities` | All entities grouped by type (PERSON, PROPERTY, etc.) |
-| `/api/cases/[caseId]/timeline` | Documents grouped by decade with contextual titles |
-| `/api/cases/[caseId]/graph` | Full graph_data.json for visualization |
-
-## Key Components
-
-### Navigation
-- `CaseLayout` - Sidebar navigation with case context
-- `Sidebar` - Navigation links for all views
-
-### Views
-- `EntityBrowser` - Type-grouped entity display with verification badges
-- `TimelinePeriod` - Expandable timeline periods with document cards
-- `GraphView` - Wrapper for knowledge graph with navigation
-
-### Graph (`components/Graph/`)
-- `KnowledgeGraph` - Force-directed visualization (react-force-graph-2d)
-- `GraphView` - Full graph page wrapper with sidebar
-- `GraphSettingsPanel` - Real-time graph customization (layout, colors, filters)
-- `EntitySidebar` - Slide-in panel that fetches and renders EntityDetail for selected nodes
-- `NodeBadge` - Entity type indicator on graph nodes
-
-### Shared (`components/shared/`)
-- `Card` - Styled container component
-- `VerificationBadge` - Verification tier badges
-- `ErrorBoundary`, `ErrorState`, `LoadingState` - Error/loading UI
-- `Header`, `Sidebar` - Layout navigation components
-
-## Data Flow
-
-```
-Factory Output                 API Routes                    Components
-─────────────                 ──────────                    ──────────
-graph_data.json    →    /api/cases/[caseId]/*    →    Page Components
-    │                         │                              │
-    ├── nodes[]              ├── /dashboard                 ├── Dashboard
-    │   └── entities         │   └── metrics,workflow       │
-    │   └── documents        ├── /entities                  ├── EntityBrowser
-    │                        │   └── grouped by type        │
-    ├── links[]              ├── /timeline                  ├── TimelinePeriod
-    │   └── relationships    │   └── grouped by decade      │
-    │                        └── /graph                     └── KnowledgeGraph
-    └── metadata                 └── full graph data
+```text
+/case/[caseId]
+/case/[caseId]/documents
+/case/[caseId]/document/[docId]
+/case/[caseId]/entities
+/case/[caseId]/entity/[entityId]
+/case/[caseId]/narrative
+/case/[caseId]/graph
 ```
 
-## Verification Tiers
+## Auth Model
 
-| Tier | Description | Color |
-|------|-------------|-------|
-| `TIER_3_AI` | AI-extracted, not verified | Grey |
-| `TIER_2_ANALYST` | Analyst verified | Amber |
-| `TIER_2_INSTITUTIONAL` | Farmer House verified | Gold with FH badge |
-| `TIER_1_CERTIFIED` | Legally certified | Blue |
+Current auth is a shared-password gate:
 
-**Note:** `TIER_4_SOURCE` is a frontend-only display tier used for source document entities in the UI.
+- login route: `/login`
+- auth API: `/api/auth/login`
+- logout API: `/api/auth/logout`
+- edge gate: `proxy.ts`
+- session token: signed `vault_session` cookie (`lib/auth.ts`)
 
-## Tech Stack
+Environment variables:
 
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript 5.7
-- **Styling**: Tailwind CSS 3.4
-- **Graph**: react-force-graph-2d
-- **Testing**: Vitest
+- `VAULT_PASSWORD`
+- `VAULT_SESSION_SECRET` (used to sign session cookies)
 
-## Development
+Current cookie behavior: `secure` is set automatically when `NODE_ENV=production`.
+
+## Development Commands
 
 ```bash
-# Run development server
 npm run dev
-
-# Run tests
 npm test
-
-# Type check
-npm run type-check
-
-# Lint
 npm run lint
+npm run type-check
 ```
 
-## Current Limitations
+## Related Docs
 
-- **Local development only** (authentication not configured)
-- **File-based data** (reads from ../cases directory)
-- **Single case support** (multi-case navigation planned)
-
-## Documentation
-
-- `/docs/architecture/FRONTEND.md` - Full frontend specification
-- `/docs/architecture/ARCHITECTURE.md` - System architecture
-- `/.claude/ROADMAP.md` - Project roadmap
+- `../docs/architecture/FRONTEND.md`
+- `../docs/architecture/ARCHITECTURE.md`
+- `../docs/architecture/SECURITY.md`

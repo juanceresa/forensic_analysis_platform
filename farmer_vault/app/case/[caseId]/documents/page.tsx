@@ -1,14 +1,12 @@
 import { DocumentList } from '@/components/Documents/DocumentList';
+import { fetchServerApi } from '@/lib/server-api';
 
 interface DocumentsPageProps {
   params: Promise<{ caseId: string }>;
 }
 
 async function fetchDocuments(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/cases/${caseId}/documents`, {
-    cache: 'no-store',
-  });
+  const res = await fetchServerApi(`/api/cases/${caseId}/documents`);
 
   if (!res.ok) {
     throw new Error('Failed to fetch documents');
@@ -18,10 +16,7 @@ async function fetchDocuments(caseId: string) {
 }
 
 async function fetchEntities(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/cases/${caseId}/entities`, {
-    cache: 'no-store',
-  });
+  const res = await fetchServerApi(`/api/cases/${caseId}/entities`);
 
   if (!res.ok) {
     throw new Error('Failed to fetch entities');

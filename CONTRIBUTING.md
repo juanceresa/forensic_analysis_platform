@@ -65,3 +65,8 @@ npm test
 2. Include tests when behavior changes.
 3. Document user-visible changes in `README.md` or relevant docs.
 4. Do not commit secrets or real case data.
+5. Before public release work, run:
+
+```bash
+bash scripts/check_public_readiness.sh
+```

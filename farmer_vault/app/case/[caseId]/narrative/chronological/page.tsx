@@ -1,14 +1,12 @@
 import { TimelineView } from '@/components/Timeline';
+import { fetchServerApi } from '@/lib/server-api';
 
 interface ChronologicalPageProps {
   params: Promise<{ caseId: string }>;
 }
 
 async function getTimeline(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/cases/${caseId}/timeline`, {
-    cache: 'no-store',
-  });
+  const res = await fetchServerApi(`/api/cases/${caseId}/timeline`);
 
   if (!res.ok) {
     throw new Error('Failed to fetch timeline');

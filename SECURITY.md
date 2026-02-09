@@ -28,7 +28,9 @@ I will acknowledge receipt and provide a mitigation timeline.
 - Keep `.env`/`.env.local` files out of source control.
 - Use strong values for:
   - `VAULT_PASSWORD`
-  - `VAULT_SESSION_SECRET`
-- If exposing the UI publicly, require HTTPS and set:
-  - `VAULT_COOKIE_SECURE=true`
+  - `VAULT_SESSION_SECRET` (used for signed-session auth)
+- If exposing the UI publicly, require HTTPS and run with `NODE_ENV=production`
+  so auth cookies are marked `secure`.
 - Treat all `TIER_3_AI` outputs as unverified analysis.
+- Before opening the repo publicly, run:
+  - `bash scripts/check_public_readiness.sh`

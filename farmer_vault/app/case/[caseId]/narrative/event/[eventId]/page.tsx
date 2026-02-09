@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { VerificationBadge } from '@/components/shared';
+import { fetchServerApi } from '@/lib/server-api';
 
 interface EventPageProps {
   params: Promise<{ caseId: string; eventId: string }>;
@@ -65,10 +66,7 @@ function formatDate(dateStr: string | null): string {
 }
 
 async function getTimeline(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/cases/${caseId}/timeline`, {
-    cache: 'no-store',
-  });
+  const res = await fetchServerApi(`/api/cases/${caseId}/timeline`);
   if (!res.ok) throw new Error('Failed to fetch timeline');
   return res.json();
 }

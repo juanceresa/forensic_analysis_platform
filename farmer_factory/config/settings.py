@@ -38,7 +38,6 @@ class Settings(BaseSettings):
 
     # Paths
     cases_dir: Path = Path("./cases")
-    output_dir: Path = Path("./output")
 
     # Translation
     translation_enabled: bool = True
@@ -64,7 +63,6 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         # Ensure directories exist
         self.cases_dir.mkdir(exist_ok=True)
-        self.output_dir.mkdir(exist_ok=True)
 
 
 # Global settings instance

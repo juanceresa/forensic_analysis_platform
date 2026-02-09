@@ -1,432 +1,158 @@
-# CLI Usage Guide
+# CLI Usage
 
-> **Last Updated:** 2026-02-07
+## Environment Setup
 
----
-
-## Installation
-
-### System Dependencies
-
-**macOS:**
-```bash
-brew install poppler
-```
-
-**Ubuntu/Debian:**
-```bash
-sudo apt-get install poppler-utils
-```
-
-**Windows:**
-Download poppler binaries from: https://github.com/oschwartz10612/poppler-windows/releases
-Add to PATH.
-
-### Python Dependencies
+Install Python deps:
 
 ```bash
 pip install -r farmer_factory/requirements.txt
 ```
 
----
+Optional system dependency for PDF handling (platform-specific):
 
-## Domain Configuration
+- macOS: `brew install poppler`
+- Ubuntu/Debian: `sudo apt-get install poppler-utils`
 
-All commands support the `--domain` flag to specify which domain configuration to use. Default is `cuban_property`.
-
-```bash
-# List available domains
-python -m farmer_factory.cli list-domains
-
-# Output:
-# Available Domains:
-# ----------------------------------------
-#   cuban_property: Cuban Property Restitution
-```
-
-See `farmer_factory/domains/README.md` for creating custom domains.
-
----
-
-## Commands
-
-### Create a New Case
+## Discover Commands
 
 ```bash
-python -m farmer_factory.cli create-case \
-    --id CASE-CERESA \
-    --name "Ceresa Family Archive" \
-    --family "Ceresa" \
-    --domain cuban_property
+python3 -m farmer_factory.cli --help
 ```
 
-**Options:**
-- `--id` (required): Case identifier (e.g., CASE-001)
-- `--name` (required): Descriptive case name
-- `--family` (required): Family name for the case
-- `--domain` (optional): Domain configuration (default: cuban_property)
-
-Creates case directory structure:
-```
-cases/CASE-CERESA/
-  intake/          # Place PDFs here
-  preprocessed/    # Auto-generated images
-  extractions/     # Auto-generated JSON
-  output/          # Final graph_data.json
-  metadata.json    # Case information (includes domain)
-```
-
----
-
-### Process Documents
+List domains:
 
 ```bash
-# Basic processing
-python -m farmer_factory.cli process CASE-CERESA
-
-# With specific domain
-python -m farmer_factory.cli process CASE-CERESA --domain cuban_property
-
-# Verbose output for debugging
-python -m farmer_factory.cli process CASE-CERESA --verbose
-
-# Process single PDF file
-python -m farmer_factory.cli process CASE-CERESA --file document.pdf
-
-# Force typed path (skip handwritten triage)
-python -m farmer_factory.cli process CASE-CERESA --force-typed
-
-# Skip graph validation (faster)
-python -m farmer_factory.cli process CASE-CERESA --skip-validation
+python3 -m farmer_factory.cli list-domains
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--domain` (optional): Domain configuration (default: cuban_property)
-- `--verbose` (optional): Enable debug logging
-- `--file` (optional): Process only this PDF from intake/
-- `--force-typed` (optional): Force OCR path for all documents
-- `--skip-validation` (optional): Skip graph_data.json validation
+## Core Workflow Commands
 
-**What happens:**
-1. Domain configuration loaded (entity types, relation types, prompts)
-2. PDFs converted to images (300 DPI grayscale)
-3. Images preprocessed (deskew, denoise)
-4. OCR via Google Cloud Vision
-5. LLM OCR text cleanup (Haiku — fixes broken words, removes artifacts)
-6. Entities/relations extracted using domain-specific hints
-7. Knowledge graph built with auto-deduplication
-8. Graph exported to `graph_data.json`
-
-**Output:**
-```
-2026-01-27 10:00:00 - Domain set to: cuban_property
-
-[1/3] Processing 1960_Mario_Ceresa.pdf...
-  Loaded 2 pages
-  Page 1/2... ✓
-  Page 2/2... ✓
-
-============================================================
-Processing Complete!
-============================================================
-Documents processed: 3
-Entities extracted:  47
-Entities merged:     12
-Relations added:     23
-
-Graph saved to: cases/CASE-CERESA/output/graph_data.json
-```
-
----
-
-### Validate Graph
+Create a case:
 
 ```bash
-python -m farmer_factory.cli validate CASE-CERESA --domain cuban_property
+python3 -m farmer_factory.cli create-case --id CASE-001 --name "My Case" --family "Family" --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--domain` (optional): Domain for type validation (default: cuban_property)
-
-Validates `graph_data.json` against schema with domain-specific entity/relation types.
-
----
-
-### List Cases
+Detect multi-part document groups:
 
 ```bash
-python -m farmer_factory.cli list-cases
+python3 -m farmer_factory.cli detect-groups CASE-001
 ```
 
-Shows all cases with status and domain.
-
----
-
-### List Entities
+Process intake documents:
 
 ```bash
-# List all entities
-python -m farmer_factory.cli list-entities CASE-CERESA
-
-# Filter by type
-python -m farmer_factory.cli list-entities CASE-CERESA --type PERSON
-python -m farmer_factory.cli list-entities CASE-CERESA --type PROPERTY
+python3 -m farmer_factory.cli process CASE-001 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--type` (optional): Filter by entity type (PERSON, PROPERTY, DOCUMENT, ORGANIZATION, LOCATION)
-
-Useful for finding entity IDs for dossier generation.
-
----
-
-### List Domains
+Validate graph export:
 
 ```bash
-python -m farmer_factory.cli list-domains
+python3 -m farmer_factory.cli validate CASE-001 --domain cuban_property
 ```
 
-Shows all available domain configurations.
-
----
-
-### Generate Dossier
+Rebuild graph from saved extractions (no OCR/LLM rerun):
 
 ```bash
-python -m farmer_factory.cli generate-dossier CASE-CERESA \
-    --property-id "property_abc123" \
-    --family-member-id "person_xyz789" \
-    --domain cuban_property
+python3 -m farmer_factory.cli rebuild-graph CASE-001 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--property-id` (required): Entity ID of focal property
-- `--family-member-id` (required): Entity ID of primary claimant
-- `--domain` (optional): Domain configuration (default: cuban_property)
-- `--output` (optional): Output directory
-- `--engine` (optional): LaTeX engine (xelatex, pdflatex)
-- `--dry-run` (optional): Generate .tex only, skip PDF compilation
-
----
-
-### Train Deduplication
+Apply confirmed merge authority:
 
 ```bash
-python -m farmer_factory.cli train-deduplication CASE-CERESA \
-    --domain cuban_property \
-    --entity-type PERSON \
-    --num-examples 30
+python3 -m farmer_factory.cli apply-merges CASE-001 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--domain` (optional): Domain configuration (default: cuban_property)
-- `--entity-type` (optional): Train specific entity type
-- `--num-examples` (optional): Examples per type (default: 30)
-
-Interactive session for labeling entity pairs as matches or non-matches.
-
----
-
-### Clean Case
+Resolve orphan relations:
 
 ```bash
-python -m farmer_factory.cli clean CASE-CERESA --confirm
+python3 -m farmer_factory.cli resolve-orphans CASE-001
 ```
 
-Removes all processed outputs while keeping source PDFs intact.
-
----
-
-### Detect Document Groups
+Run AI analysis outputs:
 
 ```bash
-python -m farmer_factory.cli detect-groups CASE-CERESA
+python3 -m farmer_factory.cli analyze CASE-001 --max-cost 2.00 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--force` (optional): Regenerate even if groups already confirmed
+## Analysis Subcommands
 
-Scans intake PDFs for multi-part document patterns and generates `document_groups.yaml` for review. See Analyst Guide for workflow details.
-
----
-
-### Generate Entity Descriptions
+Generate entity descriptions only:
 
 ```bash
-python -m farmer_factory.cli generate-descriptions CASE-CERESA
-
-# With cost limit
-python -m farmer_factory.cli generate-descriptions CASE-CERESA --max-cost 0.50
+python3 -m farmer_factory.cli generate-descriptions CASE-001 --max-cost 0.50 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--domain` (optional): Domain configuration (default: cuban_property)
-- `--max-cost` (optional): Max generation cost in USD (default: 0.50)
-
-Generates AI prose descriptions for each entity (excluding DOCUMENTs) using Haiku. Writes to `output/entity_descriptions.json` — separate from graph_data.json so descriptions survive graph rebuilds. Incremental: re-running skips entities that already have descriptions.
-
----
-
-### Rebuild Graph
+Generate document analyses only:
 
 ```bash
-# Rebuild graph from existing extractions (no OCR/LLM cost)
-python -m farmer_factory.cli rebuild-graph CASE-CERESA
-
-# Skip validation
-python -m farmer_factory.cli rebuild-graph CASE-CERESA --skip-validation
+python3 -m farmer_factory.cli generate-analyses CASE-001 --max-cost 1.00 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--skip-validation` (optional): Skip graph validation
-
-Rebuilds `graph_data.json` from existing extraction JSONs without re-running OCR or LLM extraction. Useful after retraining dedupe models or updating entity group merges.
-
----
-
-### Apply Entity Merges
+Generate case narrative only:
 
 ```bash
-# Apply confirmed merges only
-python -m farmer_factory.cli apply-merges CASE-CERESA
-
-# Preview with draft merges
-python -m farmer_factory.cli apply-merges CASE-CERESA --include-drafts
+python3 -m farmer_factory.cli generate-narrative CASE-001 --model sonnet --max-cost 2.00 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--include-drafts` (optional): Include DRAFT merges (for preview)
+## Merge and Dedupe Commands
 
-Applies confirmed entity merges from `entity_groups/*.yaml` to `graph_data.json`. See Analyst Guide for the merge review workflow.
-
----
-
-### Merge Two Entities
+Train dedupe model(s):
 
 ```bash
-python -m farmer_factory.cli merge-entities CASE-CERESA ENTITY_A ENTITY_B
+python3 -m farmer_factory.cli train-deduplication CASE-001 --entity-type PERSON --num-examples 30 --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `ENTITY_A` (required): First entity ID
-- `ENTITY_B` (required): Second entity ID
-
-Analyst-driven merge of two specific entities. Creates a CONFIRMED merge entry and applies it immediately.
-
----
-
-### Generate Manifest
+Interactive group review:
 
 ```bash
-python -m farmer_factory.cli generate-manifest CASE-CERESA
+python3 -m farmer_factory.cli review-groups CASE-001 --entity-type PERSON --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-
-Generates a manifest for a processed case that doesn't have one (useful for cases processed before manifests were implemented).
-
----
-
-### Retry Failed Relations
+Manual entity merge:
 
 ```bash
-python -m farmer_factory.cli retry-relations CASE-CERESA
-
-# With verbose output
-python -m farmer_factory.cli retry-relations CASE-CERESA --verbose
+python3 -m farmer_factory.cli merge-entities CASE-001 entity_a entity_b --domain cuban_property
 ```
 
-**Options:**
-- `CASE_ID` (required): Case identifier
-- `--verbose` (optional): Enable debug output
+## Utility Commands
 
-Re-extracts relations for documents where relation extraction previously failed.
+List cases:
 
----
-
-## Troubleshooting
-
-### "poppler not found"
-Install poppler (see system dependencies above).
-
-### "Unknown domain"
 ```bash
-# Check available domains
-python -m farmer_factory.cli list-domains
+python3 -m farmer_factory.cli list-cases
 ```
 
-### Processing fails on specific PDF
-Check `cases/CASE-ID/processing.log` for detailed error messages.
+List entities:
 
-### Low entity extraction
-- Verify PDF quality (scanned vs digital)
-- Check OCR confidence in extraction JSONs
-- Review `processing.log` for warnings
-- Ensure domain configuration matches document language
-
----
-
-## File Formats
-
-### Intermediate Outputs
-
-**Preprocessed Images:** `cases/CASE-ID/preprocessed/{pdf_stem}_page_{n}.png`
-- 300 DPI grayscale PNG
-- Deskewed and denoised
-
-**Extraction JSON:** `cases/CASE-ID/extractions/{pdf_stem}_page_{n}.json`
-- Entities with TIER_3_AI verification
-- Relations with confidence scores
-- OCR text and metadata
-
-### Final Output
-
-**Graph Data:** `cases/CASE-ID/output/graph_data.json`
-- Force-graph format (nodes + links)
-- Entity/relation types from active domain
-- Ready for frontend consumption
-
-**Case Narrative:** `cases/CASE-ID/output/case_narrative.json`
-- Period-based timeline narrative (generated by Sonnet)
-- Case summary, decade groupings, highlighted events
-
-**Entity Descriptions:** `cases/CASE-ID/output/entity_descriptions.json`
-- Per-entity AI prose descriptions (generated by Haiku)
-- Separate file — survives graph rebuilds
-
-**Cleaned OCR Text:** `cases/CASE-ID/ocr_cleaned/{doc_id}.txt`
-- LLM-cleaned OCR text (broken words fixed, artifacts removed)
-- Also embedded in extraction JSON at `ocr_result.cleaned_text`
-
-**Case Metadata:** `cases/CASE-ID/metadata.json`
-```json
-{
-  "id": "CASE-CERESA",
-  "name": "Ceresa Family Archive",
-  "family": "Ceresa",
-  "domain": "cuban_property",
-  "created_at": "2026-01-27T10:00:00",
-  "status": "INTAKE"
-}
+```bash
+python3 -m farmer_factory.cli list-entities CASE-001 --type PERSON
 ```
 
----
+Generate dossier:
 
-## Next Steps
+```bash
+python3 -m farmer_factory.cli generate-dossier CASE-001 --property-id property_x --family-member-id person_y --domain cuban_property
+```
 
-After processing:
-1. Review graph in frontend (The Vault)
-2. Analyst verification (promote TIER_3_AI → TIER_2_ANALYST)
-3. Generate dossier PDFs for legal submission
-4. Upload to Supabase (coming soon)
+Clean generated outputs (keeps intake and analyst authority files):
+
+```bash
+python3 -m farmer_factory.cli clean CASE-001 --confirm
+```
+
+Generate manifest from existing outputs:
+
+```bash
+python3 -m farmer_factory.cli generate-manifest CASE-001
+```
+
+## Placeholder Commands
+
+These commands exist but are currently placeholders in this codebase:
+
+- `upload`
+- `retry`
+- `retry-relations`
+
+Check command help output before integrating them into automation.

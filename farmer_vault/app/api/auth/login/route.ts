@@ -1,26 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const COOKIE_NAME = 'vault_session';
+import {
+  createSessionToken,
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE_SECONDS,
+  shouldUseSecureCookie,
+} from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { password } = body;
+  const body = await request.json().catch(() => null);
+  const password = body?.password;
 
   const expected = process.env.VAULT_PASSWORD;
   if (!expected) {
     return NextResponse.json({ error: 'Auth not configured' }, { status: 500 });
   }
 
-  if (password !== expected) {
+  if (typeof password !== 'string' || password !== expected) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
   }
 
+  const token = await createSessionToken();
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(COOKIE_NAME, expected, {
+  response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: shouldUseSecureCookie(),
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: SESSION_MAX_AGE_SECONDS,
     path: '/',
   });
 

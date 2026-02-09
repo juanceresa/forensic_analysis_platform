@@ -47,6 +47,19 @@ This public repository does **not** include real client/family case files.
 - secrets stay in `.env` / `.env.local` (git-ignored)
 - committed demo records under `examples/demo_case/` are synthetic
 
+Before publishing this repository (or new history) run:
+
+```bash
+bash scripts/check_public_readiness.sh
+```
+
+If the history check fails because legacy private paths were committed in older
+commits, rewrite history first:
+
+```bash
+bash scripts/sanitize_history_for_public_release.sh --yes-i-know-this-rewrites-history
+```
+
 ## Fast Local Demo
 
 From repository root:
@@ -113,15 +126,16 @@ docs/architecture/             Domain, frontend, security, and system docs
 ## Security Notes
 
 - do not commit `.env` or real case data
-- use strong `VAULT_PASSWORD` and `VAULT_SESSION_SECRET`
-- if exposing over tunnel/public HTTPS, set `VAULT_COOKIE_SECURE=true`
+- use a strong `VAULT_PASSWORD`
+- use a strong `VAULT_SESSION_SECRET` (used for signed session cookies)
+- if exposing beyond localhost, run Vault with `NODE_ENV=production` so auth cookies are `secure`
 - treat `TIER_3_AI` as non-authoritative until human review
 
 See `SECURITY.md` for reporting and hardening policy.
 
 ## License
 
-AGPL-3.0 (`LICENSE`)
+AGPL-3.0-only (`LICENSE`)
 
 ## Author
 

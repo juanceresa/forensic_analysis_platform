@@ -1,14 +1,12 @@
 import { EntityBrowser } from '@/components/Entities/EntityBrowser';
+import { fetchServerApi } from '@/lib/server-api';
 
 interface EntitiesPageProps {
   params: Promise<{ caseId: string }>;
 }
 
 async function getEntities(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const res = await fetch(`${baseUrl}/api/cases/${caseId}/entities`, {
-    cache: 'no-store',
-  });
+  const res = await fetchServerApi(`/api/cases/${caseId}/entities`);
 
   if (!res.ok) {
     throw new Error('Failed to fetch entities');
@@ -18,11 +16,8 @@ async function getEntities(caseId: string) {
 }
 
 async function getTimelineEvents(caseId: string) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   try {
-    const res = await fetch(`${baseUrl}/api/cases/${caseId}/timeline`, {
-      cache: 'no-store',
-    });
+    const res = await fetchServerApi(`/api/cases/${caseId}/timeline`);
     if (!res.ok) return [];
     const data = await res.json();
     // Only return high-signal events, not FILED

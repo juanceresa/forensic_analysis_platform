@@ -1,31 +1,21 @@
-# Docs Index
+# Documentation Index
 
-Public documentation for Civic Table.
+Public-facing documentation for Civic Table.
 
 ## Start Here
 
-- `../README.md`: top-level project overview and quick start
-- `CLI_USAGE.md`: command reference for `farmer_factory.cli`
+- `../README.md`: project overview, quickstart, and repository layout
+- `CLI_USAGE.md`: command reference for `python -m farmer_factory.cli`
 
 ## Architecture
 
-- `architecture/ARCHITECTURE.md`: system architecture and data flow
-- `architecture/SECURITY.md`: security model and operational controls
+- `architecture/ARCHITECTURE.md`: end-to-end system and data flow
+- `architecture/SECURITY.md`: current security posture and hardening guidance
 - `architecture/DOMAIN_CONFIGURATION.md`: domain-driven extraction configuration
-- `architecture/FRONTEND.md`: frontend architecture and UI model
-- `architecture/TESTING.md`: testing strategy and coverage model
+- `architecture/FRONTEND.md`: Vault UI architecture and API surface
+- `architecture/TESTING.md`: test strategy and quality gates
 
-## Operator Guides
+## Public vs Local Docs
 
-- `guides/ADMIN_GUIDE.md`: operating the platform and case lifecycle
-- `guides/ANALYST_GUIDE.md`: review, verification, and escalation workflow
-
-## Test Reporting
-
-- `testing/relation-extraction-test-results.md`: extraction quality observations
-
-## Public vs Local Notes
-
-- Public docs live only under `docs/`
-- Local/private working docs are stored under `.claude/local_docs/`
-- `docs/plans/` and `docs/internal_docx/` are intentionally not part of the public repo
+- Public docs are versioned under `docs/`.
+- Private/local working docs live under `.claude/local_docs/` and are git-ignored.

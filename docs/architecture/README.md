@@ -1,19 +1,19 @@
 # Architecture Docs
 
-High-level design references for Civic Table.
+High-level technical docs for Civic Table.
 
 ## Core
 
-- `ARCHITECTURE.md`: end-to-end system architecture and processing zones
-- `SECURITY.md`: auth posture, data boundaries, and exposure controls
-- `DOMAIN_CONFIGURATION.md`: domain model and YAML-driven extensibility
-- `TESTING.md`: testing pyramid and quality gates
+- `ARCHITECTURE.md`: system topology, processing pipeline, and outputs
+- `SECURITY.md`: implemented auth model and deployment hardening
+- `DOMAIN_CONFIGURATION.md`: how domain YAML controls extraction behavior
+- `TESTING.md`: tests by layer and release checklist
 
-## Product + UX Context
+## Product Surface
 
-- `FRONTEND.md`: UI/UX architecture and component model
+- `FRONTEND.md`: Vault routes, API contract, and UX model
 
-## Related Technical Docs
+## Related Internal Specs
 
 - `../../farmer_factory/structure/SCHEMA.md`
 - `../../farmer_factory/structure/DATA_DICTIONARY.md`

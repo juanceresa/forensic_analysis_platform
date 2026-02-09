@@ -7,6 +7,10 @@ name = "farmer-factory"
 version = "0.1.0"
 description = "Forensic document analysis platform"
 requires-python = ">=3.10"
+license = {text = "AGPL-3.0-only"}
+classifiers = [
+  "License :: OSI Approved :: GNU Affero General Public License v3",
+]
 
 [tool.setuptools.packages.find]
 include = ["farmer_factory*"]
