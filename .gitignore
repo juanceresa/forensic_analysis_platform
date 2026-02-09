@@ -81,6 +81,7 @@ temp/
 .claudes
 .claudes/
 docs/internal_docx/*
+docs/plans/
 .worktrees/
 
 # CLAUDE.md files

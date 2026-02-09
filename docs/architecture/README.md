@@ -1,37 +1,22 @@
-# Architecture Documentation
+# Architecture Docs
 
-> **Last Updated:** 2026-01-28
+High-level design references for Civic Table.
 
-This directory contains high-level architecture and design documentation for the Civic Table platform.
+## Core
 
----
+- `ARCHITECTURE.md`: end-to-end system architecture and processing zones
+- `SECURITY.md`: auth posture, data boundaries, and exposure controls
+- `DOMAIN_CONFIGURATION.md`: domain model and YAML-driven extensibility
+- `TESTING.md`: testing pyramid and quality gates
 
-## Documents
+## Product + UX Context
 
-### System Architecture
-- **ARCHITECTURE.md** - System design, Air Gap architecture, zones A & B
-- **SECURITY.md** - Authentication, authorization, audit logging
-- **TESTING.md** - Testing strategy, quality assurance, test coverage
-- **DOMAIN_CONFIGURATION.md** - Multi-domain support and configuration system
+- `FRONTEND.md`: UI/UX architecture and component model
+- `POSTURING.md`: product posture, audience, and boundary conditions
 
-### Domain Architecture
-- **POSTURING.md** - Organizational strategy, Farmer House vs Civic Table
-- **FRONTEND.md** - UI components, design system, verification tiers
+## Related Technical Docs
 
----
-
-## Quick Links
-
-**For implementation details, see module-specific docs:**
-- Entity extraction: `farmer_factory/extract/PROMPTS.md`
-- Graph schema: `farmer_factory/structure/SCHEMA.md`
-- Image preprocessing: `farmer_factory/prepare/PREPROCESSING.md`
-- Domain configuration: `farmer_factory/domains/README.md`
-
-**For Claude Code instructions:**
-- Master file: `.claude/CLAUDE.md`
-- Project roadmap: `.claude/ROADMAP.md`
-
----
-
-*These documents are design references. For code-level docs, see module READMEs.*
+- `../../farmer_factory/structure/SCHEMA.md`
+- `../../farmer_factory/structure/DATA_DICTIONARY.md`
+- `../../farmer_factory/prepare/PREPROCESSING.md`
+- `../../farmer_factory/domains/README.md`

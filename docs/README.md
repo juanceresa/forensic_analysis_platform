@@ -1,107 +1,36 @@
-# Documentation Index
+# Docs Index
 
-> **Last Updated:** 2026-01-28
+Public documentation for Civic Table.
 
-Complete documentation map for the Civic Table platform.
+## Start Here
 
----
+- `../README.md`: top-level project overview and quick start
+- `CLI_USAGE.md`: command reference for `farmer_factory.cli`
 
-## For Claude Code
+## Architecture
 
-Start here if you're using Claude Code:
-- **`.claude/CLAUDE.md`** - Master instructions and navigation
-- **`.claude/ROADMAP.md`** - Project roadmap and phases
+- `architecture/ARCHITECTURE.md`: system architecture and data flow
+- `architecture/SECURITY.md`: security model and operational controls
+- `architecture/DOMAIN_CONFIGURATION.md`: domain-driven extraction configuration
+- `architecture/FRONTEND.md`: frontend architecture and UI model
+- `architecture/POSTURING.md`: platform positioning and constraints
+- `architecture/TESTING.md`: testing strategy and coverage model
 
----
+## Operator Guides
 
-## Architecture & Design
+- `guides/ADMIN_GUIDE.md`: operating the platform and case lifecycle
+- `guides/ANALYST_GUIDE.md`: review, verification, and escalation workflow
 
-High-level system design and strategy:
-- **`architecture/ARCHITECTURE.md`** - System design, Air Gap architecture
-- **`architecture/SECURITY.md`** - Authentication, authorization, audit logging
-- **`architecture/POSTURING.md`** - Organizational strategy (Farmer House vs Civic Table)
-- **`architecture/FRONTEND.md`** - UI components and design system
-- **`architecture/TESTING.md`** - Testing strategy and quality assurance
+## Strategy / Vision
 
----
+- `strategy/CIVIC_ARCHITECTURE_VISION.md`: long-range civic/mission framing
 
-## Operational Guides
+## Test Reporting
 
-User-facing documentation for platform operators:
-- **`guides/ADMIN_GUIDE.md`** - System administration and case management
-- **`guides/ANALYST_GUIDE.md`** - Analyst verification workflow
+- `testing/relation-extraction-test-results.md`: extraction quality observations
 
----
+## Public vs Local Notes
 
-## Module Documentation
-
-Implementation-level documentation:
-
-### Extract Module (`farmer_factory/extract/`)
-- **`README.md`** - Module overview, usage examples
-- **`PROMPTS.md`** - LLM extraction prompts (canonical reference)
-
-### Structure Module (`farmer_factory/structure/`)
-- **`README.md`** - Graph construction and entity deduplication
-- **`SCHEMA.md`** - Complete JSON/Pydantic schema specification
-- **`DATA_DICTIONARY.md`** - Field-level reference
-- **`INTEGRATION.md`** - Integration guide
-
-### Prepare Module (`farmer_factory/prepare/`)
-- **`README.md`** - Module overview
-- **`PREPROCESSING.md`** - Image processing pipeline details
-
----
-
-## Recent Changes
-
-Context for recent updates in this session:
-- Preprocessing now defaults to the TYPED path unless triage is explicitly enabled.
-  - Added an `enable_triage` flag to `PreprocessingPipeline` (default `False`).
-  - Added safety checks: empty images raise errors; RGB images convert to grayscale.
-  - Added a near-blank page check in triage to avoid misrouting blank pages as handwritten.
-  - Updated tests for the new default and added empty/RGB cases.
-  - Docs clarify triage is disabled by default.
-- Narrative generation redesigned as batch per-case processing (2026-01-28). Produces `case_narrative.json` during Factory processing with per-period narratives and case summary. Old on-demand API removed.
-- Knowledge graph supports multiple relations between the same nodes (multi-edge).
-- Extraction now passes document dates into relation temporal fallbacks and skips invalid relation types without dropping valid ones.
-- Graph export format is unified on `nodes` + `links`, with metadata carrying verification distribution, entity type summary, and date range.
-- Processing now persists extraction flags, validates extraction payloads, and validates exported `graph_data.json`.
-- CLI validate now runs schema checks; `process` supports `--skip-validation`.
-- Preprocessing triage is disabled by default; it can be enabled via `PreprocessingPipeline(enable_triage=True)`.
-- Handwritten Vision extraction is mocked right now (`farmer_factory/extract/vision.py`).
-
----
-
-## Implementation Plans
-
-Dated design and implementation documents:
-- **`plans/`** - All implementation plans (YYYY-MM-DD-feature-name.md)
-
-Recent plans:
-- `2026-01-25-documentation-reorganization.md`
-- `2026-01-25-extract-module-refactor.md`
-- `2026-01-24-dedupe-entity-resolution-plan.md`
-
----
-
-## CLI Usage
-
-- **`CLI_USAGE.md`** - Command-line interface reference
-
----
-
-## Navigation Tips
-
-**Looking for:**
-- **System architecture?** → `architecture/ARCHITECTURE.md`
-- **LLM prompts?** → `farmer_factory/extract/PROMPTS.md`
-- **Schema definitions?** → `farmer_factory/structure/SCHEMA.md`
-- **Image processing?** → `farmer_factory/prepare/PREPROCESSING.md`
-- **Project status?** → `.claude/ROADMAP.md`
-- **Admin operations?** → `guides/ADMIN_GUIDE.md`
-- **Analyst workflow?** → `guides/ANALYST_GUIDE.md`
-
----
-
-*All documentation is now organized by domain. `.claude/` contains only Claude-specific instructions.*
+- Public docs live only under `docs/`
+- Local/private working docs are stored under `.claude/local_docs/`
+- `docs/plans/` and `docs/internal_docx/` are intentionally not part of the public repo
