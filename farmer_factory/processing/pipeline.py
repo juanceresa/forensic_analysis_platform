@@ -10,7 +10,10 @@ try:
     from farmer_factory.prepare import PreprocessingPipeline
 except (ModuleNotFoundError, ImportError):
     import sys
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
     from farmer_factory.prepare import PreprocessingPipeline
 from farmer_factory.extract import (
     ExtractionPipeline,
@@ -25,13 +28,19 @@ from farmer_factory.structure import (
     KnowledgeGraph,
     DedupeEntityResolver,
     GraphBuilder,
-    GraphExporter
+    GraphExporter,
 )
 from farmer_factory.intake import ManifestManager
 from farmer_factory.intake.manifest import load_case_focus
 from farmer_factory.intake.document_groups import load_document_groups
 from farmer_factory.config.settings import settings
-from .helpers import load_pdf_pages, save_extraction_json, save_ocr_text, save_cleaned_text, setup_logging
+from .helpers import (
+    load_pdf_pages,
+    save_extraction_json,
+    save_ocr_text,
+    save_cleaned_text,
+    setup_logging,
+)
 from .exceptions import ProcessingError
 
 logger = logging.getLogger(__name__)
@@ -42,7 +51,7 @@ def process_case(
     base_dir: Path = None,
     single_file: str = None,
     force_typed: bool = False,
-    skip_validation: bool = False
+    skip_validation: bool = False,
 ) -> Dict[str, Any]:
     """
     Process all PDFs in case through complete pipeline.
@@ -68,24 +77,24 @@ def process_case(
         ProcessingError: If any stage fails
     """
     if base_dir is None:
-        base_dir = Path('cases')
+        base_dir = Path("cases")
 
     # 1. Setup paths and logging
     case_dir = base_dir / case_id
     if not case_dir.exists():
         raise ProcessingError(f"Case directory not found: {case_dir}")
 
-    intake_dir = case_dir / 'intake'
-    preprocessed_dir = case_dir / 'preprocessed'
-    extractions_dir = case_dir / 'extractions'
-    output_dir = case_dir / 'output'
+    intake_dir = case_dir / "intake"
+    preprocessed_dir = case_dir / "preprocessed"
+    extractions_dir = case_dir / "extractions"
+    output_dir = case_dir / "output"
 
     # Ensure output directories exist
     preprocessed_dir.mkdir(parents=True, exist_ok=True)
     extractions_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    setup_logging(case_dir / 'processing.log')
+    setup_logging(case_dir / "processing.log")
     logger.info(f"Starting processing for case: {case_id}")
 
     # Load case-level focus configuration (optional)
@@ -106,11 +115,13 @@ def process_case(
         # Check if real APIs should be used
         # Check for Google Cloud credentials
         # gcloud auth saves to default location, doesn't set env var
-        default_creds = Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+        default_creds = (
+            Path.home() / ".config" / "gcloud" / "application_default_credentials.json"
+        )
         use_google_ocr = (
-            bool(os.getenv('GOOGLE_APPLICATION_CREDENTIALS')) or
-            bool(os.getenv('GOOGLE_CLOUD_PROJECT')) or
-            default_creds.exists()
+            bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+            or bool(os.getenv("GOOGLE_CLOUD_PROJECT"))
+            or default_creds.exists()
         )
 
         use_anthropic = bool(settings.anthropic_api_key)
@@ -124,11 +135,11 @@ def process_case(
         extract_pipeline = ExtractionPipeline(
             ocr_service=OCRService(
                 use_real_api=use_google_ocr,
-                credentials_path=None  # Use Application Default Credentials (gcloud auth)
+                credentials_path=None,  # Use Application Default Credentials (gcloud auth)
             ),
             vision_service=VisionExtractionService(api_key=settings.anthropic_api_key),
             llm_service=LLMExtractionService(api_key=settings.anthropic_api_key),
-            validator=SchemaValidator()
+            validator=SchemaValidator(),
         )
     except Exception as e:
         raise ProcessingError(f"Failed to initialize pipelines: {e}")
@@ -154,7 +165,7 @@ def process_case(
         raise ProcessingError(f"Failed to initialize graph builder: {e}")
 
     # 4. Process each PDF
-    pdfs = sorted(intake_dir.glob('*.pdf'))
+    pdfs = sorted(intake_dir.glob("*.pdf"))
 
     # Filter to single file if requested
     if single_file:
@@ -204,6 +215,7 @@ def process_case(
                 # Force TYPED path if requested (for testing OCR)
                 if force_typed:
                     from farmer_factory.prepare import DocumentPath
+
                     preprocessed.path = DocumentPath.TYPED
                     logger.debug(f"Forcing TYPED path for {document_id}")
 
@@ -222,7 +234,7 @@ def process_case(
 
             # Save OCR text as standalone .txt file
             try:
-                ocr_text_path = case_dir / 'ocr' / f"{document_id}.txt"
+                ocr_text_path = case_dir / "ocr" / f"{document_id}.txt"
                 save_ocr_text(extraction.ocr_result, ocr_text_path)
             except Exception as e:
                 logger.warning(f"Failed to save OCR text: {e}")
@@ -230,7 +242,7 @@ def process_case(
             # Save cleaned OCR text if available
             try:
                 if extraction.cleaned_text:
-                    cleaned_path = case_dir / 'ocr_cleaned' / f"{document_id}.txt"
+                    cleaned_path = case_dir / "ocr_cleaned" / f"{document_id}.txt"
                     save_cleaned_text(extraction.cleaned_text, cleaned_path)
             except Exception as e:
                 logger.warning(f"Failed to save cleaned OCR text: {e}")
@@ -238,12 +250,16 @@ def process_case(
             # Translate OCR text if enabled and non-English (local, offline)
             try:
                 if settings.translation_enabled:
-                    ocr_metadata = extraction.ocr_result.metadata if extraction.ocr_result else {}
-                    detected_lang = ocr_metadata.get('language', 'unknown')
+                    ocr_metadata = (
+                        extraction.ocr_result.metadata if extraction.ocr_result else {}
+                    )
+                    detected_lang = ocr_metadata.get("language", "unknown")
 
                     if needs_translation(detected_lang):
                         logger.info(f"    Translating from {detected_lang} via GCP...")
-                        ocr_text = extraction.ocr_result.text if extraction.ocr_result else ""
+                        ocr_text = (
+                            extraction.ocr_result.text if extraction.ocr_result else ""
+                        )
                         translated = translate_text(
                             ocr_text,
                             source_language=detected_lang,
@@ -251,13 +267,17 @@ def process_case(
                         )
 
                         if translated:
-                            translated_dir = case_dir / 'ocr_translated'
+                            translated_dir = case_dir / "ocr_translated"
                             translated_dir.mkdir(parents=True, exist_ok=True)
                             translated_path = translated_dir / f"{document_id}.txt"
-                            translated_path.write_text(translated, encoding='utf-8')
-                            logger.info(f"    Translation saved: {translated_path.name}")
+                            translated_path.write_text(translated, encoding="utf-8")
+                            logger.info(
+                                f"    Translation saved: {translated_path.name}"
+                            )
                         else:
-                            logger.warning("    Translation unavailable (missing GCP credentials?)")
+                            logger.warning(
+                                "    Translation unavailable (missing GCP credentials?)"
+                            )
             except Exception as e:
                 logger.warning(f"Failed to translate OCR text: {e}")
 
@@ -286,13 +306,12 @@ def process_case(
     logger.info("Exporting graph...")
     try:
         exporter = GraphExporter(knowledge_graph=graph)
-        exporter.save(output_dir / 'graph_data.json', factory_version="1.0.0")
+        exporter.save(output_dir / "graph_data.json", factory_version="1.0.0")
     except Exception as e:
         raise ProcessingError(f"Failed to export graph: {e}")
 
     # 5a. Generate/update entity merge files (DRAFT)
     try:
-        from farmer_factory.structure.merge.writer import write_entity_groups, write_cross_type_relations
         from farmer_factory.structure.merge.engine import apply_merges
 
         # Collect dedupe clusters from the resolver's partition results
@@ -304,8 +323,11 @@ def process_case(
         entity_groups_dir = case_dir / "entity_groups"
         if entity_groups_dir.exists() and any(entity_groups_dir.iterdir()):
             try:
-                apply_merges(case_dir, include_drafts=False,
-                            output_path=output_dir / 'graph_data.json')
+                apply_merges(
+                    case_dir,
+                    include_drafts=False,
+                    output_path=output_dir / "graph_data.json",
+                )
                 logger.info("Applied confirmed merges to graph")
             except FileNotFoundError:
                 pass  # No graph yet, skip
@@ -315,7 +337,7 @@ def process_case(
         logger.warning(f"Merge file generation failed (non-fatal): {e}")
 
     # 5b. Save manifest
-    manifest.save_manifest(case_dir / 'manifest.json')
+    manifest.save_manifest(case_dir / "manifest.json")
     logger.info(f"Manifest saved: {case_dir / 'manifest.json'}")
 
     # 5c. Validate export output
@@ -324,8 +346,8 @@ def process_case(
             import json
             from farmer_factory.structure.schema import GraphExport
 
-            graph_file = output_dir / 'graph_data.json'
-            with open(graph_file, 'r', encoding='utf-8') as f:
+            graph_file = output_dir / "graph_data.json"
+            with open(graph_file, "r", encoding="utf-8") as f:
                 export_data = json.load(f)
 
             GraphExport.model_validate(export_data)
@@ -366,7 +388,7 @@ def rebuild_graph(
         Dictionary with processing statistics
     """
     import json
-    from farmer_factory.structure.schema import BaseEntity, Relation
+    from farmer_factory.structure.schema import Relation
 
     if base_dir is None:
         base_dir = Path("cases")
@@ -416,7 +438,9 @@ def rebuild_graph(
                     try:
                         entities.append(entity_cls.model_validate(e_data))
                     except Exception as e:
-                        logger.warning(f"Failed to parse entity in {ext_file.name}: {e}")
+                        logger.warning(
+                            f"Failed to parse entity in {ext_file.name}: {e}"
+                        )
 
             # Reconstruct relations from JSON
             relations = []
@@ -444,7 +468,9 @@ def rebuild_graph(
                 processing_metadata=proc_meta,
             )
             builder.add_extraction(extraction)
-            logger.info(f"  Loaded {ext_file.name}: {len(entities)} entities, {len(relations)} relations")
+            logger.info(
+                f"  Loaded {ext_file.name}: {len(entities)} entities, {len(relations)} relations"
+            )
 
         except Exception as e:
             logger.warning(f"Failed to load {ext_file.name}: {e}")
@@ -461,8 +487,12 @@ def rebuild_graph(
         if entity_groups_dir.exists() and any(entity_groups_dir.iterdir()):
             try:
                 from farmer_factory.structure.merge.engine import apply_merges
-                apply_merges(case_dir, include_drafts=False,
-                            output_path=output_dir / "graph_data.json")
+
+                apply_merges(
+                    case_dir,
+                    include_drafts=False,
+                    output_path=output_dir / "graph_data.json",
+                )
                 logger.info("Applied confirmed merges to graph")
             except FileNotFoundError:
                 pass
@@ -475,6 +505,7 @@ def rebuild_graph(
     if not skip_validation:
         try:
             from farmer_factory.structure.schema import GraphExport
+
             graph_file = output_dir / "graph_data.json"
             with open(graph_file, "r", encoding="utf-8") as f:
                 export_data = json.load(f)
@@ -495,8 +526,13 @@ def rebuild_graph(
 def _get_entity_class(entity_type: str):
     """Get the Pydantic entity class for a given entity type string."""
     from farmer_factory.structure.schema import (
-        Person, Property, Organization, Location, Document,
+        Person,
+        Property,
+        Organization,
+        Location,
+        Document,
     )
+
     return {
         "PERSON": Person,
         "PROPERTY": Property,
@@ -517,13 +553,22 @@ def _generate_merge_files(
     and writes them as DRAFT entity_groups/*.yaml files.
     """
     from collections import defaultdict
-    from farmer_factory.structure.merge.writer import write_entity_groups, write_cross_type_relations
+    from farmer_factory.structure.merge.writer import (
+        write_entity_groups,
+        write_cross_type_relations,
+    )
 
     # Build clusters from builder's merge_log
     # merge_log entries: (absorbed_id, absorbed_name, canonical_id, canonical_name, confidence)
     # Group by canonical_id
     clusters_by_canonical: Dict[str, list] = defaultdict(list)
-    for absorbed_id, absorbed_name, canonical_id, canonical_name, confidence in builder.merge_log:
+    for (
+        absorbed_id,
+        absorbed_name,
+        canonical_id,
+        canonical_name,
+        confidence,
+    ) in builder.merge_log:
         clusters_by_canonical[canonical_id].append(
             (absorbed_id, absorbed_name, confidence)
         )
@@ -575,9 +620,7 @@ def _generate_merge_files(
                 singletons=singletons,
             )
             if clusters:
-                logger.info(
-                    f"Wrote {len(clusters)} merge group(s) for {entity_type}"
-                )
+                logger.info(f"Wrote {len(clusters)} merge group(s) for {entity_type}")
         except Exception as e:
             logger.warning(f"Failed to write {entity_type} merge file: {e}")
 
@@ -593,18 +636,97 @@ def _generate_merge_files(
                 source_name = source_name[0] if source_name else ""
             if isinstance(target_name, list):
                 target_name = target_name[0] if target_name else ""
-            cross_relations.append({
-                "source_id": source,
-                "source_name": str(source_name),
-                "target_id": target,
-                "target_name": str(target_name),
-                "relation_type": edge_data.get("relation_type", ""),
-                "date": edge_data.get("date"),
-                "source": "extraction",
-            })
+            cross_relations.append(
+                {
+                    "source_id": source,
+                    "source_name": str(source_name),
+                    "target_id": target,
+                    "target_name": str(target_name),
+                    "relation_type": edge_data.get("relation_type", ""),
+                    "date": edge_data.get("date"),
+                    "source": "extraction",
+                }
+            )
 
     if cross_relations:
         try:
             write_cross_type_relations(case_dir, cross_relations)
         except Exception as e:
             logger.warning(f"Failed to write cross-type relations: {e}")
+
+    # Collect flagged family/succession relations for analyst review
+    try:
+        _collect_flagged_relations(case_dir, graph)
+    except Exception as e:
+        logger.warning(f"Failed to collect flagged relations: {e}")
+
+
+def _collect_flagged_relations(
+    case_dir: Path,
+    graph: "KnowledgeGraph",
+) -> None:
+    """Collect PERSON-PERSON family/succession relations for analyst review.
+
+    Reads flagged relation types from domain config (category=family or succession
+    where both source and target are PERSON). Falls back to a hardcoded set.
+    Writes results to entity_groups/relation_review.yaml.
+    """
+    from farmer_factory.structure.merge.writer import write_relation_review
+    from farmer_factory.domains import domain_registry
+
+    # Determine which relation types to flag
+    flagged_types: set[str] = set()
+    try:
+        if domain_registry.is_active:
+            for name, cfg in domain_registry.active.relation_types.items():
+                if (
+                    cfg.category in ("family", "succession")
+                    and "PERSON" in cfg.source_types
+                    and "PERSON" in cfg.target_types
+                ):
+                    flagged_types.add(name)
+    except Exception:
+        pass
+
+    if not flagged_types:
+        flagged_types = {"SPOUSE_OF", "CHILD_OF", "HEIR_OF", "RELATED_TO"}
+
+    # Collect matching edges from graph
+    flagged_relations: list[dict] = []
+    for source, target, _key, edge_data in graph.graph.edges(keys=True, data=True):
+        rel_type = edge_data.get("relation_type", "")
+        if rel_type not in flagged_types:
+            continue
+
+        source_type = graph.graph.nodes[source].get("entity_type", "")
+        target_type = graph.graph.nodes[target].get("entity_type", "")
+        if source_type != "PERSON" or target_type != "PERSON":
+            continue
+
+        source_name = graph.graph.nodes[source].get("name", "")
+        target_name = graph.graph.nodes[target].get("name", "")
+        if isinstance(source_name, list):
+            source_name = source_name[0] if source_name else ""
+        if isinstance(target_name, list):
+            target_name = target_name[0] if target_name else ""
+
+        flagged_relations.append(
+            {
+                "source_id": source,
+                "source_name": str(source_name),
+                "target_id": target,
+                "target_name": str(target_name),
+                "relation_type": rel_type,
+                "date": edge_data.get("date"),
+                "document_id": edge_data.get("extracted_from", ""),
+                "evidence": edge_data.get("evidence", ""),
+            }
+        )
+
+    if flagged_relations:
+        write_relation_review(case_dir, flagged_relations)
+        logger.info(
+            f"Flagged {len(flagged_relations)} family/succession relations for review"
+        )
+    else:
+        logger.info("No family/succession relations to flag for review")

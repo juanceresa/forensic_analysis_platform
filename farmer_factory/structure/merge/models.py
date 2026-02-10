@@ -151,3 +151,33 @@ class CrossTypeRelationsFile(BaseModel):
                         "Top-level status is CONFIRMED but a relation is DRAFT"
                     )
         return self
+
+
+# ============================================================================
+# Relation Review Models (for analyst review of flagged relations)
+# ============================================================================
+
+RelationReviewStatus = Literal["DRAFT", "CONFIRMED", "REJECTED"]
+
+
+class RelationReviewEntry(BaseModel):
+    """A flagged relation requiring analyst review."""
+
+    source_id: str
+    source_name: str
+    target_id: str
+    target_name: str
+    relation_type: str
+    date: Optional[str] = None
+    document_id: str = ""
+    evidence: str = ""
+    status: RelationReviewStatus = "DRAFT"
+    review_reason: str = ""
+
+
+class RelationReviewFile(BaseModel):
+    """Top-level model for relation_review.yaml."""
+
+    status: RelationReviewStatus = "DRAFT"
+    extractions_hash: str = ""
+    relations: List[RelationReviewEntry] = Field(default_factory=list)

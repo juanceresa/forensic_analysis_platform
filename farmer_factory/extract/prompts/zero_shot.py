@@ -128,6 +128,8 @@ RULES:
 - Preserve Spanish names exactly
 - Use null for missing fields, [] for empty lists
 - Family relationships: look for "hijo de", "casado con", "esposa de"
+- Entity fields like spouse, mother, father are informational attributes from text.
+  They do NOT create relation assertions — relations are extracted separately.
 - confidence: 0.0-1.0 based on text clarity
 
 Document: {document_id} | Type: {document_type} | OCR: {quality_desc}
@@ -194,6 +196,16 @@ RULES:
 - Only extract explicit relationships from text
 - temporal.date_precision: "exact", "month", "year", "decade", "unknown"
 - If no relations found, return empty array
+
+FAMILY RELATION RULES (STRICT):
+- SPOUSE_OF: Only extract when text explicitly names BOTH parties as married
+  to each other (e.g., "casado con Elena", "esposa de Mario"). The word
+  "casado/casada" alone describes marital STATUS, it does NOT identify the spouse.
+- CHILD_OF / PARENT_OF: Only when text explicitly names both parent and child
+  (e.g., "hijo de Juan García", "madre: Maria López")
+- HEIR_OF: Only when text explicitly names both the decedent and the heir
+- Never infer family relationships from co-occurrence in a document
+- Never infer relationships from entity-level attributes (spouse field, etc.)
 
 Document: {document_id}
 

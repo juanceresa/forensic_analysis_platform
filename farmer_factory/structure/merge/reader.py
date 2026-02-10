@@ -66,6 +66,29 @@ def read_cross_type_relations(case_dir: Path) -> Optional[CrossTypeRelationsFile
     return CrossTypeRelationsFile.model_validate(data)
 
 
+def read_relation_review(case_dir: Path):
+    """Read and validate the relation review file.
+
+    Args:
+        case_dir: Path to case directory.
+
+    Returns:
+        RelationReviewFile if file exists, None otherwise.
+    """
+    from .models import RelationReviewFile
+
+    filepath = case_dir / "entity_groups" / "relation_review.yaml"
+    if not filepath.exists():
+        return None
+
+    with open(filepath) as f:
+        data = yaml.safe_load(f)
+    if data is None:
+        return None
+
+    return RelationReviewFile.model_validate(data)
+
+
 def get_confirmed_merges(
     case_dir: Path, include_drafts: bool = False
 ) -> Dict[str, str]:

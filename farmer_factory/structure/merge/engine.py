@@ -131,6 +131,9 @@ def apply_merges(
     if dropped:
         logger.info(f"Removed {dropped} links with dangling entity references")
 
+    # Apply relation rejections from analyst review
+    links = _apply_relation_rejections(case_dir, links, full_merge_map)
+
     # Recompute metadata to reflect merged state
     metadata = _recompute_metadata(metadata, nodes, links)
 
@@ -334,3 +337,80 @@ def _recompute_metadata(
     metadata["verification_distribution"] = dict(verification_dist)
 
     return metadata
+
+
+def _apply_relation_rejections(
+    case_dir: Path,
+    links: List[Dict[str, Any]],
+    merge_map: Dict[str, str],
+) -> List[Dict[str, Any]]:
+    """Remove relations that analysts have REJECTED in relation_review.yaml.
+
+    Handles symmetric relations (e.g., SPOUSE_OF) by building unordered keys
+    so rejecting A->B also catches B->A.
+    """
+    from .reader import read_relation_review
+
+    review_file = read_relation_review(case_dir)
+    if review_file is None:
+        return links
+
+    rejected = [r for r in review_file.relations if r.status == "REJECTED"]
+    if not rejected:
+        return links
+
+    # Determine which relation types are symmetric from domain config
+    symmetric_types: set[str] = set()
+    try:
+        from farmer_factory.domains import domain_registry
+
+        if domain_registry.is_active:
+            for name, cfg in domain_registry.active.relation_types.items():
+                if cfg.symmetric:
+                    symmetric_types.add(name)
+    except Exception:
+        pass
+
+    # Build rejection key sets (both original and merge-mapped variants)
+    symmetric_rejections: set[tuple[frozenset, str]] = set()
+    directional_rejections: set[tuple[str, str, str]] = set()
+
+    for entry in rejected:
+        rel_type = entry.relation_type
+        sid = entry.source_id
+        tid = entry.target_id
+        mapped_sid = merge_map.get(sid, sid)
+        mapped_tid = merge_map.get(tid, tid)
+
+        if rel_type in symmetric_types:
+            symmetric_rejections.add((frozenset({sid, tid}), rel_type))
+            symmetric_rejections.add((frozenset({mapped_sid, mapped_tid}), rel_type))
+        else:
+            directional_rejections.add((sid, tid, rel_type))
+            directional_rejections.add((mapped_sid, mapped_tid, rel_type))
+
+    # Filter links
+    filtered: list[Dict[str, Any]] = []
+    removed = 0
+    for link in links:
+        source = link["source"]
+        target = link["target"]
+        rel_type = link.get("relation_type", "")
+
+        is_rejected = False
+        if rel_type in symmetric_types:
+            if (frozenset({source, target}), rel_type) in symmetric_rejections:
+                is_rejected = True
+        else:
+            if (source, target, rel_type) in directional_rejections:
+                is_rejected = True
+
+        if is_rejected:
+            removed += 1
+        else:
+            filtered.append(link)
+
+    if removed:
+        logger.info(f"Removed {removed} analyst-rejected relations")
+
+    return filtered
