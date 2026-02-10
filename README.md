@@ -1,136 +1,152 @@
 # Civic Table
 
-Forensic document intelligence platform for provenance-first case reconstruction.
+**Turn degraded archival documents into structured evidence.**
 
-Civic Table turns messy archival records into a structured evidence graph, timeline, and analyst-facing narrative while preserving verification posture:
+Civic Table is a forensic document intelligence platform that extracts entities, relationships, and timelines from historical records — then presents them as an interactive evidence graph with full provenance tracking.
 
-- `TIER_3_AI`: machine-generated extraction/analysis
-- `TIER_2_ANALYST`: human-reviewed
-- `TIER_1_CERTIFIED`: credentialed legal certification
+Built for families pursuing property restitution claims, researchers working with degraded archives, and anyone who needs to reconstruct a documentary record where the paper trail is fragmented, multilingual, and decades old.
 
-## Why This Exists
+<!-- TODO: Add screenshot of Vault UI (dashboard, graph view, or timeline) -->
+<!-- ![Civic Table — Case Dashboard](docs/assets/screenshot-dashboard.png) -->
 
-Most "document AI" stacks optimize for summarization speed.
-This project optimizes for evidentiary traceability:
+## The Problem
 
-- where each claim came from
-- how entities were inferred and merged
-- what is still uncertain
+A family has a box of 60-year-old scanned documents — deeds, wills, confiscation orders — in faded Spanish with OCR errors. They need to prove who owned what, when, and how ownership transferred. No existing tool does this without losing the chain of evidence.
 
-The system is built around legal/audit-oriented workflows, not chatbot-style output.
+## What Civic Table Does
 
-## System Architecture
+1. **Ingests** scanned PDFs through OCR with LLM-powered text cleanup
+2. **Extracts** people, properties, organizations, locations, and their relationships using Claude
+3. **Builds** a knowledge graph with ML-powered entity deduplication and analyst-controlled merge workflows
+4. **Generates** AI narratives, per-entity descriptions, document analyses, and a forensic PDF dossier
+5. **Presents** everything in a read-only web interface with verification tiers on every data point
 
-Two-zone architecture:
+Every extracted fact carries a verification tier:
 
-- `farmer_factory/`: processing zone (OCR, extraction, graph construction, narrative generation)
-- `farmer_vault/`: read-only delivery zone (Next.js viewer + APIs)
+| Tier | Meaning |
+|------|---------|
+| `TIER_3_AI` | Machine-extracted, unverified |
+| `TIER_2_ANALYST` | Human-reviewed and confirmed |
+| `TIER_1_CERTIFIED` | Legally certified by external body |
 
-Data flow is one-way: Factory -> Vault.
+Nothing is presented as truth until a human says it is.
 
-## Core Capabilities
+## Architecture
 
-- OCR ingestion + cleaned OCR text generation
-- entity extraction across `PERSON`, `PROPERTY`, `ORGANIZATION`, `LOCATION`, `DOCUMENT`
-- relation extraction + orphan relation recovery
-- graph build/export (`graph_data.json`)
-- analyst-controlled merge workflow with YAML review files
-- narrative/timeline generation with inline entity linking
-- document-level AI analysis (`document_analyses.json`)
-- dossier PDF generation
+Two-zone, air-gapped design. Processing and presentation are fully separated.
 
-## Public Repo Data Policy
-
-This public repository does **not** include real client/family case files.
-
-- real case data lives under local `cases/` (git-ignored)
-- secrets stay in `.env` / `.env.local` (git-ignored)
-- committed demo records under `examples/demo_case/` are synthetic
-
-Before publishing this repository (or new history) run:
-
-```bash
-bash scripts/check_public_readiness.sh
+```text
+farmer_factory/  (Python)          farmer_vault/  (Next.js)
+─────────────────────────          ──────────────────────────
+PDF Intake                         Case Dashboard
+  -> Image Preprocessing           Entity Browser
+  -> OCR (Google Cloud Vision)     Document Viewer (OCR + cleaned text)
+  -> LLM Text Cleanup (Haiku)     Knowledge Graph (force-directed)
+  -> Entity Extraction (Haiku)     Scroll-Driven Timeline
+  -> Relation Extraction           AI Narrative Explorer
+  -> Graph Build + Dedup           Forensic Dossier Download
+  -> JSON Export ──────────────>   Read-Only API Layer
 ```
 
-## Fast Local Demo
+Data flows one direction: Factory produces JSON artifacts, Vault consumes them. Clients never touch the processing zone.
 
-From repository root:
+## Tech Stack
+
+**Factory (Python):** Pydantic, NetworkX, Google Cloud Vision, Anthropic Claude API, dedupe (ML entity resolution)
+
+**Vault (Next.js):** TypeScript, Tailwind CSS, shadcn/ui, react-force-graph-2d
+
+**Infrastructure:** Domain-configurable (swap entity types and extraction prompts via YAML), case-level focus configuration, LaTeX dossier generation via XeLaTeX
+
+## Quick Start
 
 ```bash
-# Python env (Factory)
+# Clone and set up Python environment
+git clone https://github.com/juanceresa/forensic_analysis_platform.git
+cd forensic_analysis_platform
 python3 -m venv venv
 source venv/bin/activate
 pip install -r farmer_factory/requirements.txt
 
-# Install synthetic demo case data into local /cases
+# Install synthetic demo case
 bash scripts/install_demo_case.sh
 
-# Start Vault UI
+# Start the Vault UI
 cd farmer_vault
 npm install
 npm run dev
 ```
 
-Open:
+Open `http://localhost:3000` — the app auto-selects the demo case.
 
-`http://localhost:3000`
-
-The app auto-selects an available local case and prefers `DEMO-SYNTHETIC`.
-
-## Factory CLI
+## Processing Pipeline (CLI)
 
 ```bash
-# Create a new case
-python -m farmer_factory.cli create-case --id MY-CASE --name "My Case" --family "Family Name"
+# Create a case and add PDFs to cases/MY-CASE/intake/
+python3 -m farmer_factory.cli create-case --id MY-CASE --name "My Case" --family "Family"
 
-# End-to-end processing
-python -m farmer_factory.cli process MY-CASE
+# Run the full extraction pipeline (OCR -> cleanup -> extraction -> graph)
+python3 -m farmer_factory.cli process MY-CASE
 
-# Graph cleanup / authority workflows
-python -m farmer_factory.cli resolve-orphans MY-CASE
-python -m farmer_factory.cli apply-merges MY-CASE
+# Post-processing: resolve orphan relations, review merges, apply
+python3 -m farmer_factory.cli resolve-orphans MY-CASE
+python3 -m farmer_factory.cli apply-merges MY-CASE
 
-# AI analysis outputs
-python -m farmer_factory.cli analyze MY-CASE
-python -m farmer_factory.cli generate-analyses MY-CASE
-python -m farmer_factory.cli generate-descriptions MY-CASE
-python -m farmer_factory.cli generate-narrative MY-CASE
+# Generate AI analysis (runs on the cleaned graph, not during processing)
+python3 -m farmer_factory.cli analyze MY-CASE
+
+# Generate forensic PDF dossier
+python3 -m farmer_factory.cli generate-dossier MY-CASE \
+  --property-id <PROPERTY_ENTITY_ID> \
+  --family-member-id <PERSON_ENTITY_ID>
 ```
 
 ## Repository Layout
 
 ```text
-farmer_factory/                Python pipeline + CLI
-farmer_vault/                  Next.js viewer + API layer
-examples/demo_case/            Synthetic public demo data template
-scripts/install_demo_case.sh   One-command local demo installer
+farmer_factory/                Python processing pipeline + CLI
+  domains/configs/             Domain configurations (entity types, relation types, prompts)
+  extract/                     LLM entity/relation extraction
+  narrative/                   AI narrative, descriptions, document analysis generation
+  structure/                   Graph construction, dedup, merge engine
+  dossier/                     LaTeX PDF dossier generator
+farmer_vault/                  Next.js read-only viewer + API layer
 tests/                         Python test suite
-docs/architecture/             Domain, frontend, security, and system docs
+docs/                          Architecture, security, frontend, and operational docs
+examples/demo_case/            Synthetic demo data
 ```
+
+## Key Design Decisions
+
+- **Verification tiers are not optional.** Every node and edge in the graph carries provenance metadata. The UI enforces this visually — unverified data is always labeled.
+- **Entity merges require human review.** The system suggests merges via ML deduplication, but an analyst must confirm them in YAML authority files before they take effect.
+- **AI analysis is separated from extraction.** The `process` command builds a raw graph. AI narratives and descriptions are generated later on the cleaned graph, so you don't burn credits on output you'll throw away during merge review.
+- **Domain-configurable.** Entity types, relation types, and extraction prompts are defined in YAML, not hardcoded. The current domain is Cuban property restitution; the architecture supports genealogy, academic research, investigative journalism, or any documentary recovery domain.
+
+## Data Policy
+
+This repository does **not** contain real client or family case data.
+
+- Case data lives under `cases/` (git-ignored)
+- Secrets stay in `.env` / `.env.local` (git-ignored)
+- Demo data under `examples/demo_case/` is synthetic
 
 ## Documentation
 
-- architecture overview: `docs/architecture/ARCHITECTURE.md`
-- security model: `docs/architecture/SECURITY.md`
-- frontend domain model: `docs/architecture/FRONTEND.md`
-- domain configuration: `docs/architecture/DOMAIN_CONFIGURATION.md`
-
-## Security Notes
-
-- do not commit `.env` or real case data
-- use a strong `VAULT_PASSWORD`
-- use a strong `VAULT_SESSION_SECRET` (used for signed session cookies)
-- if exposing beyond localhost, run Vault with `NODE_ENV=production` so auth cookies are `secure`
-- treat `TIER_3_AI` as non-authoritative until human review
-
-See `SECURITY.md` for reporting and hardening policy.
+- [System Architecture](docs/architecture/ARCHITECTURE.md)
+- [Domain Configuration](docs/architecture/DOMAIN_CONFIGURATION.md)
+- [Frontend Architecture](docs/architecture/FRONTEND.md)
+- [Security Model](docs/architecture/SECURITY.md)
+- [CLI Usage Guide](docs/CLI_USAGE.md)
+- [Analyst Guide](docs/guides/ANALYST_GUIDE.md)
+- [Admin Guide](docs/guides/ADMIN_GUIDE.md)
 
 ## License
 
-AGPL-3.0-only (`LICENSE`)
+AGPL-3.0-only — see [LICENSE](LICENSE)
 
 ## Author
 
-Juan Ceresa  
-GitHub: `@juanceresa`
+**Juan Ceresa** — [@juanceresa](https://github.com/juanceresa)
+
+Built at the intersection of civic infrastructure, AI, and documentary recovery. Methodology developed at the Farmer House Democratic Repair Lab at Huston-Tillotson University.
